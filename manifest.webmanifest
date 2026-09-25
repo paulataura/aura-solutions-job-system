@@ -1,0 +1,9 @@
+{
+  "name": "Aura Solutions Work System",
+  "short_name": "Aura Solutions",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f3",
+  "theme_color": "#ffffff",
+  "description": "Aura Solutions job management work system"
+}
