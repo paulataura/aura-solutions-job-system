@@ -1985,3 +1985,20 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.service
 </script>
 
                                                                                                        <!-- v32.43 dashboard category filter reliability --><script>(function(){window.dashboardCategoryFilter=function(category){if(!activeProfile||!['admin','manager','company_user'].includes(activeProfile.role))return;if(typeof setCentreMode==='function')setCentreMode('jobs');jobCentreView='active';var values={active:'all',draft:'draft',in_progress:'in_progress',returned:'returned'},filter=el('jobStatusFilter');if(filter)filter.value=values[category]||'all';document.querySelectorAll('#jobTabs .tabbtn').forEach(function(b){b.classList.toggle('active',b.dataset.view==='active');});if(typeof renderJobCentre==='function')renderJobCentre();var panel=document.getElementById('jobCentrePanel');if(panel)panel.scrollIntoView({behavior:'smooth',block:'start'});};})();</script>
+
+<script>
+(function(){
+ var oldPrint=window.printJobCard;
+ if(!oldPrint)return;
+ window.printJobCard=async function(){
+  var visitResult=await db.from('job_visits').select('waste_removed,waste_transfer_note_number,waste_description,waste_type,waste_ewc_code,ewc_code,waste_quantity_value,waste_quantity_unit,waste_quantity,disposal_site,transfer_note').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);
+  var visit=visitResult.data&&visitResult.data[0];
+  if(visit&&visit.waste_removed){
+   try{await ensureSavedWtn(activeJob.id);var refreshed=await db.from('job_visits').select('waste_removed,waste_transfer_note_number,waste_description,waste_type,waste_ewc_code,ewc_code,waste_quantity_value,waste_quantity_unit,waste_quantity,disposal_site,transfer_note').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);visit=refreshed.data&&refreshed.data[0]||visit;}catch(e){alert('The WTN could not be created: '+(e.message||String(e)));return;}
+  }
+  var originalOpen=window.open;
+  window.open=function(){var child=originalOpen.apply(this,arguments);if(child&&child.document){var originalWrite=child.document.write.bind(child.document);child.document.write=function(html){if(visit&&visit.waste_removed){var quantity=[visit.waste_quantity_value,visit.waste_quantity_unit].filter(Boolean).join(' ')||visit.waste_quantity||'—';var block='<section class="section"><div class="bar"><span class="ico">♻</span>Waste Transfer Note</div><div class="grid2"><div class="cell"><div class="key">WTN number</div><div class="val">'+esc(visit.waste_transfer_note_number||'—')+'</div></div><div class="cell"><div class="key">Waste description</div><div class="val">'+esc(visit.waste_description||visit.waste_type||'—')+'</div></div><div class="cell"><div class="key">EWC / LoW code</div><div class="val">'+esc(visit.waste_ewc_code||visit.ewc_code||'—')+'</div></div><div class="cell"><div class="key">Quantity</div><div class="val">'+esc(quantity)+'</div></div><div class="cell"><div class="key">Disposal site</div><div class="val">'+esc(visit.disposal_site||'—')+'</div></div><div class="cell"><div class="key">Tipping reference</div><div class="val">'+esc(visit.transfer_note||'—')+'</div></div></div></section>';html=html.replace(' <section class="section"><div class="bar"><span class="ico">▤</span>Additional Notes</div>',block+' <section class="section"><div class="bar"><span class="ico">▤</span>Additional Notes</div>');}originalWrite(html);};}return child;};
+  try{await oldPrint();}finally{window.open=originalOpen;}
+ };
+})();
+</script>
