@@ -2082,3 +2082,5 @@ async function save(id){var m=document.getElementById('finalWtnMsg');if(!m)retur
 window.finalWtnRefresh=draw;setInterval(function(){draw().catch(function(e){console.warn(e);});},1200);
 })();
 </script>
+
+<script>(function(){var cache={};document.addEventListener('input',function(e){if(/^finalWtn/.test(e.target.id))cache[e.target.id]=e.target.value;});new MutationObserver(function(){Object.keys(cache).forEach(function(id){var n=document.getElementById(id);if(n&&document.activeElement!==n&&cache[id]!==undefined)n.value=cache[id];});}).observe(document.body,{childList:true,subtree:true});})();</script>
