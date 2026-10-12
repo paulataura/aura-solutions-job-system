@@ -2035,3 +2035,18 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.service
  setInterval(showBottomWtnEditor,800);
 })();
 </script>
+
+<script>
+(function(){
+ async function refreshSingleWtn(){
+  var old=document.getElementById('wtnEditor');if(old)old.remove();
+  if(!activeJob||!activeProfile||!['admin','manager'].includes(activeProfile.role)||!['completed','returned','reviewed','closed'].includes(activeJob.status))return;
+  var q=await db.from('job_visits').select('*').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);var v=q.data&&q.data[0]||{};
+  var desc=v.waste_description||v.waste_type||activeJob.planned_waste_description||'',ewc=v.waste_ewc_code||v.ewc_code||activeJob.planned_ewc_code||'',qty=v.waste_quantity_value??activeJob.planned_waste_quantity??'',unit=v.waste_quantity_unit||activeJob.planned_waste_unit||'';
+  var set=function(id,val){var n=document.getElementById(id);if(n&&(!n.value||String(n.value).trim()===''))n.value=val??'';};
+  set('bottomWtnDescription',desc);set('bottomWtnEwc',ewc);set('bottomWtnQty',qty);set('bottomWtnUnit',unit);set('bottomWtnSite',v.disposal_site||'');set('bottomWtnRef',v.transfer_note||'');
+  var n=document.getElementById('bottomWtnNumber');if(n&&v.waste_transfer_note_number)n.value=v.waste_transfer_note_number;
+ }
+ setInterval(function(){refreshSingleWtn().catch(function(e){console.warn('WTN refresh failed',e);});},1500);
+})();
+</script>
