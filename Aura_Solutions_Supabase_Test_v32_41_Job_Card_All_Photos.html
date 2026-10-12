@@ -2002,3 +2002,22 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.service
  };
 })();
 </script>
+
+<script>
+(function(){
+ async function renderWtnEditor(){
+  if(!activeJob||!['admin','manager'].includes(activeProfile?.role))return;
+  var host=document.getElementById('managementReviewSection');if(!host)return;
+  var old=document.getElementById('wtnEditor');if(old)old.remove();
+  var q=await db.from('job_visits').select('*').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);var v=q.data&&q.data[0]||{};
+  var box=document.createElement('div');box.id='wtnEditor';box.className='card';box.style.marginTop='14px';
+  box.innerHTML='<h2>Waste Transfer Note</h2><p class="muted">Review or correct the WTN details here. Saving will create the WTN number and update the job card.</p><div class="two"><div class="field"><label>Waste removed?</label><select id="wtnEditRemoved"><option value="false">No</option><option value="true">Yes</option></select></div><div class="field"><label>WTN number</label><input id="wtnEditNumber" readonly></div></div><div id="wtnEditFields"><div class="two"><div class="field"><label>Waste description *</label><input id="wtnEditDescription"></div><div class="field"><label>EWC / LoW code *</label><input id="wtnEditEwc"></div></div><div class="two"><div class="field"><label>Actual quantity *</label><input id="wtnEditQty" type="number" step="0.01" min="0"></div><div class="field"><label>Unit *</label><select id="wtnEditUnit"><option value="">Select unit</option><option>tonnes</option><option>kg</option><option>litres</option><option>m3</option><option>bags</option><option>items</option></select></div></div><div class="two"><div class="field"><label>Disposal site</label><input id="wtnEditSite"></div><div class="field"><label>Tipping ticket / transfer reference</label><input id="wtnEditRef"></div></div></div><button class="btn primary" type="button" onclick="saveWtnEditor()">Save WTN details</button><div id="wtnEditMsg" style="margin-top:10px"></div>';
+  host.appendChild(box);
+  el('wtnEditRemoved').value=String(!!v.waste_removed);el('wtnEditNumber').value=v.waste_transfer_note_number||'Will be generated when saved';el('wtnEditFields').classList.toggle('hidden',!v.waste_removed);
+  el('wtnEditDescription').value=v.waste_description||v.waste_type||'';el('wtnEditEwc').value=v.waste_ewc_code||v.ewc_code||'';el('wtnEditQty').value=v.waste_quantity_value??'';el('wtnEditUnit').value=v.waste_quantity_unit||'';el('wtnEditSite').value=v.disposal_site||'';el('wtnEditRef').value=v.transfer_note||'';
+  el('wtnEditRemoved').onchange=function(){el('wtnEditFields').classList.toggle('hidden',this.value!=='true');};
+ }
+ window.saveWtnEditor=async function(){var msg=el('wtnEditMsg');msg.innerHTML='<div class="muted">Saving WTN details…</div>';try{var visitId=await getLatestVisitId(),removed=el('wtnEditRemoved').value==='true',payload={waste_removed:removed,updated_at:new Date().toISOString()};if(removed){var desc=el('wtnEditDescription').value.trim(),ewc=el('wtnEditEwc').value.trim(),qty=Number(el('wtnEditQty').value),unit=el('wtnEditUnit').value;if(!desc||!ewc||!Number.isFinite(qty)||qty<=0||!unit)throw new Error('Complete waste description, EWC code, quantity and unit.');Object.assign(payload,{waste_description:desc,waste_type:desc,waste_ewc_code:ewc,ewc_code:ewc,waste_quantity_value:qty,waste_quantity_unit:unit,waste_quantity:qty+' '+unit,disposal_site:el('wtnEditSite').value.trim()||null,transfer_note:el('wtnEditRef').value.trim()||null});}var up=await db.from('job_visits').update(payload).eq('id',visitId);if(up.error)throw up.error;if(removed){var n=await ensureSavedWtn(activeJob.id);el('wtnEditNumber').value=n||'Created';}else el('wtnEditNumber').value='Not required';msg.innerHTML='<div class="ok">WTN details saved to the job card.</div>';await loadManagementReview();}catch(error){msg.innerHTML='<div class="err">Could not save WTN details: '+esc(error.message||String(error))+'</div>';}};
+ var oldReview=window.loadManagementReview;window.loadManagementReview=async function(){await oldReview();await renderWtnEditor();};
+})();
+</script>
