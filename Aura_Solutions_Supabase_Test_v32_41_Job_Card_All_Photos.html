@@ -2183,3 +2183,24 @@ setInterval(function(){enhance().catch(function(e){console.warn(e);});},900);
 /* v34 visible build label */
 (function(){document.title='Aura Solutions — Operator Workflow v34';var n=document.querySelector('.brand .muted');if(n)n.textContent='Operator Workflow v34';})();
 </script>
+
+<script>
+/* v35 persistent operator layout cleanup */
+(function(){
+  if(!new URLSearchParams(location.search).has('operator_v2'))return;
+  function clean(){
+    var host=document.getElementById('jobDetail'),panel=document.getElementById('operatorV2Panel');
+    if(!host||!panel)return;
+    Array.from(host.children).forEach(function(node){
+      if(node!==panel)node.style.setProperty('display','none','important');
+    });
+  }
+  clean();
+  new MutationObserver(clean).observe(document.body,{childList:true,subtree:true});
+  setInterval(clean,300);
+})();
+</script>
+<script>
+/* v35 visible build label */
+(function(){document.title='Aura Solutions — Operator Workflow v35';var n=document.querySelector('.brand .muted');if(n)n.textContent='Operator Workflow v35';})();
+</script>
