@@ -8,7 +8,9 @@
 <body>
   <p>Opening the Aura Solutions job system…</p>
   <script>
-    location.replace('./Aura_Solutions_Supabase_Test_v32_41_Job_Card_All_Photos.html' + location.search + location.hash);
+    const params = new URLSearchParams(location.search);
+    if (!params.has('operator_v2')) params.set('operator_v2', '1');
+    location.replace('./Aura_Solutions_Supabase_Test_v32_41_Job_Card_All_Photos.html?' + params.toString() + location.hash);
   </script>
 </body>
 </html>
