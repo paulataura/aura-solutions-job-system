@@ -2134,3 +2134,13 @@ setInterval(function(){enhance().catch(function(e){console.warn(e);});},900);
  var oldRender=renderWorkflow;renderWorkflow=function(){oldRender();if(mgmt())setTimeout(function(){load().then(render).catch(function(e){console.warn('Operator preview',e);});},50);};setInterval(function(){if(mgmt()&&!q('operatorV2Panel'))load().then(render).catch(function(){});},1200);
 })();
 </script>
+<script>
+(function(){
+ var old=window.auraV2Choose;
+ if(!old)return;
+ window.auraV2Choose=async function(input,type,key){
+  await old(input,type,key);
+  if(key==='arrival'&&window.activeJob&&window.db){try{var id=window.activeJob.id,vid=window.getLatestVisitId?await window.getLatestVisitId():null;if(vid)await window.db.from('job_visits').update({arrived_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',vid);}catch(e){console.warn('Arrival gate save failed',e);}}
+ };
+})();
+</script>
