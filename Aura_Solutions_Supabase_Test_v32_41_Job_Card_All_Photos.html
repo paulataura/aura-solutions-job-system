@@ -2204,3 +2204,40 @@ setInterval(function(){enhance().catch(function(e){console.warn(e);});},900);
 /* v35 visible build label */
 (function(){document.title='Aura Solutions — Operator Workflow v35';var n=document.querySelector('.brand .muted');if(n)n.textContent='Operator Workflow v35';})();
 </script>
+
+<script>
+/* v36 restore the preferred legacy operator layout */
+(function(){
+ if(!new URLSearchParams(location.search).has('operator_v2'))return;
+ function clean(){
+  var host=document.getElementById('jobDetail');if(!host)return;
+  var panel=document.getElementById('operatorV2Panel');if(panel)panel.style.setProperty('display','none','important');
+  Array.from(host.children).forEach(function(n){if(n!==panel)n.style.removeProperty('display');});
+  if(host.firstElementChild&&host.firstElementChild.classList.contains('row'))host.firstElementChild.style.setProperty('display','none','important');
+  ['detailIssueInfo','detailRevisit'].forEach(function(id){var n=document.getElementById(id);if(n)n.style.setProperty('display','none','important');});
+  var addr=document.getElementById('detailAddress');
+  if(addr&&!document.getElementById('operatorContacts')){
+   var box=document.createElement('div');box.id='operatorContacts';box.style.cssText='margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#f8faf8';
+   box.innerHTML='<h3 style="margin:0 0 10px">Job contacts</h3><div class="two"><div><b>Site contact</b><div id="operatorSiteContact" class="muted">Not provided</div><div id="operatorSitePhone"></div></div><div><b>Aura contact</b><div class="muted">Aura Solutions</div><a href="tel:01386400001">Call Aura Solutions</a></div></div>';
+   addr.parentNode.insertBefore(box,addr.nextSibling);
+  }
+  var j=window.activeJob;if(j&&document.getElementById('operatorSiteContact')){
+   document.getElementById('operatorSiteContact').textContent=j.site_contact_name||'Not provided';
+   document.getElementById('operatorSitePhone').innerHTML=j.site_contact_phone?'<a href="tel:'+esc(String(j.site_contact_phone))+'">Call '+esc(String(j.site_contact_phone))+'</a>':'';
+  }
+  var input=document.getElementById('arrival_photo');
+  if(input&&!input.dataset.v36){input.dataset.v36='1';input.addEventListener('change',function(){
+   if(!input.files||!input.files.length)return;
+   var old=document.getElementById('v36ArrivalNote');if(old)old.remove();
+   var modal=document.createElement('div');modal.id='v36ArrivalNote';modal.className='v2-modal';modal.innerHTML='<div class="v2-modal-box"><h2>Arrival picture note</h2><p class="muted">Add an optional note about access, the gate or the site condition.</p><textarea id="v36ArrivalText" placeholder="e.g. Arrived at rear gate; access clear"></textarea><div class="actions"><button class="btn light" type="button" id="v36ArrivalSkip">Skip note</button><button class="btn primary" type="button" id="v36ArrivalSave">Save note</button></div></div>';document.body.appendChild(modal);
+   document.getElementById('v36ArrivalSkip').onclick=function(){modal.remove();};
+   document.getElementById('v36ArrivalSave').onclick=function(){var t=document.getElementById('v36ArrivalText').value.trim(),n=document.getElementById('arrival_notes');if(t&&n)n.value=n.value?(n.value+'\\n'+t):t;modal.remove();};
+  });}
+ }
+ clean();new MutationObserver(clean).observe(document.body,{childList:true,subtree:true});setInterval(clean,250);
+})();
+</script>
+<script>
+/* v36 visible build label */
+(function(){document.title='Aura Solutions — Operator Workflow v36';var n=document.querySelector('.brand .muted');if(n)n.textContent='Operator Workflow v36';})();
+</script>
