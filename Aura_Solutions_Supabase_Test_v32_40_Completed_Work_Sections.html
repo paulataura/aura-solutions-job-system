@@ -993,7 +993,7 @@ function viewWtnPdf(){
  const html='<!doctype html><html><head><meta charset="utf-8"><title>Waste Transfer Note</title><style>body{font:14px Arial,sans-serif;color:#18251d;margin:28px}h1{color:#176b3a}table{width:100%;border-collapse:collapse}td{border:1px solid #ccd8ce;padding:9px;vertical-align:top}td:first-child{width:30%;font-weight:bold;background:#f3f7f3}.print{margin-bottom:20px;padding:10px 16px;background:#176b3a;color:white;border:0;border-radius:6px;font-weight:bold}@media print{.print{display:none}}</style></head><body><button class="print" onclick="window.print()">Print / Save as PDF</button><h1>Aura Solutions — Waste Transfer Note</h1><p><b>Job:</b> '+esc(activeJob.job_number)+' &nbsp; <b>Customer:</b> '+esc(activeJob.customers?.company_name||'')+'</p><table>'+rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('')+'</table><p>Transferor signature is captured during job sign-off. Receiver and disposal evidence are completed after tipping.</p></body></html>';
  w.document.open();w.document.write(html);w.document.close();
 }
-function leaveCustomerSite(){
+async function leaveCustomerSite(){
  const management=['admin','manager'].includes(activeProfile?.role), managementCapture=management;
  if(!activeJob||!(activeJob.status==='on_site'||(managementCapture&&['draft','completed'].includes(activeJob.status))))return;
  const waste=el('waste_removed').value;if(!waste){el('siteSignoffMsg').innerHTML='<div class="err">Please select whether waste was removed.</div>';return;}
