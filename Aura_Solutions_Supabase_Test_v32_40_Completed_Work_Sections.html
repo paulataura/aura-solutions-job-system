@@ -72,11 +72,21 @@
 <div id="scopeSectionsPanel" class="card hidden"><h2>Scope sections & reference pictures</h2><div class="muted">Read these saved sections and reference pictures before travelling to site. They describe the work planned for this job.</div><div id="scopeSectionsList"></div></div>
 <div id="arrivalCapture" class="card hidden">
   <h2>Arrive on Site</h2>
-  <p class="muted">Take an arrival photo to prove you are on site. The photo upload time will be used as the official arrival timestamp.</p>
-  <div class="field"><label for="arrival_photo">Mandatory arrival photo</label><input id="arrival_photo" type="file" accept="image/*" onchange="arrivalPhotoChosen()"></div>
-  <div id="arrivalPreview" class="hidden" style="margin:10px 0"><img id="arrivalPreviewImg" alt="Arrival preview" style="max-width:100%;max-height:340px;border-radius:12px;border:1px solid var(--line)"></div>
-  <div class="actions"><button id="confirmArrivalBtn" class="btn primary" type="button" onclick="confirmArrival()" disabled>Confirm Arrival</button></div>
+  <p class="muted">Take or upload one arrival picture. Add a note when prompted, then save to record your arrival and open the job.</p>
+  <div id="arrivalPhotoRequirement" class="notice" style="margin:10px 0;border-color:#d88a86;color:#8d2924;background:#fff0ef">🔴 Arrival picture required</div>
+  <input id="arrival_photo" type="file" accept="image/*" capture="environment" onchange="arrivalPhotoChosen()" style="display:none">
+  <div id="arrivalPreview" class="hidden" style="margin:10px 0"><img id="arrivalPreviewImg" alt="Arrival preview" style="max-width:100%;max-height:240px;border-radius:12px;border:1px solid var(--line)"></div>
+  <div class="actions"><button id="takeArrivalPhotoBtn" class="btn primary" type="button" onclick="beginArrivalPhoto()">📷 Take / Upload Arrival Picture</button></div>
   <div id="arrivalCaptureMsg" style="margin-top:12px"></div>
+</div>
+<div id="arrivalPhotoNoteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="arrivalPhotoNoteTitle">
+  <div class="card" style="max-width:520px;width:calc(100% - 28px);margin:10vh auto">
+    <h2 id="arrivalPhotoNoteTitle">Arrival picture</h2>
+    <p class="muted">Add a note about access or the site condition shown in this picture.</p>
+    <div class="field"><label for="arrivalPhotoNote">Picture note</label><textarea id="arrivalPhotoNote" placeholder="Describe what this picture shows…"></textarea></div>
+    <div class="actions"><button id="saveArrivalPhotoBtn" class="btn primary" type="button" onclick="confirmArrival()">Save Arrival & Open Job</button><button class="btn light" type="button" onclick="cancelArrivalPhoto()">Choose another picture</button></div>
+    <div id="arrivalPhotoNoteMsg" style="margin-top:10px"></div>
+  </div>
 </div>
 <div id="arrivalSection" class="card hidden">
   <h2>Arrival / Site Condition</h2>
@@ -609,8 +619,7 @@ function renderWorkflow(){
  else if(management && activeJob.status==='closed') w.innerHTML='<div class="ok"><b>Closed</b><br>This job is complete and closed.</div>';
  else if(activeJob.status==='aborted') w.innerHTML='<div class="err"><b>Job Aborted</b><br>The normal job workflow is locked. See the abort record below.</div>';
  else if(management && activeJob.contractor_id && ['draft','issued','accepted','on_site','completed'].includes(activeJob.status)) w.innerHTML=contractorLinkControls();
- else if(!management && activeJob.status==='issued') w.innerHTML='<button class="btn primary" onclick="setJobStatus(\'accepted\')">Accept Job</button>';
- else if(!management && activeJob.status==='accepted') w.innerHTML='<button class="btn primary" onclick="beginArrivalPhoto()">Arrive on Site</button>';
+ else if(!management && ['issued','accepted'].includes(activeJob.status)) w.innerHTML='<button class="btn primary" onclick="beginArrivalPhoto()">📷 Take / Upload Arrival Picture</button>';
  else if(!management && activeJob.status==='on_site') w.innerHTML='<div class="ok">You are marked as on site. Complete the arrival section below.</div>';
  else if(!management && activeJob.status==='returned') w.innerHTML='<div class="ok"><b>Job returned to management.</b><br>This job is complete and locked for operative editing.</div>';
  else w.innerHTML='';
@@ -632,29 +641,36 @@ function renderWorkflow(){
 }
 function beginArrivalPhoto(){
  el('arrivalCapture').classList.remove('hidden');
- el('arrivalCaptureMsg').innerHTML='<div class="muted">Take a photo before confirming arrival.</div>';
+ el('arrivalCaptureMsg').innerHTML='';
  setTimeout(()=>el('arrival_photo').click(),100);
 }
 function arrivalPhotoChosen(){
  const f=el('arrival_photo').files&&el('arrival_photo').files[0];
- if(!f){el('confirmArrivalBtn').disabled=true;return;}
+ if(!f){el('arrivalPreview').classList.add('hidden');el('arrivalPhotoNoteModal').classList.add('hidden');return;}
  el('arrivalPreviewImg').src=URL.createObjectURL(f);
  el('arrivalPreview').classList.remove('hidden');
- el('confirmArrivalBtn').disabled=false;
- el('arrivalCaptureMsg').innerHTML='<div class="ok">Photo ready. Confirm Arrival to upload it and record the arrival time.</div>';
+ el('arrivalPhotoNote').value='';
+ el('arrivalPhotoNoteMsg').innerHTML='';
+ el('arrivalPhotoNoteModal').classList.remove('hidden');
+}
+function cancelArrivalPhoto(){
+ el('arrivalPhotoNoteModal').classList.add('hidden');
+ el('arrival_photo').value='';
+ el('arrivalPreview').classList.add('hidden');
 }
 async function confirmArrival(){
- if(!activeJob || activeJob.status!=='accepted') return;
+ if(!activeJob || !['issued','accepted'].includes(activeJob.status)) return;
  const f=el('arrival_photo').files&&el('arrival_photo').files[0];
- if(!f){el('arrivalCaptureMsg').innerHTML='<div class="err">An arrival photo is required.</div>';return;}
- const btn=el('confirmArrivalBtn'); btn.disabled=true;
- el('arrivalCaptureMsg').innerHTML='<div class="upload-loading"><span class="upload-spinner" aria-hidden="true"></span><span>Uploading arrival photo and recording arrival time…</span></div>';
+ if(!f){el('arrivalPhotoNoteMsg').innerHTML='<div class="err">Please take or choose an arrival picture first.</div>';return;}
+ const btn=el('saveArrivalPhotoBtn');btn.disabled=true;
+ el('arrivalPhotoNoteMsg').innerHTML='<div class="upload-loading"><span class="upload-spinner" aria-hidden="true"></span><span>Saving arrival picture and opening job…</span></div>';
  try{
    const ext=(f.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'').toLowerCase()||'jpg';
    const path=`jobs/${activeJob.id}/arrival-${Date.now()}.${ext}`;
    const up=await db.storage.from('job-files').upload(path,f,{contentType:f.type||'image/jpeg',upsert:false});
    if(up.error) throw up.error;
-   const ins=await db.from('job_files').insert({job_id:activeJob.id,file_type:'arrival_photo',file_name:f.name||'arrival-photo.jpg',storage_path:path,uploaded_by:activeSession.user.id}).select('id,created_at').single();
+   const caption=el('arrivalPhotoNote').value.trim();
+   const ins=await db.from('job_files').insert({job_id:activeJob.id,file_type:'arrival_photo',file_name:f.name||'arrival-photo.jpg',storage_path:path,caption:caption||null,uploaded_by:activeSession.user.id}).select('id,created_at').single();
    if(ins.error) throw ins.error;
    const serverArrival=ins.data.created_at;
    const existing=await db.from('job_visits').select('id').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);
@@ -664,11 +680,14 @@ async function confirmArrival(){
    else {({error:visitErr}=await db.from('job_visits').insert({job_id:activeJob.id,arrived_at:serverArrival}));}
    if(visitErr) throw visitErr;
    await persistJobStatus('on_site');
-   el('arrivalCapture').classList.add('hidden'); renderWorkflow(); await loadArrivalNotes();
-   el('detailMsg').innerHTML='<div class="ok">Arrival confirmed. Photo saved and arrival time recorded.</div>';
+   el('arrivalPhotoNoteModal').classList.add('hidden');
+   el('arrivalCapture').classList.add('hidden');
+   el('arrival_photo').value='';
+   renderWorkflow();await loadArrivalNotes();
+   el('detailMsg').innerHTML='<div class="ok">Arrival picture saved. You are now in the job.</div>';
  }catch(err){
    btn.disabled=false;
-   el('arrivalCaptureMsg').innerHTML='<div class="err">Could not confirm arrival: '+esc(err.message||String(err))+'</div>';
+   el('arrivalPhotoNoteMsg').innerHTML='<div class="err">Could not save arrival picture: '+esc(err.message||String(err))+'</div>';
  }
 }
 async function loadArrivalNotes(){
