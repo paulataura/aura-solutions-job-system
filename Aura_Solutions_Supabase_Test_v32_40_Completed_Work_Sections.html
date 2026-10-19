@@ -634,7 +634,7 @@ function toggleOperatorJobDetails(){window.asgOperatorDetailsOpen=!window.asgOpe
 function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWorkOpen;syncStandardOperatorWorkflow();}
 function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
 function syncStandardOperatorWorkflow(){
- const job=activeJob,role=activeProfile?.role,operator=role==='operative',onsite=!!job&&operator&&['on_site','completed'].includes(job.status);
+ const job=activeJob,role=activeProfile?.role,operator=!!role&&!['admin','manager'].includes(role),onsite=!!job&&operator&&['on_site','completed'].includes(job.status);
  if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;}
  const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
  if(group)group.classList.toggle('hidden',onsite&&!window.asgOperatorDetailsOpen);
@@ -642,6 +642,7 @@ function syncStandardOperatorWorkflow(){
  const workBtn=el('toggleCompleteWorkBtn'),workContent=el('completeWorkContent');
  if(workBtn){workBtn.classList.toggle('hidden',!onsite);workBtn.textContent=window.asgCompleteWorkOpen?'Close Complete Work':'Open Complete Work';}
  if(workContent)workContent.classList.toggle('hidden',onsite&&!window.asgCompleteWorkOpen);
+ const siteVisitPanel=el('siteVisitPanel');if(siteVisitPanel&&isSiteVisitJob())siteVisitPanel.classList.toggle('hidden',onsite&&!window.asgCompleteWorkOpen);
  const wasteBtn=el('toggleConfirmWasteBtn'),wasteContent=el('confirmWasteContent');
  if(wasteBtn){wasteBtn.classList.toggle('hidden',!onsite);wasteBtn.textContent=window.asgConfirmWasteOpen?'Close Confirm Waste':'Open Confirm Waste';}
  if(wasteContent)wasteContent.classList.toggle('hidden',onsite&&!window.asgConfirmWasteOpen);
@@ -675,11 +676,11 @@ function renderWorkflow(){
  el('arrivalCapture').classList.toggle('hidden',!showArrivalCapture);
  const siteVisit=isSiteVisitJob();
  const serviceJob=!!serviceChecklistDefinition();el('serviceChecklistPanel').classList.toggle('hidden',!serviceJob||!['on_site','completed','returned','reviewed','closed'].includes(activeJob.status));
- const canComplete=(!management && !siteVisit && ['on_site','completed'].includes(activeJob.status))||(managementCapture&&['draft','issued','accepted','on_site','completed','returned','reviewed'].includes(activeJob.status));
+ const canComplete=(!management && ['on_site','completed'].includes(activeJob.status))||(managementCapture&&['draft','issued','accepted','on_site','completed','returned','reviewed'].includes(activeJob.status));
  el('completionSection').classList.toggle('hidden',!canComplete);
- const canSignoff=(!management && !siteVisit && activeJob.status==='on_site')||(managementCapture&&['draft','on_site','completed'].includes(activeJob.status));
+ const canSignoff=(!management && activeJob.status==='on_site')||(managementCapture&&['draft','on_site','completed'].includes(activeJob.status));
  el('siteSignoffSection').classList.toggle('hidden',!canSignoff);
- const canDispose=(!management && !siteVisit && activeJob.status==='completed')||(managementCapture&&activeJob.status==='completed');
+ const canDispose=(!management && activeJob.status==='completed')||(managementCapture&&activeJob.status==='completed');
  el('disposalSection').classList.toggle('hidden',!canDispose);
  const canAbort=canAbortActiveJob();el('abortSection').classList.toggle('hidden',!canAbort);if(canAbort){el('abort_reason').value='';el('abort_notes').value='';el('abortMsg').innerHTML='';}
  if(canSignoff||canDispose) setTimeout(initSignaturePads,50);
@@ -978,8 +979,9 @@ async function confirmWasteDetails(){
   const work=await db.from('job_visits').select('completion_notes,completion_sections').eq('id',visitId).maybeSingle();if(work.error)throw work.error;
   const sections=Array.isArray(work.data?.completion_sections)?work.data.completion_sections:[];
   if(!String(work.data?.completion_notes||'').trim()&&!sections.length){msg.innerHTML='<div class="err">Complete Work first: save the work summary or completed-work sections.</div>';btn.disabled=false;return;}
-  const pics=await db.from('job_files').select('id').eq('job_id',activeJob.id).eq('file_type','completion_photo');if(pics.error)throw pics.error;
+  const pics=await db.from('job_files').select('id,caption').eq('job_id',activeJob.id).eq('file_type','completion_photo');if(pics.error)throw pics.error;
   if(!(pics.data||[]).length){msg.innerHTML='<div class="err">Complete Work first: upload at least one Job Complete picture with its note.</div>';btn.disabled=false;return;}
+  if((pics.data||[]).some(p=>!String(p.caption||'').trim())){msg.innerHTML='<div class="err">Every Job Complete picture must have a saved note. Add notes to the missing pictures before confirming waste.</div>';btn.disabled=false;return;}
   if(waste==='true')await ensureWtnNumber();
   const payload={waste_removed:waste==='true',waste_type:waste==='true'?el('waste_type').value.trim():null,ewc_code:waste==='true'?el('ewc_code').value.trim():null,waste_quantity:waste==='true'?el('waste_quantity').value.trim():null,waste_hazardous:waste==='true'?(el('waste_hazardous').value==='true'):false,waste_description:waste==='true'?el('waste_description').value.trim():null,waste_ewc_code:waste==='true'?el('waste_ewc_code').value.trim():null,waste_quantity_value:waste==='true'?Number(el('waste_quantity_value').value):null,waste_quantity_unit:waste==='true'?el('waste_quantity_unit').value:null,waste_container_type:waste==='true'?el('waste_container_type').value.trim():null,waste_sic_code:waste==='true'?(el('waste_sic_code').value.trim()||null):null,waste_transfer_location:waste==='true'?el('waste_transfer_location').value.trim():null,waste_transfer_at:waste==='true'?new Date().toISOString():null,waste_transferor_name:waste==='true'?el('waste_transferor_name').value.trim():null,waste_transferor_company:waste==='true'?el('waste_transferor_company').value.trim():null,waste_transferor_address:waste==='true'?(el('waste_transferor_address').value.trim()||null):null,waste_transferor_capacity:waste==='true'?el('waste_transferor_capacity').value:null,waste_transferor_registration:waste==='true'?(el('waste_transferor_registration').value.trim()||null):null,waste_hierarchy_confirmed:waste==='true'?el('waste_hierarchy_confirmed').checked:false,updated_at:new Date().toISOString()};
   const saved=await db.from('job_visits').update(payload).eq('id',visitId);if(saved.error)throw saved.error;
