@@ -119,6 +119,7 @@
 <div id="siteSignoffSection" class="card hidden">
   <div class="row" style="align-items:center"><h2>Confirm Waste & Sign-off</h2><button id="toggleConfirmWasteBtn" class="btn light hidden" type="button" onclick="toggleConfirmWaste()">Open Confirm Waste</button></div><div id="confirmWasteContent" class="hidden">
   <div class="muted" style="margin-bottom:12px">Complete this before leaving the customer site.</div>
+<div id="wasteConfirmFields">
   <div class="field"><label>Was waste removed from site? *</label><select id="waste_removed" onchange="toggleWasteFields()"><option value="">Select Yes or No</option><option value="false">No</option><option value="true">Yes</option></select></div>
   <div id="wasteFields" class="hidden">
     <div class="two"><div class="field"><label>Waste type *</label><input id="waste_type" placeholder="e.g. mixed construction waste"></div><div class="field"><label>EWC code *</label><input id="ewc_code" placeholder="e.g. 17 09 04"></div></div>
@@ -141,17 +142,21 @@
     </div>
     <div class="muted">Disposal-site details are completed later, after the waste has actually been tipped.</div>
   </div>
+</div>
+  <div class="actions"><button id="confirmWasteDetailsBtn" class="btn primary" type="button" onclick="confirmWasteDetails()">Confirm Waste & Create WTN</button><button id="viewWtnPdfBtn" class="btn light hidden" type="button" onclick="viewWtnPdf()">View WTN PDF</button></div>
+  <div id="wasteConfirmMsg" style="margin-top:10px"></div>
+  <div id="customerSignoffFinal" class="hidden">
   <div class="field"><label for="customer_signoff_status">Customer sign-off *</label><select id="customer_signoff_status" onchange="toggleCustomerSignoff()"><option value="signed">Customer present and signs</option><option value="absent">Customer unavailable / absent</option><option value="refused">Customer declined to sign</option></select></div>
   <div id="customerSignatureWrap" class="field"><label>Customer signature *</label><canvas id="customerSig" class="sigpad"></canvas><button class="btn light" type="button" onclick="clearSignature('customerSig')" style="margin-top:7px">Clear customer signature</button></div>
   <div id="customerSignoffExceptionWrap" class="field hidden"><label for="customer_signoff_reason">Record reason / details *</label><textarea id="customer_signoff_reason" placeholder="Record who was contacted, why a signature was unavailable or refused, and any relevant details."></textarea></div>
   <div class="field"><label>Operative signature *</label><canvas id="operativeSig" class="sigpad"></canvas><button class="btn light" type="button" onclick="clearSignature('operativeSig')" style="margin-top:7px">Clear operative signature</button></div>
   <div class="actions"><button class="btn primary" type="button" onclick="leaveCustomerSite()">Submit Completed Job</button></div>
-  <div id="siteSignoffMsg" style="margin-top:12px"></div>
+  <div id="siteSignoffMsg" style="margin-top:12px"></div></div>
 </div></div>
 <div id="disposalSection" class="card hidden">
   <h2>Waste Disposal / Tipping Site</h2>
   <div class="muted" style="margin-bottom:12px">Complete this only after the waste has been tipped at the disposal site.</div>
-  <div class="two"><div class="field"><label>Disposal site *</label><input id="disposal_site"></div><div class="field"><label>Disposal date *</label><input id="disposal_date" type="date"></div></div>
+  <div class="two"><div class="field"><label>Planned disposal site (set by office)</label><input id="disposal_site" readonly aria-readonly="true" title="The planned disposal site is set by the office and cannot be changed here"></div><div class="field"><label>Disposal date *</label><input id="disposal_date" type="date"></div></div>
   <div class="card" style="background:#f8faf8">
     <h2 style="font-size:18px">Waste Transfer Note — Receiver</h2>
     <div class="two"><div class="field"><label>Receiver / transferee name *</label><input id="waste_transferee_name"></div><div class="field"><label>Receiver company *</label><input id="waste_transferee_company"></div></div>
@@ -942,7 +947,7 @@ function clearSignature(id){const c=el(id);if(!c)return;c.getContext('2d').clear
 function signatureData(id){const c=el(id);return c&&sigState[id]?.signed?c.toDataURL('image/png'):null;}
 async function ensureWtnNumber(){if(!activeJob||el('waste_removed').value!=='true')return;try{const visitId=await getLatestVisitId();const q=await db.from('job_visits').select('waste_transfer_note_number').eq('id',visitId).single();let n=q.data?.waste_transfer_note_number;if(!n){const g=await db.rpc('generate_wtn_number');if(g.error)throw g.error;n=g.data;const u=await db.from('job_visits').update({waste_transfer_note_number:n,updated_at:new Date().toISOString()}).eq('id',visitId);if(u.error)throw u.error;}el('wtnNumber').textContent=n||'Pending';}catch(err){el('wtnNumber').textContent='Could not generate';el('siteSignoffMsg').innerHTML='<div class="err">WTN number could not be generated: '+esc(err.message||String(err))+'</div>';}}
 function applyPlannedWasteDefaults(){if(!activeJob)return;if(!el('waste_description').value)el('waste_description').value=activeJob.planned_waste_description||'';if(!el('waste_type').value)el('waste_type').value=activeJob.planned_waste_description||'';if(!el('waste_ewc_code').value)el('waste_ewc_code').value=activeJob.planned_ewc_code||'';if(!el('ewc_code').value)el('ewc_code').value=activeJob.planned_ewc_code||'';if(!el('waste_sic_code').value)el('waste_sic_code').value=activeJob.planned_sic_code||'';if(!el('waste_quantity_value').value&&activeJob.planned_waste_quantity!=null)el('waste_quantity_value').value=activeJob.planned_waste_quantity;if(!el('waste_quantity_unit').value)el('waste_quantity_unit').value=activeJob.planned_waste_unit||'';if(!el('waste_container_type').value)el('waste_container_type').value=activeJob.planned_container_type||'';if(!el('waste_quantity').value&&activeJob.planned_waste_quantity!=null)el('waste_quantity').value=[activeJob.planned_waste_quantity,activeJob.planned_waste_unit].filter(Boolean).join(' ');}
-function toggleWasteFields(){const show=el('waste_removed').value==='true';el('wasteFields').classList.toggle('hidden',!show);if(show){applyPlannedWasteDefaults();if(!el('waste_transfer_location').value)el('waste_transfer_location').value=activeJob?.site_address||'';if(!el('waste_transferor_name').value)el('waste_transferor_name').value=activeProfile?.full_name||'';if(!el('waste_transferor_company').value)el('waste_transferor_company').value=companySettings?.company_name||'AURA SOLUTIONS GROUP LIMITED';if(!el('waste_transferor_address').value)el('waste_transferor_address').value=[companySettings?.business_address,companySettings?.postcode].filter(Boolean).join(', ');if(!el('waste_transferor_registration').value)el('waste_transferor_registration').value=companySettings?.waste_carrier_registration||'';if(!el('waste_transferor_capacity').value)el('waste_transferor_capacity').value='Carrier';ensureWtnNumber();}}
+function toggleWasteFields(){if(window.asgWasteConfirmedForJob===activeJob?.id){window.asgWasteConfirmedForJob=null;el('customerSignoffFinal')?.classList.add('hidden');el('confirmWasteDetailsBtn').textContent='Confirm Waste & Create WTN';el('viewWtnPdfBtn').classList.add('hidden');}const show=el('waste_removed').value==='true';el('wasteFields').classList.toggle('hidden',!show);if(show){applyPlannedWasteDefaults();if(!el('waste_transfer_location').value)el('waste_transfer_location').value=activeJob?.site_address||'';if(!el('waste_transferor_name').value)el('waste_transferor_name').value=activeProfile?.full_name||'';if(!el('waste_transferor_company').value)el('waste_transferor_company').value=companySettings?.company_name||'AURA SOLUTIONS GROUP LIMITED';if(!el('waste_transferor_address').value)el('waste_transferor_address').value=[companySettings?.business_address,companySettings?.postcode].filter(Boolean).join(', ');if(!el('waste_transferor_registration').value)el('waste_transferor_registration').value=companySettings?.waste_carrier_registration||'';if(!el('waste_transferor_capacity').value)el('waste_transferor_capacity').value='Carrier';ensureWtnNumber();}}
 async function loadSiteSignoff(){
  const management=['admin','manager'].includes(activeProfile?.role), managementCapture=management;
  if(!activeJob||!((!management)||managementCapture))return;
@@ -957,6 +962,37 @@ async function toggleCustomerSignoff(){
  if(!signed&&el('customerSig'))clearSignature('customerSig');
  if(signed&&el('customerSig'))setTimeout(()=>initSignaturePads(),50);
 }
+window.asgWasteConfirmedForJob=null;
+async function confirmWasteDetails(){
+ if(!activeJob||activeJob.status!=='on_site')return;
+ const waste=el('waste_removed').value,msg=el('wasteConfirmMsg'),btn=el('confirmWasteDetailsBtn');
+ if(!waste){msg.innerHTML='<div class="err">Please confirm whether waste was removed.</div>';return;}
+ if(waste==='true'&&(!el('waste_type').value.trim()||!el('ewc_code').value.trim()||!el('waste_quantity').value.trim())){msg.innerHTML='<div class="err">Complete the waste type, EWC code and quantity.</div>';return;}
+ if(waste==='true'&&el('waste_hazardous').value==='true'){msg.innerHTML='<div class="err">Hazardous waste requires the hazardous-waste consignment-note process; the digital WTN is for non-hazardous waste.</div>';return;}
+ if(waste==='true'){const miss=['waste_description','waste_ewc_code','waste_quantity_value','waste_quantity_unit','waste_container_type','waste_transfer_location','waste_transferor_name','waste_transferor_company','waste_transferor_capacity'].filter(id=>!String(el(id)?.value||'').trim());if(!el('waste_hierarchy_confirmed').checked)miss.push('waste_hierarchy_confirmed');if(miss.length){markRequired(miss);msg.innerHTML='<div class="err">Complete the highlighted Waste Transfer Note fields.</div>';return;}}
+ btn.disabled=true;msg.innerHTML='<div class="muted">Saving waste confirmation…</div>';
+ try{
+  if(waste==='true')await ensureWtnNumber();
+  const visitId=await getLatestVisitId();
+  const payload={waste_removed:waste==='true',waste_type:waste==='true'?el('waste_type').value.trim():null,ewc_code:waste==='true'?el('ewc_code').value.trim():null,waste_quantity:waste==='true'?el('waste_quantity').value.trim():null,waste_hazardous:waste==='true'?(el('waste_hazardous').value==='true'):false,waste_description:waste==='true'?el('waste_description').value.trim():null,waste_ewc_code:waste==='true'?el('waste_ewc_code').value.trim():null,waste_quantity_value:waste==='true'?Number(el('waste_quantity_value').value):null,waste_quantity_unit:waste==='true'?el('waste_quantity_unit').value:null,waste_container_type:waste==='true'?el('waste_container_type').value.trim():null,waste_sic_code:waste==='true'?(el('waste_sic_code').value.trim()||null):null,waste_transfer_location:waste==='true'?el('waste_transfer_location').value.trim():null,waste_transfer_at:waste==='true'?new Date().toISOString():null,waste_transferor_name:waste==='true'?el('waste_transferor_name').value.trim():null,waste_transferor_company:waste==='true'?el('waste_transferor_company').value.trim():null,waste_transferor_address:waste==='true'?(el('waste_transferor_address').value.trim()||null):null,waste_transferor_capacity:waste==='true'?el('waste_transferor_capacity').value:null,waste_transferor_registration:waste==='true'?(el('waste_transferor_registration').value.trim()||null):null,waste_hierarchy_confirmed:waste==='true'?el('waste_hierarchy_confirmed').checked:false,updated_at:new Date().toISOString()};
+  const saved=await db.from('job_visits').update(payload).eq('id',visitId);if(saved.error)throw saved.error;
+  window.asgWasteConfirmedForJob=activeJob.id;
+  el('customerSignoffFinal').classList.remove('hidden');
+  btn.textContent=waste==='true'?'Waste Confirmed — WTN Created':'Waste Confirmed — No WTN Required';
+  btn.disabled=false;
+  el('viewWtnPdfBtn').classList.toggle('hidden',waste!=='true');
+  msg.innerHTML='<div class="ok">Waste details saved. '+(waste==='true'?'WTN created; review the WTN, then complete sign-off.':'No waste transfer recorded; complete sign-off below.')+'</div>';
+  if(waste==='true')await ensureWtnNumber();
+ }catch(err){btn.disabled=false;msg.innerHTML='<div class="err">Could not confirm waste: '+esc(err.message||String(err))+'</div>';}
+}
+function viewWtnPdf(){
+ const val=id=>String(el(id)?.value||'').trim();
+ if(el('waste_removed').value!=='true'){el('wasteConfirmMsg').innerHTML='<div class="err">A WTN is only available when waste was removed.</div>';return;}
+ const w=window.open('','_blank');if(!w){el('wasteConfirmMsg').innerHTML='<div class="err">Allow pop-ups to view the WTN.</div>';return;}
+ const rows=[['WTN number',val('wtnNumber')],['Waste description',val('waste_description')],['EWC / LoW code',val('waste_ewc_code')],['SIC code',val('waste_sic_code')],['Quantity',val('waste_quantity_value')+' '+val('waste_quantity_unit')],['Container / presentation',val('waste_container_type')],['Transfer location',val('waste_transfer_location')],['Transferor',val('waste_transferor_name')],['Transferor company',val('waste_transferor_company')],['Transferor address',val('waste_transferor_address')],['Transferor capacity',val('waste_transferor_capacity')],['Carrier registration',val('waste_transferor_registration')],['Planned receiving site',activeJob?.disposal_sites?[activeJob.disposal_sites.site_name,activeJob.disposal_sites.address,activeJob.disposal_sites.postcode].filter(Boolean).join(', '):'As specified by office']];
+ const html='<!doctype html><html><head><meta charset="utf-8"><title>Waste Transfer Note</title><style>body{font:14px Arial,sans-serif;color:#18251d;margin:28px}h1{color:#176b3a}table{width:100%;border-collapse:collapse}td{border:1px solid #ccd8ce;padding:9px;vertical-align:top}td:first-child{width:30%;font-weight:bold;background:#f3f7f3}.print{margin-bottom:20px;padding:10px 16px;background:#176b3a;color:white;border:0;border-radius:6px;font-weight:bold}@media print{.print{display:none}}</style></head><body><button class="print" onclick="window.print()">Print / Save as PDF</button><h1>Aura Solutions — Waste Transfer Note</h1><p><b>Job:</b> '+esc(activeJob.job_number)+' &nbsp; <b>Customer:</b> '+esc(activeJob.customers?.company_name||'')+'</p><table>'+rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('')+'</table><p>Transferor signature is captured during job sign-off. Receiver and disposal evidence are completed after tipping.</p></body></html>';
+ w.document.open();w.document.write(html);w.document.close();
+}
 function leaveCustomerSite(){
  const management=['admin','manager'].includes(activeProfile?.role), managementCapture=management;
  if(!activeJob||!(activeJob.status==='on_site'||(managementCapture&&['draft','completed'].includes(activeJob.status))))return;
@@ -964,6 +1000,7 @@ function leaveCustomerSite(){
  if(waste==='true'&&(!el('waste_type').value.trim()||!el('ewc_code').value.trim()||!el('waste_quantity').value.trim())){el('siteSignoffMsg').innerHTML='<div class="err">Please complete the waste type, EWC code and quantity.</div>';return;}
  if(waste==='true'&&el('waste_hazardous').value==='true'){el('siteSignoffMsg').innerHTML='<div class="err">Hazardous waste needs the hazardous-waste consignment-note process. This Digital WTN is for non-hazardous waste only.</div>';return;}
  if(waste==='true'){const miss=['waste_description','waste_ewc_code','waste_quantity_value','waste_quantity_unit','waste_container_type','waste_transfer_location','waste_transferor_name','waste_transferor_company','waste_transferor_capacity'].filter(id=>!String(el(id)?.value||'').trim());if(!el('waste_hierarchy_confirmed').checked)miss.push('waste_hierarchy_confirmed');if(miss.length){markRequired(miss);el('siteSignoffMsg').innerHTML='<div class="err">Please complete the highlighted Waste Transfer Note fields.</div>';return;}}
+ if(window.asgWasteConfirmedForJob!==activeJob.id){el('siteSignoffMsg').innerHTML='<div class="err">Please confirm the waste details first, even if no waste was removed.</div>';return;}
  const signoffStatus=el('customer_signoff_status')?.value||'signed';
  const exceptionReason=(el('customer_signoff_reason')?.value||'').trim();
  const customer=signoffStatus==='signed'?signatureData('customerSig'):null;
