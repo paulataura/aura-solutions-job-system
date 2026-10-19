@@ -495,7 +495,7 @@ async function openJob(id){
  el('siteVisitThanks').classList.add('hidden');el('dash').classList.add('hidden');el('createJob').classList.add('hidden');el('jobDetail').classList.remove('hidden');el('detailMsg').innerHTML='<div class="muted">Loading job…</div>';
  const {data:j,error}=await db.from('jobs').select('id,job_number,customer_id,customer_site_id,job_type_id,site_address,postcode,site_latitude,site_longitude,google_place_id,what3words,site_location_notes,site_contact_name,site_contact_phone,reference,job_date,job_time,instructions,scope_of_work,status,issued_by,issued_by_name,issued_at,aborted_at,aborted_by,aborted_by_name,aborted_from_status,abort_reason,abort_notes,waste_expected,disposal_site_id,assigned_to,contractor_id,converted_from_contractor_id,planned_waste_description,planned_ewc_code,planned_sic_code,planned_waste_quantity,planned_waste_unit,planned_container_type,revisit_interval_value,revisit_interval_unit,revisit_due_on,revisit_source_job_id,stage_parent_job_id,stage_number,stage_title,maintenance_plan_id,maintenance_due_month,job_types(name,code,description,requires_waste_workflow),customers(company_name,contact_name,email,phone,address,postcode),disposal_sites(site_name,address,postcode,email)').eq('id',id).single();
  if(error||!j){el('detailMsg').innerHTML='<div class="err">Could not open this job: '+esc(error?.message||'Job not found')+'</div>';return;}
- activeJob=j;updateEditJobButton();el('duplicateJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('addStageJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('detailJobNo').textContent=j.job_number;el('detailStatus').textContent=statusLabel(j.status);el('detailJobType').textContent=j.job_types?.name||'Bulk Waste Removal';el('detailDate').textContent=(j.job_date||'No date')+(j.job_time?' · '+j.job_time.slice(0,5):'');el('detailRef').textContent=j.reference||'—';el('detailAddress').textContent=(j.site_address||'')+(j.postcode?' · '+j.postcode:'');renderDetailLocation(j);el('detailInstructions').textContent=j.instructions||'—';el('detailScope').textContent=j.scope_of_work||'—';el('detailStageInfo').textContent=j.stage_parent_job_id?'Stage '+j.stage_number+' · '+(j.stage_title||'Follow-up works'):'';el('detailContractInfo').textContent=j.maintenance_plan_id?'Contract maintenance · due '+new Date(j.maintenance_due_month+'T12:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';el('detailRevisit').textContent=j.revisit_interval_value?'🔔 Suggested revisit: every '+j.revisit_interval_value+' '+j.revisit_interval_unit+(j.revisit_due_on?' · due '+new Date(j.revisit_due_on+'T12:00:00').toLocaleDateString('en-GB',{dateStyle:'medium'}):' after completion'):'';const ds=j.disposal_sites;el('plannedDisposalDetail').classList.toggle('hidden',!j.waste_expected);el('detailDisposalSite').textContent=ds?[ds.site_name,ds.address,ds.postcode].filter(Boolean).join(' · '):'To be confirmed';await refreshActiveJobAssignee();await renderIssueInfo();await loadDetailAssignment();renderWorkflow();renderAbortAudit();await loadArrivalNotes();await loadCompletionDetails();await loadServiceChecklist();await loadSiteSignoff();await loadManagementReview();await Promise.all([loadLinkedStages(),loadScopeSections(),loadSiteVisit()]);el('detailMsg').innerHTML='';
+ activeJob=j;updateEditJobButton();el('duplicateJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('addStageJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('detailJobNo').textContent=j.job_number;el('detailStatus').textContent=statusLabel(j.status);el('detailJobType').textContent=j.job_types?.name||'Bulk Waste Removal';el('detailDate').textContent=(j.job_date||'No date')+(j.job_time?' · '+j.job_time.slice(0,5):'');el('detailRef').textContent=j.reference||'—';el('detailAddress').textContent=(j.site_address||'')+(j.postcode?' · '+j.postcode:'');renderDetailLocation(j);el('detailInstructions').textContent=j.instructions||'—';el('detailScope').textContent=j.scope_of_work||'—';el('detailStageInfo').textContent=j.stage_parent_job_id?'Stage '+j.stage_number+' · '+(j.stage_title||'Follow-up works'):'';el('detailContractInfo').textContent=j.maintenance_plan_id?'Contract maintenance · due '+new Date(j.maintenance_due_month+'T12:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';el('detailRevisit').textContent=j.revisit_interval_value?'🔔 Suggested revisit: every '+j.revisit_interval_value+' '+j.revisit_interval_unit+(j.revisit_due_on?' · due '+new Date(j.revisit_due_on+'T12:00:00').toLocaleDateString('en-GB',{dateStyle:'medium'}):' after completion'):'';el('detailRevisit').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));const ds=j.disposal_sites;el('plannedDisposalDetail').classList.toggle('hidden',!j.waste_expected);el('detailDisposalSite').textContent=ds?[ds.site_name,ds.address,ds.postcode].filter(Boolean).join(' · '):'To be confirmed';await refreshActiveJobAssignee();await renderIssueInfo();await loadDetailAssignment();renderWorkflow();renderAbortAudit();await loadArrivalNotes();await loadCompletionDetails();await loadServiceChecklist();await loadSiteSignoff();await loadManagementReview();await Promise.all([loadLinkedStages(),loadScopeSections(),loadSiteVisit()]);el('detailMsg').innerHTML='';
 }
 
 
@@ -513,6 +513,16 @@ async function refreshActiveJobAssignee(){
 
 async function renderIssueInfo(){
  const box=el('detailIssueInfo');if(!box||!activeJob)return;
+ const management=['admin','manager'].includes(activeProfile?.role);
+ if(!management){
+  const siteName=activeJob.site_contact_name||'Site contact not provided';
+  const sitePhone=activeJob.site_contact_phone||'';
+  const auraPhone='01386 571556';
+  const telValue=v=>String(v||'').replace(/[^+0-9]/g,'');
+  box.classList.remove('hidden');
+  box.innerHTML='<h2 style="margin-bottom:8px">Site & support contacts</h2><div class="issue-audit-grid"><div class="issue-audit-box"><b>Site contact</b><div class="muted">'+esc(siteName)+'</div>'+(sitePhone?'<a class="contact-call-link" href="tel:'+esc(telValue(sitePhone))+'">☎ Call '+esc(sitePhone)+'</a>':'<div class="muted">No site phone number provided</div>')+'</div><div class="issue-audit-box"><b>Aura Solutions contact</b><div class="muted">Aura Solutions support</div><a class="contact-call-link" href="tel:'+telValue(auraPhone)+'">☎ Call '+auraPhone+'</a></div></div>';
+  return;
+ }
  if(activeJob.status==='draft'){box.classList.add('hidden');box.innerHTML='';return;}
  let issuer=activeJob.issued_by_name||'Not recorded';
  if(!activeJob.issued_by_name&&activeJob.issued_by&&activeSession?.user?.id===activeJob.issued_by) issuer=(activeProfile?.full_name||activeSession.user.email||'Management');
@@ -1938,32 +1948,3 @@ async function signOut(){await db.auth.signOut();activeSession=null;activeProfil
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('./Aura_Solutions_Contractor_Offline_v4.js').catch(e=>console.warn('Offline worker could not register',e));}
 (async()=>{try{restoreRememberedLogin();const token=new URLSearchParams(location.search).get('contractor_token');if(token){el('conn').textContent='Secure Contractor Link';await loadContractorPortal(token);return;}const {data:{session}}=await db.auth.getSession();el('conn').textContent='Ready';if(session)await loadApp(session);else showLogin();}catch(e){el('conn').textContent='Error';showLogin('Could not connect to Supabase. '+e.message);}})();
 </script></body></html>
-<script>
-(function(){
- function escx(v){return String(v||'').replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
- function apply(){
-  var op=window.activeProfile&&['operative','contractor'].includes(window.activeProfile.role);
-  var detail=document.getElementById('jobDetail');
-  if(!op||!detail)return;
-  var issue=document.getElementById('detailIssueInfo');
-  if(issue)issue.style.setProperty('display','none','important');
-  var abort=document.getElementById('abortSection');
-  if(abort&&(!window.activeJob||!['on_site','completed'].includes(window.activeJob.status)))abort.style.setProperty('display','none','important');
-  if(!document.getElementById('operatorContacts')){
-   var a=document.getElementById('detailAddress');
-   if(a){
-    var b=document.createElement('section');b.id='operatorContacts';b.className='card';
-    b.innerHTML='<h2>Contacts</h2><div class="two"><div><b>Site contact</b><div id="opSiteName" class="muted">Not provided</div><div id="opSitePhone"></div></div><div><b>Aura contact</b><div class="muted">Aura Solutions</div><a href="tel:01386400001">Call Aura Solutions</a></div></div>';
-    a.parentNode.insertBefore(b,a.nextSibling);
-   }
-  }
-  var j=window.activeJob;
-  if(j&&document.getElementById('opSiteName')){
-   document.getElementById('opSiteName').textContent=j.site_contact_name||'Not provided';
-   document.getElementById('opSitePhone').innerHTML=j.site_contact_phone?'<a href="tel:'+escx(j.site_contact_phone)+'">Call site contact</a>':'';
-  }
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);else apply();
- setInterval(apply,700);
-})();
-</script>
