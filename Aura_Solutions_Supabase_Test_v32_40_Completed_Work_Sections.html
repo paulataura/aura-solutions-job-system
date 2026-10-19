@@ -575,10 +575,9 @@ function renderAbortAudit(){
  box.innerHTML='<h2 style="margin-bottom:8px;color:#7b2c25">⚠ Job Aborted</h2><div class="review-grid"><div class="review-box"><b>Aborted by</b>'+esc(activeJob.aborted_by_name||'Not recorded')+'</div><div class="review-box"><b>When</b>'+esc(when)+'</div><div class="review-box"><b>Stage</b>'+esc(statusLabel(activeJob.aborted_from_status||''))+'</div><div class="review-box"><b>Reason</b>'+esc(activeJob.abort_reason||'—')+'</div></div><div style="margin-top:10px"><b>Notes</b><div class="muted" style="margin-top:4px">'+esc(activeJob.abort_notes||'—')+'</div></div>';
 }
 function canAbortActiveJob(){
- if(!activeJob||activeJob.status==='aborted'||['returned','reviewed','closed'].includes(activeJob.status))return false;
- const management=['admin','manager'].includes(activeProfile?.role);
- if(management)return ['draft','issued','accepted'].includes(activeJob.status);
- return ['issued','accepted'].includes(activeJob.status);
+ // Aborting is only available after the operative has arrived on site,
+ // regardless of job type or whether the user is staff, contractor or management.
+ return !!activeJob && activeJob.status==='on_site';
 }
 async function abortActiveJob(){
  if(!canAbortActiveJob())return;
@@ -671,6 +670,9 @@ async function confirmArrival(){
  const btn=el('saveArrivalPhotoBtn');btn.disabled=true;
  el('arrivalPhotoNoteMsg').innerHTML='<div class="upload-loading"><span class="upload-spinner" aria-hidden="true"></span><span>Saving arrival picture and opening job…</span></div>';
  try{
+   // The status rules require the normal issued -> accepted -> on_site sequence.
+   // Acceptance is automatic here; the operative does not see an Accept Job step.
+   if(activeJob.status==='issued') await persistJobStatus('accepted');
    const ext=(f.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'').toLowerCase()||'jpg';
    const path=`jobs/${activeJob.id}/arrival-${Date.now()}.${ext}`;
    const up=await db.storage.from('job-files').upload(path,f,{contentType:f.type||'image/jpeg',upsert:false});
