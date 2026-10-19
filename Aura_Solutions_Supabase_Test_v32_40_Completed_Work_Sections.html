@@ -218,10 +218,11 @@ function w3wUrl(v){const w=normaliseW3W(v);return w?'https://what3words.com/'+en
 function openEnteredW3W(){const u=w3wUrl(el('what3words')?.value);if(!u){alert('Enter a what3words address first.');return;}window.open(u,'_blank');}
 function renderDetailLocation(j){const box=el('detailExactLocation');if(!box)return;const mapUrl=mapsUrlForJob(j),embedUrl=mapsEmbedUrlForJob(j),w3w=normaliseW3W(j?.what3words);if(!mapUrl&&!w3w&&!j?.site_location_notes){box.classList.add('hidden');box.innerHTML='';return;}box.classList.remove('hidden');box.innerHTML=(w3w?'<div><b>what3words:</b> ///'+esc(w3w)+'</div>':'')+(j?.site_location_notes?'<div style="margin-top:4px"><b>Location notes:</b> '+esc(j.site_location_notes)+'</div>':'')+(embedUrl?'<iframe class="detail-map-preview" title="Site location map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="'+esc(embedUrl)+'"></iframe>':'')+'<div class="actions">'+(mapUrl?'<button type="button" class="btn light" onclick="window.open(\''+mapUrl+'\',\'_blank\')">Directions to exact pin</button>':'')+(w3w?'<button type="button" class="btn light" onclick="window.open(\''+w3wUrl(w3w)+'\',\'_blank\')">Open what3words</button>':'')+'</div>';}
 // Keep site and Aura support contacts visible while the compact onsite workflow is open.
-(function keepOnsiteContactsVisible(){
+function keepOnsiteContactsVisible(){
  const issue=el('detailIssueInfo'),group=el('jobBriefingGroup');
  if(issue&&group&&group.contains(issue)) group.parentElement.insertBefore(issue,group);
-})();
+}
+keepOnsiteContactsVisible();
 function showLogin(msg=''){el('login').classList.remove('hidden');el('dash').classList.add('hidden');el('createJob').classList.add('hidden');el('jobDetail').classList.add('hidden');el('siteVisitThanks').classList.add('hidden');el('loginMsg').innerHTML=msg?'<div class="err">'+esc(msg)+'</div>':'';}
 function showDashboard(){editingJobId=null;el('createJob').classList.add('hidden');el('jobDetail').classList.add('hidden');el('siteVisitThanks').classList.add('hidden');el('dash').classList.remove('hidden');loadJobs();}
 async function loadApp(session){
@@ -527,6 +528,7 @@ async function refreshActiveJobAssignee(){
 }
 
 async function renderIssueInfo(){
+ keepOnsiteContactsVisible();
  const box=el('detailIssueInfo');if(!box||!activeJob)return;
  const management=['admin','manager'].includes(activeProfile?.role);
  if(!management){
@@ -640,6 +642,7 @@ function toggleOperatorJobDetails(){window.asgOperatorDetailsOpen=!window.asgOpe
 function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWorkOpen;syncStandardOperatorWorkflow();}
 function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
 function syncStandardOperatorWorkflow(){
+ keepOnsiteContactsVisible();
  const job=activeJob,role=activeProfile?.role,operator=!!role&&!['admin','manager'].includes(role),onsite=!!job&&operator&&['on_site','completed'].includes(job.status);
  if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;}
  const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
