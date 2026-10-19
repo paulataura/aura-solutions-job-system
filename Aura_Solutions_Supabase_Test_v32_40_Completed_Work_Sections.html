@@ -1936,7 +1936,6 @@ async function signOut(){await db.auth.signOut();activeSession=null;activeProfil
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('./Aura_Solutions_Contractor_Offline_v4.js').catch(e=>console.warn('Offline worker could not register',e));}
 (async()=>{try{restoreRememberedLogin();const token=new URLSearchParams(location.search).get('contractor_token');if(token){el('conn').textContent='Secure Contractor Link';await loadContractorPortal(token);return;}const {data:{session}}=await db.auth.getSession();el('conn').textContent='Ready';if(session)await loadApp(session);else showLogin();}catch(e){el('conn').textContent='Error';showLogin('Could not connect to Supabase. '+e.message);}})();
 </script></body></html>
-<scr</body></html>
 <script>
 (function(){
  function escx(v){return String(v||'').replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
