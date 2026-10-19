@@ -159,8 +159,8 @@
   <div class="two"><div class="field"><label>Planned disposal site (set by office)</label><input id="disposal_site" readonly aria-readonly="true" title="The planned disposal site is set by the office and cannot be changed here"></div><div class="field"><label>Disposal date *</label><input id="disposal_date" type="date"></div></div>
   <div class="card" style="background:#f8faf8">
     <h2 style="font-size:18px">Waste Transfer Note — Receiver</h2>
-    <div class="two"><div class="field"><label>Receiver / transferee name *</label><input id="waste_transferee_name"></div><div class="field"><label>Receiver company *</label><input id="waste_transferee_company"></div></div>
-    <div class="field"><label>Receiver address *</label><input id="waste_transferee_address"></div>
+    <div class="two"><div class="field"><label>Receiver / transferee name *</label><input id="waste_transferee_name"></div><div class="field"><label>Receiver company (planned site)</label><input id="waste_transferee_company" readonly aria-readonly="true"></div></div>
+    <div class="field"><label>Receiver address (planned site)</label><input id="waste_transferee_address" readonly aria-readonly="true"></div>
     <div class="field"><label>Receiver capacity *</label><select id="waste_transferee_capacity"><option value="">Select</option><option>Receiver</option><option>Holder</option><option>Carrier</option><option>Broker</option><option>Dealer</option></select></div>
   </div>
   <div class="field"><label>Transfer note / weighbridge reference *</label><input id="transfer_note"></div>
@@ -851,7 +851,7 @@ async function loadCompletionDetails(){
 }
 function completionPhotosChosen(){
  const files=[...(el('completion_photos').files||[])];
- el('completionPhotoPreview').innerHTML=files.map((f,i)=>`<div class="card" style="padding:8px;margin:0"><img src="${URL.createObjectURL(f)}" alt="Job complete photo ${i+1}" style="width:100%;height:130px;object-fit:cover;border-radius:9px"><div class="muted" style="margin-top:5px;font-size:12px">${esc(f.name||('Photo '+(i+1)))}</div><label for="completionPhotoCaption_${i}">Note for this picture</label><textarea id="completionPhotoCaption_${i}" placeholder="What was completed or what does this picture show?"></textarea></div>`).join('');
+ el('completionPhotoPreview').innerHTML=files.map((f,i)=>`<div class="card" style="padding:8px;margin:0"><img src="${URL.createObjectURL(f)}" alt="Job complete photo ${i+1}" style="width:100%;height:130px;object-fit:cover;border-radius:9px"><div class="muted" style="margin-top:5px;font-size:12px">${esc(f.name||('Photo '+(i+1)))}</div><label for="completionPhotoCaption_${i}">Note for this picture *</label><textarea id="completionPhotoCaption_${i}" placeholder="What was completed or what does this picture show?"></textarea></div>`).join('');
 }
 async function loadCompletionPhotoCount(){
  if(!activeJob) return;
@@ -878,6 +878,8 @@ async function uploadCompletionPhotos(){
  if(!activeJob || !(activeJob.status==='on_site'||(managementCapture&&['draft','issued','accepted','completed','returned'].includes(activeJob.status)))) return;
  const files=[...(el('completion_photos').files||[])];
  if(!files.length){el('completionMsg').innerHTML='<div class="err">Please choose or take at least one completion photo.</div>';return;}
+ const missingPhotoNotes=files.map((f,i)=>({i,note:(el('completionPhotoCaption_'+i)?.value||'').trim()})).filter(x=>!x.note);
+ if(missingPhotoNotes.length){el('completionMsg').innerHTML='<div class="err">Add a note for every Job Complete picture before uploading.</div>';return;}
  el('completionMsg').innerHTML='<div class="upload-loading"><span class="upload-spinner" aria-hidden="true"></span><span>Uploading completion photos…</span></div>';
  try{
    const visitId=await getLatestVisitId();
@@ -972,8 +974,13 @@ async function confirmWasteDetails(){
  if(waste==='true'){const miss=['waste_description','waste_ewc_code','waste_quantity_value','waste_quantity_unit','waste_container_type','waste_transfer_location','waste_transferor_name','waste_transferor_company','waste_transferor_capacity'].filter(id=>!String(el(id)?.value||'').trim());if(!el('waste_hierarchy_confirmed').checked)miss.push('waste_hierarchy_confirmed');if(miss.length){markRequired(miss);msg.innerHTML='<div class="err">Complete the highlighted Waste Transfer Note fields.</div>';return;}}
  btn.disabled=true;msg.innerHTML='<div class="muted">Saving waste confirmation…</div>';
  try{
-  if(waste==='true')await ensureWtnNumber();
   const visitId=await getLatestVisitId();
+  const work=await db.from('job_visits').select('completion_notes,completion_sections').eq('id',visitId).maybeSingle();if(work.error)throw work.error;
+  const sections=Array.isArray(work.data?.completion_sections)?work.data.completion_sections:[];
+  if(!String(work.data?.completion_notes||'').trim()&&!sections.length){msg.innerHTML='<div class="err">Complete Work first: save the work summary or completed-work sections.</div>';btn.disabled=false;return;}
+  const pics=await db.from('job_files').select('id').eq('job_id',activeJob.id).eq('file_type','completion_photo');if(pics.error)throw pics.error;
+  if(!(pics.data||[]).length){msg.innerHTML='<div class="err">Complete Work first: upload at least one Job Complete picture with its note.</div>';btn.disabled=false;return;}
+  if(waste==='true')await ensureWtnNumber();
   const payload={waste_removed:waste==='true',waste_type:waste==='true'?el('waste_type').value.trim():null,ewc_code:waste==='true'?el('ewc_code').value.trim():null,waste_quantity:waste==='true'?el('waste_quantity').value.trim():null,waste_hazardous:waste==='true'?(el('waste_hazardous').value==='true'):false,waste_description:waste==='true'?el('waste_description').value.trim():null,waste_ewc_code:waste==='true'?el('waste_ewc_code').value.trim():null,waste_quantity_value:waste==='true'?Number(el('waste_quantity_value').value):null,waste_quantity_unit:waste==='true'?el('waste_quantity_unit').value:null,waste_container_type:waste==='true'?el('waste_container_type').value.trim():null,waste_sic_code:waste==='true'?(el('waste_sic_code').value.trim()||null):null,waste_transfer_location:waste==='true'?el('waste_transfer_location').value.trim():null,waste_transfer_at:waste==='true'?new Date().toISOString():null,waste_transferor_name:waste==='true'?el('waste_transferor_name').value.trim():null,waste_transferor_company:waste==='true'?el('waste_transferor_company').value.trim():null,waste_transferor_address:waste==='true'?(el('waste_transferor_address').value.trim()||null):null,waste_transferor_capacity:waste==='true'?el('waste_transferor_capacity').value:null,waste_transferor_registration:waste==='true'?(el('waste_transferor_registration').value.trim()||null):null,waste_hierarchy_confirmed:waste==='true'?el('waste_hierarchy_confirmed').checked:false,updated_at:new Date().toISOString()};
   const saved=await db.from('job_visits').update(payload).eq('id',visitId);if(saved.error)throw saved.error;
   window.asgWasteConfirmedForJob=activeJob.id;
