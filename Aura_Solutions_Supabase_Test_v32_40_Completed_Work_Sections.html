@@ -649,6 +649,8 @@ function arrivalPhotoChosen(){
  if(!f){el('arrivalPreview').classList.add('hidden');el('arrivalPhotoNoteModal').classList.add('hidden');return;}
  el('arrivalPreviewImg').src=URL.createObjectURL(f);
  el('arrivalPreview').classList.remove('hidden');
+ const requirement=el('arrivalPhotoRequirement');
+ if(requirement){requirement.textContent='🟢 Arrival picture selected';requirement.style.background='#edf7ef';requirement.style.borderColor='#b8d7be';requirement.style.color='#166534';}
  el('arrivalPhotoNote').value='';
  el('arrivalPhotoNoteMsg').innerHTML='';
  el('arrivalPhotoNoteModal').classList.remove('hidden');
@@ -657,6 +659,8 @@ function cancelArrivalPhoto(){
  el('arrivalPhotoNoteModal').classList.add('hidden');
  el('arrival_photo').value='';
  el('arrivalPreview').classList.add('hidden');
+ const requirement=el('arrivalPhotoRequirement');
+ if(requirement){requirement.textContent='🔴 Arrival picture required';requirement.style.background='#fff0ef';requirement.style.borderColor='#d88a86';requirement.style.color='#8d2924';}
 }
 async function confirmArrival(){
  if(!activeJob || !['issued','accepted'].includes(activeJob.status)) return;
