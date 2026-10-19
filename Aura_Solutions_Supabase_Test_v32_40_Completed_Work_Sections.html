@@ -771,7 +771,7 @@ function renderWorkflow(){
  else if(activeJob.status==='aborted') w.innerHTML='<div class="err"><b>Job Aborted</b><br>The normal job workflow is locked. See the abort record below.</div>';
  else if(management && activeJob.contractor_id && ['draft','issued','accepted','on_site','completed'].includes(activeJob.status)) w.innerHTML=contractorLinkControls();
  else if(!management && ['issued','accepted'].includes(activeJob.status)) w.innerHTML='';
- else if(!management && activeJob.status==='on_site') w.innerHTML='<div class="ok">You are marked as on site. Complete the arrival section below.</div>';
+ else if(!management && activeJob.status==='on_site') w.innerHTML='<div class="ok">You are on site. Use the workflow below.</div>';
  else if(!management && activeJob.status==='returned') w.innerHTML='<div class="ok"><b>Job returned to management.</b><br>This job is complete and locked for operative editing.</div>';
  else w.innerHTML='';
  const managementCapture=management;
