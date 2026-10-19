@@ -220,7 +220,7 @@ function renderDetailLocation(j){const box=el('detailExactLocation');if(!box)ret
 // Keep site and Aura support contacts visible while the compact onsite workflow is open.
 (function keepOnsiteContactsVisible(){
  const issue=el('detailIssueInfo'),group=el('jobBriefingGroup');
- if(issue&&group&&issue.parentElement===group) group.parentElement.insertBefore(issue,group);
+ if(issue&&group&&group.contains(issue)) group.parentElement.insertBefore(issue,group);
 })();
 function showLogin(msg=''){el('login').classList.remove('hidden');el('dash').classList.add('hidden');el('createJob').classList.add('hidden');el('jobDetail').classList.add('hidden');el('siteVisitThanks').classList.add('hidden');el('loginMsg').innerHTML=msg?'<div class="err">'+esc(msg)+'</div>':'';}
 function showDashboard(){editingJobId=null;el('createJob').classList.add('hidden');el('jobDetail').classList.add('hidden');el('siteVisitThanks').classList.add('hidden');el('dash').classList.remove('hidden');loadJobs();}
