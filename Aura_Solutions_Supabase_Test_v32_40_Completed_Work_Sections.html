@@ -110,7 +110,7 @@
   <button class="btn light" type="button" onclick="addCompletionSection()" style="margin:10px 0 14px">+ Add another completed-work section</button>
   <div class="field"><label for="completion_notes">Overall work completed</label><textarea id="completion_notes" placeholder="Summarise the work completed across all areas…"></textarea></div>
   <div class="field"><label for="completion_issues">Issues / further works required</label><textarea id="completion_issues" placeholder="Record any issues, defects, access problems or further works required. Leave blank if none."></textarea></div>
-  <div class="field"><label for="completion_photos">Completion photos *</label><input id="completion_photos" type="file" accept="image/*" multiple onchange="completionPhotosChosen()"><div class="muted" style="margin-top:6px">At least one completion photo will be required before the job can later be submitted.</div></div>
+  <div class="field"><label for="completion_photos"><b>Job Complete — final photos & notes *</b></label><input id="completion_photos" type="file" accept="image/*" multiple onchange="completionPhotosChosen()"><div class="muted" style="margin-top:6px">At least one completion photo will be required before the job can later be submitted.</div></div>
   <div id="completionPhotoPreview" class="grid" style="margin:10px 0"></div>
   <div class="actions"><button class="btn primary" type="button" onclick="saveCompletionDetails()">Save completion details</button><button class="btn light" type="button" onclick="uploadCompletionPhotos()">Upload completion photos</button><button id="managementFinishJobCardBtn" class="btn primary hidden" type="button" onclick="managementFinishJobCard()">Complete Aura job card</button></div>
   <div id="completionPhotoCount" class="muted" style="margin-top:10px"></div>
@@ -621,7 +621,7 @@ function displayJobTypeName(type){
  const code=typeof type==='string'?type:(type?.code||'');
  const name=typeof type==='string'?'':(type?.name||'');
  const key=String(code||name).toLowerCase().replace(/[^a-z0-9]+/g,'_');
- const labels={pump_station_service:'Minor Site Service',minor_site_service:'Minor Site Service',pump_station_major_service:'Pump Station Major Service',major_site_service:'Pump Station Major Service',pump_station_compound_maintenance:'Pump Station Compound Maintenance',compound_maintenance:'Pump Station Compound Maintenance',bulk_liquid_waste_removal:'Bulk Waste Removal',bulk_waste_removal:'Bulk Waste Removal',site_visit:'Site Visit',remedial_works:'Remedial Works'};
+ const labels={pump_station_service:'Minor Site Service',minor_site_service:'Minor Site Service',pump_station_major_service:'Pump Station Major Service',major_site_service:'Pump Station Major Service',pump_station_compound_maintenance:'Pump Station Compound Maintenance',compound_maintenance:'Pump Station Compound Maintenance',bulk_liquid_waste_removal:'Bulk Waste Removal',bulk_liquid_removal:'Bulk Waste Removal',bulk_waste_removal:'Bulk Waste Removal',site_visit:'Site Visit',remedial_works:'Remedial Works'};
  return labels[key]||labels[String(name).toLowerCase().replace(/[^a-z0-9]+/g,'_')]||name||'Job';
 }
 window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgWorkflowJobId=null;
@@ -846,7 +846,7 @@ async function loadCompletionDetails(){
 }
 function completionPhotosChosen(){
  const files=[...(el('completion_photos').files||[])];
- el('completionPhotoPreview').innerHTML=files.map((f,i)=>`<div class="card" style="padding:8px;margin:0"><img src="${URL.createObjectURL(f)}" alt="Completion photo ${i+1}" style="width:100%;height:130px;object-fit:cover;border-radius:9px"><div class="muted" style="margin-top:5px;font-size:12px">${esc(f.name||('Photo '+(i+1)))}</div></div>`).join('');
+ el('completionPhotoPreview').innerHTML=files.map((f,i)=>`<div class="card" style="padding:8px;margin:0"><img src="${URL.createObjectURL(f)}" alt="Job complete photo ${i+1}" style="width:100%;height:130px;object-fit:cover;border-radius:9px"><div class="muted" style="margin-top:5px;font-size:12px">${esc(f.name||('Photo '+(i+1)))}</div><label for="completionPhotoCaption_${i}">Note for this picture</label><textarea id="completionPhotoCaption_${i}" placeholder="What was completed or what does this picture show?"></textarea></div>`).join('');
 }
 async function loadCompletionPhotoCount(){
  if(!activeJob) return;
@@ -882,7 +882,7 @@ async function uploadCompletionPhotos(){
      const path=`jobs/${activeJob.id}/completion-${Date.now()}-${i}.${ext}`;
      const up=await db.storage.from('job-files').upload(path,f,{contentType:f.type||'image/jpeg',upsert:false});
      if(up.error) throw up.error;
-     const ins=await db.from('job_files').insert({job_id:activeJob.id,visit_id:visitId,file_type:'completion_photo',file_name:f.name||`completion-photo-${i+1}.jpg`,storage_path:path,uploaded_by:activeSession.user.id});
+     const caption=(el('completionPhotoCaption_'+i)?.value||'').trim();const ins=await db.from('job_files').insert({job_id:activeJob.id,visit_id:visitId,file_type:'completion_photo',file_name:f.name||`completion-photo-${i+1}.jpg`,storage_path:path,caption:caption||null,uploaded_by:activeSession.user.id});
      if(ins.error) throw ins.error;
    }
    el('completion_photos').value='';el('completionPhotoPreview').innerHTML='';
