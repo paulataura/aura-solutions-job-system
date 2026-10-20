@@ -1179,8 +1179,7 @@ async function loadManagementReview(){
  el('reviewStatusText').textContent=activeJob.contractor_id&& !['returned','reviewed','closed'].includes(activeJob.status)?'Third-party progress received. Review the notes and pictures, then convert this into an Aura job card if needed.':activeJob.status==='returned'?'Returned job awaiting management review.':activeJob.status==='reviewed'?'Management review completed.':'Job reviewed and closed.';
  el('markReviewedBtn').classList.toggle('hidden',activeJob.status!=='returned');
  el('closeJobBtn').classList.toggle('hidden',activeJob.status!=='reviewed');
- el('printJobCardBtn').classList.toggle('hidden',isSiteVisitJob());
- if(isSiteVisitJob()){el('printWtnBtn').classList.add('hidden');el('managementReviewBody').innerHTML='<div class="muted">Review the arrival condition, proposed work, waste assessment, photos and comments in the Site Visit report below.</div>';return;}
+ el('printJobCardBtn').classList.remove('hidden');
  el('managementReviewBody').innerHTML='<div class="muted">Loading submitted job record…</div>';
  const [vr,fr]=await Promise.all([
    db.from('job_visits').select('*').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1),
@@ -1195,7 +1194,7 @@ async function loadManagementReview(){
    fileCards.push(`<div class="review-box"><b>${esc((f.file_type||'file').replaceAll('_',' '))}</b>${url?`<a href="${url}" target="_blank" rel="noopener"><img class="review-photo" src="${url}" alt="${esc(f.file_name||'Job evidence')}"></a>`:''}<div class="muted" style="margin-top:5px">${esc(f.file_name||'Evidence')}</div>${f.caption?`<div style="white-space:pre-wrap;margin-top:5px">${esc(f.caption)}</div>`:''}</div>`);
  }
  const waste=!!v.waste_removed;
- el('printWtnBtn').classList.toggle('hidden',!waste);
+ el('printWtnBtn').classList.remove('hidden');
  el('managementReviewBody').innerHTML=`
  <h2 style="font-size:17px">Work record</h2><div class="review-grid">
  <div class="review-box"><b>Arrival / site condition</b>${reviewValue(v.arrival_notes)}</div>
