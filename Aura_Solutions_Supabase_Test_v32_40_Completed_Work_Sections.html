@@ -335,14 +335,6 @@ async function restoreJobFromDashboard(id){
  if(error){alert('The job could not be restored: '+error.message);return;}
  await loadJobs();
 }
-async function deleteJobFromDashboard(id){
- if(activeProfile?.role!=='admin')return;
- const job=jobCentreJobs.find(j=>j.id===id);if(!job)return;
- if(!window.confirm('Permanently delete '+(job.job_number||'')+'? This cannot be undone.'))return;
- const {error}=await db.from('jobs').delete().eq('id',id);
- if(error){alert('The job could not be deleted. It may have linked records that must be removed first. '+error.message);return;}
- await loadJobs();
-}
 function renderJobCentre(){
  const management=['admin','manager'].includes(activeProfile?.role);
  const q=(el('jobSearch')?.value||'').trim().toLowerCase();
@@ -355,7 +347,7 @@ function renderJobCentre(){
  if(q) list=list.filter(j=>[j.job_number,j.customers?.company_name,j.site_address,j.postcode,j.reference,j.scope_of_work,j.instructions,displayJobTypeName(j.job_types),j.job_types?.name,statusLabel(j.status)].some(v=>String(v||'').toLowerCase().includes(q)));
  el('jobCount').textContent=list.length+' job'+(list.length===1?'':'s');
  if(!list.length){el('jobs').innerHTML='<div class="empty-state">No jobs match this view or search.</div>';return;}
- el('jobs').innerHTML=list.map(j=>`<div class="job-card" onclick="openJob('${j.id}')" style="cursor:pointer"><div class="job-top"><div>${management?`<div class="job-customer">${esc(j.customers?.company_name||'Customer')}</div>`:''}${j.reference?`<div class="job-reference-title">Reference: ${esc(j.reference)}</div>`:''}<div><span class="job-type-prominent">Type: ${esc(displayJobTypeName(j.job_types)||'Not specified')}</span></div><div class="job-number">Job no. ${esc(j.job_number)}</div></div><span class="pill status-${esc(j.status)}">${esc(statusLabel(j.status))}</span></div><div class="job-meta"><span>📅 ${esc(j.job_date||'No date')}${j.job_time?' · '+esc(j.job_time.slice(0,5)):''}</span><span>📍 ${esc(j.site_address||'No address')}${j.postcode?' · '+esc(j.postcode):''}</span></div>${j.scope_of_work?`<div class="job-scope"><b>Scope:</b> ${esc(j.scope_of_work)}</div>`:''}${j.status==='returned'?'<div class="attention">● Management review required</div>':''}${!management&&j.instructions?`<div class="job-scope"><b>Instructions:</b> ${esc(j.instructions)}</div>`:''}${management&&activeProfile?.role==='admin'?`<div class="dashboard-job-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn light" onclick="event.stopPropagation();${j.status==='aborted'?'restoreJobFromDashboard':'archiveJobFromDashboard'}('${j.id}')">${j.status==='aborted'?'Restore to Draft':'Archive job'}</button><button type="button" class="btn danger" onclick="event.stopPropagation();deleteJobFromDashboard('${j.id}')">Delete permanently</button></div>`:''}<div style="margin-top:10px;font-weight:800;color:#0c3e17">Open job →</div></div>`).join('');
+ el('jobs').innerHTML=list.map(j=>`<div class="job-card" onclick="openJob('${j.id}')" style="cursor:pointer"><div class="job-top"><div>${management?`<div class="job-customer">${esc(j.customers?.company_name||'Customer')}</div>`:''}${j.reference?`<div class="job-reference-title">Reference: ${esc(j.reference)}</div>`:''}<div><span class="job-type-prominent">Type: ${esc(displayJobTypeName(j.job_types)||'Not specified')}</span></div><div class="job-number">Job no. ${esc(j.job_number)}</div></div><span class="pill status-${esc(j.status)}">${esc(statusLabel(j.status))}</span></div><div class="job-meta"><span>📅 ${esc(j.job_date||'No date')}${j.job_time?' · '+esc(j.job_time.slice(0,5)):''}</span><span>📍 ${esc(j.site_address||'No address')}${j.postcode?' · '+esc(j.postcode):''}</span></div>${j.scope_of_work?`<div class="job-scope"><b>Scope:</b> ${esc(j.scope_of_work)}</div>`:''}${j.status==='returned'?'<div class="attention">● Management review required</div>':''}${!management&&j.instructions?`<div class="job-scope"><b>Instructions:</b> ${esc(j.instructions)}</div>`:''}${management&&activeProfile?.role==='admin'?`<div class="dashboard-job-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn light" onclick="event.stopPropagation();${j.status==='aborted'?'restoreJobFromDashboard':'archiveJobFromDashboard'}('${j.id}')">${j.status==='aborted'?'Restore to Draft':'Archive job'}</button></div>`:''}<div style="margin-top:10px;font-weight:800;color:#0c3e17">Open job →</div></div>`).join('');
 }
 
 
