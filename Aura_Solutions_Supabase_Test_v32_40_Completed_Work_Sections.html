@@ -2367,4 +2367,32 @@ saveOnsiteScope = window.saveOnsiteScope = async function(key){
   st.message={kind:'err',text:'Save failed: '+(err.message||String(err))};onsiteCompletionState[key]=st;renderOnsiteWorkflow();
  }
 };
+
+/* v32.45 use the proven arrival picture popup for every scope picture */
+scopePhotoChosen = window.scopePhotoChosen = function(key,type){
+ const row=document.querySelector('[data-onsite-scope="'+key+'"]');
+ const file=row?.querySelector(type==='progress'?'[data-onsite-progress-photo]':'[data-onsite-photo]')?.files?.[0];
+ if(file)openOnsitePhotoNote(type,key,file,type==='progress'?'Job scope progress picture':'Job scope completion picture');
+};
+confirmOnsitePhotoNote = window.confirmOnsitePhotoNote = function(){
+ const target=window.asgPhotoModalTarget,note=el('onsitePhotoNoteInput')?.value.trim()||'';
+ if(!target||!note){el('onsitePhotoNoteMsg').innerHTML='<div class="err">Add a note for this picture.</div>';return;}
+ if(target.kind!=='progress'&&target.kind!=='completion'){
+  const prior=window.asgOriginalConfirmOnsitePhotoNote;
+  if(prior)return prior();
+  return;
+ }
+ const st=onsiteCompletionState[target.key]||{};
+ if(target.kind==='progress'){st.pendingProgressPhoto=target.file;st.pendingProgressNote=note;st.progress_photo_note=note;st.progress_message={kind:'ok',text:'Progress picture and note added.'};}
+ else{st.pendingPhoto=target.file;st.photo_note=note;st.message={kind:'ok',text:'Completion picture and note added.'};}
+ onsiteCompletionState[target.key]=st;cancelOnsitePhotoNote();renderOnsiteWorkflow();
+};
+window.asgOriginalConfirmOnsitePhotoNote=window.asgOriginalConfirmOnsitePhotoNote||null;
+(function(){
+ const original=confirmArrival;
+ confirmArrival=window.confirmArrival=async function(){
+  await original();
+  if(activeJob?.status==='on_site')setTimeout(()=>el('onsiteWorkflowPanel')?.scrollIntoView({behavior:'smooth',block:'start'}),160);
+ };
+})();
 </script></body></html>
