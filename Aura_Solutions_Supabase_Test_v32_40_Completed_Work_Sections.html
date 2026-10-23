@@ -2259,4 +2259,66 @@ function contractorPhotoWithNote(input,kind,msgId){const file=input?.files?.[0];
 function simplifyContractorPortal(){const flow=el('contractorWasteDisposalFlow');if(!flow)return;const boxes=flow.querySelectorAll(':scope > .contractor-box');if(boxes[1])boxes[1].classList.add('hidden');if(boxes[2]){const note=boxes[2].querySelector('.contractor-step-note');if(note)note.textContent='Optional. Add a disposal picture if useful.';}if(boxes[3])boxes[3].classList.add('hidden');if(!el('contractorSimpleFinishBtn')){const b=document.createElement('button');b.id='contractorSimpleFinishBtn';b.type='button';b.className='btn primary contractor-start-btn';b.textContent='✓ Confirm disposal and finish job';b.onclick=()=>contractorFinishWastePreview();flow.appendChild(b);}}
 async function contractorFinishWastePreview(){const msg=el('contractorWasteFinishMsg');if(msg)msg.innerHTML='<div class="muted">Finishing job…</div>';try{await contractorRpc('contractor_return_job');if(contractorIsOffline()){await contractorOfflinePatchSnapshot(x=>{x.pendingReturn=true;});contractorShowPendingSyncScreen();}else{if(activeContractorJob)activeContractorJob.status='returned';contractorShowCompleteScreen();}}catch(error){if(msg)msg.innerHTML='<div class="err">Could not finish the job: '+esc(error.message||String(error))+'</div>';}}
 function contractorShowCompleteScreen(){const box=el('contractorPortalContent'),status=el('contractorPortalStatus');if(status)status.textContent='Job Complete';if(!box)return;box.innerHTML='<div class="modal" style="display:block;position:static;background:transparent"><div class="contractor-box" style="text-align:center;padding:34px 20px;margin-top:14px"><div style="font-size:54px;line-height:1;margin-bottom:14px">✅</div><h2>Job completed</h2><div style="font-size:18px;font-weight:800;margin-bottom:8px">Job completed and waste safely disposed of.</div><button class="btn primary" type="button" onclick="window.location.href=\'./\'">Back to dashboard</button></div></div>';contractorOfflineClearCurrent().catch(()=>{});contractorUpdateConnectivityBanner();window.scrollTo({top:0,behavior:'smooth'});}
+
+/* v32.43 definitive operator scope workflow override
+   This is intentionally last so legacy renderers cannot replace the operator UI. */
+renderOnsiteWorkflow = window.renderOnsiteWorkflow = function(){
+ const panel=el('onsiteWorkflowPanel'),cards=el('onsiteScopeCards'); if(!panel||!cards)return;
+ const locked=activeJob?.status!=='on_site';
+ cards.innerHTML=(onsiteScopes||[]).map((scope,index)=>{
+  const key=onsiteKey(scope.id);
+  const state=onsiteCompletionState[key]||{id:key,scope_id:scope.id,title:scope.title,work:'',photo_file_id:null,photo_note:'',progress_photo_note:'',message:''};
+  const done=onsiteStateComplete(key);
+  const progressPreview=state.pendingProgressPhoto?'<img class="review-photo" style="max-height:170px;margin-top:10px" src="'+URL.createObjectURL(state.pendingProgressPhoto)+'" alt="Progress picture preview">':'';
+  const completionPreview=state.pendingPhoto?'<img class="review-photo" style="max-height:190px;margin-top:10px" src="'+URL.createObjectURL(state.pendingPhoto)+'" alt="Completed work picture preview">':'';
+  return '<div class="onsite-scope-card" data-onsite-scope="'+esc(key)+'">'+
+   '<h3>Scope '+(index+1)+': '+esc(scope.title)+'</h3>'+
+   '<div class="onsite-scope-details">'+esc(scope.details||'No details added')+'</div>'+
+   (activeJob?.instructions?'<div class="onsite-scope-extra"><b>Job instruction:</b> '+esc(activeJob.instructions)+'</div>':'')+
+   '<div class="onsite-complete-card" style="border-color:#cbdccd;background:#fbfdfb">'+
+    '<h4 style="margin:0;color:#0c3e17">Job scope '+(index+1)+' progress picture and notes</h4>'+
+    '<div class="muted" style="margin:6px 0 10px">Optional. Add progress notes and a picture while work is in progress.</div>'+
+    '<div class="field"><label>Progress notes</label><textarea data-onsite-progress-note placeholder="Add progress notes" '+(locked?'disabled':'')+'>'+esc(state.progress_photo_note||'')+'</textarea></div>'+
+    '<div class="field"><label>Progress picture</label><input data-onsite-progress-photo type="file" accept="image/*" onchange="scopePhotoChosen(\\''+esc(key)+'\\',\\'progress\\')" '+(locked?'disabled':'')+'>'+progressPreview+
+    '<div class="muted" style="margin-top:7px">'+(state.pendingProgressPhoto?'Picture selected — save this scope to upload it.':'Selecting a picture opens the picture-note box.')+'</div></div>'+
+   '</div>'+
+   '<div class="onsite-complete-card '+(done?'ready':'')+'">'+
+    '<h4 style="margin:0;color:#0c3e17">Job scope complete?</h4>'+
+    '<div class="muted" style="margin:6px 0 10px">Add the completed work details, picture and note. This is required.</div>'+
+    '<div class="field"><label>Completed work *</label><textarea data-onsite-work placeholder="Describe what was completed for this scope" '+(locked?'disabled':'')+'>'+esc(state.work||'')+'</textarea></div>'+
+    '<div class="field"><label>Completed work picture *</label><input data-onsite-photo type="file" accept="image/*" onchange="scopePhotoChosen(\\''+esc(key)+'\\',\\'completion\\')" '+(locked?'disabled':'')+'>'+completionPreview+
+    '<div class="onsite-status '+(state.photo_file_id||state.pendingPhoto?'onsite-status-green':'onsite-status-red')+'">'+(state.photo_file_id||state.pendingPhoto?'🟢 Completion picture selected':'🔴 Completion picture required')+'</div>'+
+    '<div class="muted" style="margin-top:7px">'+esc(state.photo_note||'Selecting a picture opens the picture-note box.')+'</div></div>'+
+    '<div class="actions"><button class="btn primary" type="button" onclick="saveOnsiteScope(\\''+esc(key)+'\\')" '+(locked?'disabled':'')+'>Save completed scope</button></div>'+
+    (state.message?'<div class="'+(state.message.kind||'ok')+'" style="margin-top:10px">'+esc(state.message.text||'')+'</div>':'')+
+   '</div></div>';
+ }).join('');
+ const complete=(onsiteScopes||[]).length>0&&onsiteScopes.every(x=>onsiteStateComplete(onsiteKey(x.id)));
+ const status=el('onsiteFinishStatus'),btn=el('onsiteFinishBtn');
+ if(status){status.className='onsite-status '+(complete?'onsite-status-green':'onsite-status-red');status.textContent=complete?'🟢 All scopes saved — confirm waste to finish.':'🔴 Complete and save every scope above before continuing.';}
+ if(btn)btn.disabled=!complete||locked;
+ const pill=el('onsiteWorkflowStatus');if(pill){pill.textContent=locked?'Completed':'In progress';pill.classList.toggle('status-completed',locked);}
+};
+scopePhotoChosen = window.scopePhotoChosen = function(key,type){
+ const row=document.querySelector('[data-onsite-scope="'+key+'"]');
+ const input=row?.querySelector(type==='progress'?'[data-onsite-progress-photo]':'[data-onsite-photo]');
+ const file=input?.files?.[0]; if(!file)return;
+ window.asgScopePhotoTarget={key,type,file};
+ let modal=el('scopePhotoNoteModal');
+ if(!modal){modal=document.createElement('div');modal.id='scopePhotoNoteModal';modal.className='modal';modal.innerHTML='<div class="card" style="max-width:520px;width:calc(100% - 28px);margin:10vh auto"><h2 id="scopePhotoModalTitle">Picture note</h2><img id="scopePhotoModalPreview" alt="Selected picture preview" style="display:block;width:100%;max-height:260px;object-fit:contain;border:1px solid var(--line);border-radius:10px;margin:8px 0"><div class="field"><label for="scopePhotoModalNote">Picture note *</label><textarea id="scopePhotoModalNote" placeholder="Describe what this picture shows…"></textarea></div><div class="actions"><button class="btn primary" type="button" onclick="confirmScopePhoto()">Save picture and note</button><button class="btn light" type="button" onclick="cancelScopePhoto()">Choose another picture</button></div><div id="scopePhotoModalMsg" style="margin-top:10px"></div></div>';document.body.appendChild(modal);}
+ el('scopePhotoModalTitle').textContent=type==='progress'?'Progress picture note':'Completed work picture note';
+ el('scopePhotoModalPreview').src=URL.createObjectURL(file);
+ el('scopePhotoModalNote').value='';el('scopePhotoModalMsg').innerHTML='';modal.classList.remove('hidden');setTimeout(()=>el('scopePhotoModalNote')?.focus(),50);
+};
+cancelScopePhoto = window.cancelScopePhoto = function(){const m=el('scopePhotoNoteModal');if(m)m.classList.add('hidden');window.asgScopePhotoTarget=null;};
+confirmScopePhoto = window.confirmScopePhoto = function(){
+ const t=window.asgScopePhotoTarget,n=el('scopePhotoModalNote')?.value.trim()||'';
+ if(!t||!n){el('scopePhotoModalMsg').innerHTML='<div class="err">Add a note for this picture.</div>';return;}
+ const state=onsiteCompletionState[t.key]||{};
+ if(t.type==='progress'){state.pendingProgressPhoto=t.file;state.progress_photo_note=n;}
+ else{state.pendingPhoto=t.file;state.photo_note=n;}
+ state.message={kind:'ok',text:(t.type==='progress'?'Progress picture and note added.':'Completion picture and note added.')+' Save this scope to store it.'};
+ onsiteCompletionState[t.key]=state;cancelScopePhoto();renderOnsiteWorkflow();
+};
+onsiteCompletionPhotoChosen = window.onsiteCompletionPhotoChosen = function(key){scopePhotoChosen(key,'completion');};
 </script></body></html>
