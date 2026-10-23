@@ -2279,17 +2279,17 @@ renderOnsiteWorkflow = window.renderOnsiteWorkflow = function(){
     '<h4 style="margin:0;color:#0c3e17">Job scope '+(index+1)+' progress picture and notes</h4>'+
     '<div class="muted" style="margin:6px 0 10px">Optional. Add progress notes and a picture while work is in progress.</div>'+
     '<div class="field"><label>Progress notes</label><textarea data-onsite-progress-note placeholder="Add progress notes" '+(locked?'disabled':'')+'>'+esc(state.progress_photo_note||'')+'</textarea></div>'+
-    '<div class="field"><label>Progress picture</label><input data-onsite-progress-photo type="file" accept="image/*" onchange="scopePhotoChosen(\\''+esc(key)+'\\',\\'progress\\')" '+(locked?'disabled':'')+'>'+progressPreview+
+    '<div class="field"><label>Progress picture</label><input data-onsite-progress-photo type="file" accept="image/*" onchange="scopePhotoChosen(\''+esc(key)+'\',\'progress\')" '+(locked?'disabled':'')+'>'+progressPreview+
     '<div class="muted" style="margin-top:7px">'+(state.pendingProgressPhoto?'Picture selected — save this scope to upload it.':'Selecting a picture opens the picture-note box.')+'</div></div>'+
    '</div>'+
    '<div class="onsite-complete-card '+(done?'ready':'')+'">'+
     '<h4 style="margin:0;color:#0c3e17">Job scope complete?</h4>'+
     '<div class="muted" style="margin:6px 0 10px">Add the completed work details, picture and note. This is required.</div>'+
     '<div class="field"><label>Completed work *</label><textarea data-onsite-work placeholder="Describe what was completed for this scope" '+(locked?'disabled':'')+'>'+esc(state.work||'')+'</textarea></div>'+
-    '<div class="field"><label>Completed work picture *</label><input data-onsite-photo type="file" accept="image/*" onchange="scopePhotoChosen(\\''+esc(key)+'\\',\\'completion\\')" '+(locked?'disabled':'')+'>'+completionPreview+
+    '<div class="field"><label>Completed work picture *</label><input data-onsite-photo type="file" accept="image/*" onchange="scopePhotoChosen(\''+esc(key)+'\',\'completion\')" '+(locked?'disabled':'')+'>'+completionPreview+
     '<div class="onsite-status '+(state.photo_file_id||state.pendingPhoto?'onsite-status-green':'onsite-status-red')+'">'+(state.photo_file_id||state.pendingPhoto?'🟢 Completion picture selected':'🔴 Completion picture required')+'</div>'+
     '<div class="muted" style="margin-top:7px">'+esc(state.photo_note||'Selecting a picture opens the picture-note box.')+'</div></div>'+
-    '<div class="actions"><button class="btn primary" type="button" onclick="saveOnsiteScope(\\''+esc(key)+'\\')" '+(locked?'disabled':'')+'>Save completed scope</button></div>'+
+    '<div class="actions"><button class="btn primary" type="button" onclick="saveOnsiteScope(\''+esc(key)+'\')" '+(locked?'disabled':'')+'>Save completed scope</button></div>'+
     (state.message?'<div class="'+(state.message.kind||'ok')+'" style="margin-top:10px">'+esc(state.message.text||'')+'</div>':'')+
    '</div></div>';
  }).join('');
