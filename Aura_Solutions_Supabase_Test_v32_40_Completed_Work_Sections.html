@@ -447,7 +447,8 @@ function renderCalendar(){
 }
 
 let siteVisitSections=[],siteVisitPhotos=[],siteVisitReport=null;
-function isSiteVisitJob(){return ['site_visit','remedial_works'].includes(activeJob?.job_types?.code);}
+function isSiteVisitJob(){return false;}
+// All job types use the standard Aura operator workflow. Legacy site-visit rendering remains only for old records and is never selected for new jobs.
 function fieldReportLabel(){return activeJob?.job_types?.code==='remedial_works'?'Remedial Works':'Site Visit';}
 function isAdditionalSiteVisitPhoto(row){return /\/site-[^/]+$/.test(row?.storage_path||'');}
 function siteVisitToggleWaste(){el('siteVisitWasteFields').classList.toggle('hidden',el('siteVisitWastePresent').value!=='true');}
@@ -682,7 +683,7 @@ const serviceChecklistDefinitions={
 };
 const serviceChecklistAliases={pump_station_service:'pump_station_service',pump_station_minor_service:'pump_station_service',minor_site_service:'pump_station_service',minor_service:'pump_station_service',pump_station_major_service:'pump_station_major_service',pump_station_major:'pump_station_major_service',major_site_service:'pump_station_major_service',major_service:'pump_station_major_service',pump_station_compound_maintenance:'pump_station_compound_maintenance',pump_station_compound:'pump_station_compound_maintenance',compound_maintenance:'pump_station_compound_maintenance'};
 function serviceChecklistCode(){const raw=activeJob?.job_types?.code||'';return serviceChecklistAliases[raw]||raw;}
-function serviceChecklistDefinition(){return serviceChecklistDefinitions[serviceChecklistCode()]||null;}
+function serviceChecklistDefinition(){return null;}
 function displayJobTypeName(type){
  const code=typeof type==='string'?type:(type?.code||'');
  const name=typeof type==='string'?'':(type?.name||'');
@@ -2041,13 +2042,13 @@ async function editActiveJob(){
  await showCreateJob(activeJob);
 }
 function toggleJobType(){
- const id=el('job_type_id')?.value||'';const t=jobTypeTemplates.find(x=>x.id===id);const waste=!!t?.requires_waste_workflow;const contractorOption=el('assignment_type')?.querySelector('option[value="contractor"]');if(contractorOption)contractorOption.disabled=['site_visit','remedial_works'].includes(t?.code);if(['site_visit','remedial_works'].includes(t?.code)&&el('assignment_type').value==='contractor'){el('assignment_type').value='employee';toggleAssignment();}
+ const id=el('job_type_id')?.value||'',t=jobTypeTemplates.find(x=>x.id===id),waste=!!t?.requires_waste_workflow;
  el('wastePlanningSection')?.classList.toggle('hidden',!waste);
- if(!waste){el('waste_expected').value='false';el('plannedDisposalWrap').classList.add('hidden');}else if(['bulk_liquid_waste','bulk_liquid_waste_removal','bulk_liquid_removal','bulk_waste_removal'].includes(t?.code)){el('waste_expected').value='true';toggleWastePlanning();}
+ if(!waste){el('waste_expected').value='false';el('plannedDisposalWrap').classList.add('hidden');}else if(!el('waste_expected').value||el('waste_expected').value==='false'){el('waste_expected').value='true';toggleWastePlanning();}
  const help=el('jobTypeHelp'),info=el('nonWasteTemplateInfo');
- if(!t){if(help)help.textContent='Choose the type of work first. Aura will show the relevant planning fields and, as each template is developed, the correct operative prompts and final report.';if(info)info.classList.add('hidden');return;}
- if(help)help.innerHTML='<b>'+esc(t.name)+'</b>'+(t.description?' — '+esc(t.description):'');
- if(info){if(waste){info.classList.add('hidden');info.textContent='';}else{info.classList.remove('hidden');info.innerHTML=t.code==='site_visit'?'<b>Site Visit</b><br>Assign this survey to an employed operative. They can add proposed scopes, pricing needs and a waste assessment with photos on site.':'<b>🧰 '+esc(t.name)+' template</b><br>This job type is now separated from the waste workflow. The exact service prompts, required checks, photos and report fields will be configured next without changing the common Aura job workflow.';}}
+ if(!t){if(help)help.textContent='Choose the job type. Every job type uses the standard Aura operator workflow.';if(info)info.classList.add('hidden');return;}
+ if(help)help.innerHTML='<b>'+esc(t.name)+'</b>'+(t.description?' — '+esc(t.description):'')+'<div class="location-hint" style="margin-top:6px">All job types use the standard Aura operator workflow.</div>';
+ if(info){info.classList.add('hidden');info.textContent='';}
 }
 function toggleWastePlanning(){el('plannedDisposalWrap').classList.toggle('hidden',el('waste_expected').value!=='true');}
 function toggleAssignment(){const t=el('assignment_type').value;el('employeeWrap').classList.toggle('hidden',t!=='employee');el('contractorWrap').classList.toggle('hidden',t!=='contractor');}
@@ -2055,7 +2056,7 @@ function makeJobNumber(){const d=new Date(),pad=n=>String(n).padStart(2,'0');ret
 el('jobForm').addEventListener('submit',async e=>{
  e.preventDefault();clearValidation(el('jobForm'));
  const basic=['job_type_id','customer_id','site_address'].filter(id=>!String(el(id).value||'').trim());if(basic.length){markRequired(basic);el('jobMsg').innerHTML='<div class="err">Please complete the highlighted required fields.</div>';return;}
- const t=el('assignment_type').value;const selectedType=jobTypeTemplates.find(x=>x.id===el('job_type_id').value);if(['site_visit','remedial_works'].includes(selectedType?.code)&&t==='contractor'){el('jobMsg').innerHTML='<div class="err">Assign a Site Visit to an employed operative.</div>';return;}const assigned=t==='employee'?el('assigned_to').value:null;const contractor=t==='contractor'?el('contractor_id').value:null;
+ const t=el('assignment_type').value;const selectedType=jobTypeTemplates.find(x=>x.id===el('job_type_id').value);const assigned=t==='employee'?el('assigned_to').value:null;const contractor=t==='contractor'?el('contractor_id').value:null;
  if(t==='employee'&&!assigned){el('jobMsg').innerHTML='<div class="err">Please select an employed operative.</div>';return;}if(t==='contractor'&&!contractor){el('jobMsg').innerHTML='<div class="err">Please select a contractor.</div>';return;}
  const saveCustomerSite=!!el('save_customer_site')?.checked&&!el('customer_site_id')?.value;if(saveCustomerSite&&!String(el('customer_site_name')?.value||'').trim()){markRequired(['customer_site_name']);el('jobMsg').innerHTML='<div class="err">Please give the saved site a name.</div>';return;}
  if(newStageParentId&&!el('newStageTitle').value.trim()){markRequired(['newStageTitle']);el('jobMsg').innerHTML='<div class="err">Give this stage a name.</div>';return;}
