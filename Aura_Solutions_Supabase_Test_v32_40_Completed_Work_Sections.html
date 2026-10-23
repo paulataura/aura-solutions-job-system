@@ -127,7 +127,7 @@
   <div class="card" style="max-width:520px;width:calc(100% - 28px);margin:10vh auto">
     <h2 id="onsitePhotoNoteTitle">Picture note</h2>
     <p class="muted">Add a note about what this picture shows.</p>
-    <div class="field"><label for="onsitePhotoNoteInput">Picture note *</label><textarea id="onsitePhotoNoteInput" placeholder="Describe what this picture shows…"></textarea></div>
+    <img id="onsitePhotoNotePreview" alt="Selected picture preview" style="display:none;width:100%;max-height:260px;object-fit:contain;border:1px solid var(--line);border-radius:10px;margin:8px 0"><div class="field"><label for="onsitePhotoNoteInput">Picture note *</label><textarea id="onsitePhotoNoteInput" placeholder="Describe what this picture shows…"></textarea></div>
     <div class="actions"><button class="btn primary" type="button" onclick="confirmOnsitePhotoNote()">Save picture note</button><button class="btn light" type="button" onclick="cancelOnsitePhotoNote()">Choose another picture</button></div>
     <div id="onsitePhotoNoteMsg" style="margin-top:10px"></div>
   </div>
@@ -2178,13 +2178,13 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.service
 function toggleAbortPanel(open=true){const f=el('abortForm');if(!f)return;f.classList.toggle('hidden',!open);if(open)el('abort_reason')?.focus();}
 function openOnsitePhotoNote(kind,key,file,title){
  window.asgPhotoModalTarget={kind,key,file};
- el('onsitePhotoNoteTitle').textContent=title||'Picture note';
+ el('onsitePhotoNoteTitle').textContent=title||'Picture note';const preview=el('onsitePhotoNotePreview');if(preview){preview.src=URL.createObjectURL(file);preview.style.display='block';}
  el('onsitePhotoNoteInput').value='';
  el('onsitePhotoNoteMsg').innerHTML='';
  el('onsitePhotoNoteModal').classList.remove('hidden');
  setTimeout(()=>el('onsitePhotoNoteInput')?.focus(),50);
 }
-function cancelOnsitePhotoNote(){window.asgPhotoModalTarget=null;el('onsitePhotoNoteModal')?.classList.add('hidden');}
+function cancelOnsitePhotoNote(){window.asgPhotoModalTarget=null;const preview=el('onsitePhotoNotePreview');if(preview){preview.removeAttribute('src');preview.style.display='none';}el('onsitePhotoNoteModal')?.classList.add('hidden');}
 function confirmOnsitePhotoNote(){
  const target=window.asgPhotoModalTarget,note=el('onsitePhotoNoteInput')?.value.trim()||'';
  if(!target||!note){el('onsitePhotoNoteMsg').innerHTML='<div class="err">Add a note for this picture.</div>';return;}
