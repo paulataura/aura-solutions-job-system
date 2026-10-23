@@ -285,7 +285,7 @@ async function loadJobs(){
  const {data:jobs,error:jErr}=await db.from('jobs').select(fields).order('created_at',{ascending:false});
  if(jErr){el('status').className='err';el('status').textContent='Connected, but jobs could not be loaded: '+jErr.message;return;}
  el('status').className='ok';el('status').textContent=management?'Supabase connected successfully.':'Showing only jobs assigned to your operative account.';
- jobCentreJobs=jobs||[];
+ jobCentreJobs=management?(jobs||[]):(jobs||[]).filter(j=>!['completed','aborted'].includes(j.status));
  if(management && !jobCentreJobs.length){
    el('status').className='err';
    el('status').textContent='No jobs were returned for this management account. Check the jobs read policy in the v32.33 SQL migration.';
