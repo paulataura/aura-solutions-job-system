@@ -2321,4 +2321,50 @@ confirmScopePhoto = window.confirmScopePhoto = function(){
  onsiteCompletionState[t.key]=state;cancelScopePhoto();renderOnsiteWorkflow();
 };
 onsiteCompletionPhotoChosen = window.onsiteCompletionPhotoChosen = function(key){scopePhotoChosen(key,'completion');};
+
+/* v32.44 definitive scope save override: one upload path for progress and completion evidence */
+saveOnsiteScope = window.saveOnsiteScope = async function(key){
+ const scope=onsiteScopeByKey(key),row=document.querySelector('[data-onsite-scope="'+key+'"]');
+ if(!activeJob||activeJob.status!=='on_site'||!scope||!row)return;
+ const st=onsiteCompletionState[key]||{};
+ const work=row.querySelector('[data-onsite-work]')?.value.trim()||'';
+ const progressNote=row.querySelector('[data-onsite-progress-note]')?.value.trim()||st.progress_photo_note||'';
+ const completionFile=st.pendingPhoto||row.querySelector('[data-onsite-photo]')?.files?.[0]||null;
+ const completionNote=String(st.photo_note||'').trim();
+ if(!work){st.message={kind:'err',text:'Add the completed work for this scope.'};onsiteCompletionState[key]=st;renderOnsiteWorkflow();return;}
+ if(!st.photo_file_id&&!completionFile){st.message={kind:'err',text:'Add the completed work picture.'};onsiteCompletionState[key]=st;renderOnsiteWorkflow();return;}
+ if(!st.photo_file_id&&!completionNote){st.message={kind:'err',text:'Select the completed work picture and add its picture note.'};onsiteCompletionState[key]=st;renderOnsiteWorkflow();return;}
+ st.work=work;st.progress_photo_note=progressNote;st.message={kind:'muted',text:'Saving scope pictures and notes…'};onsiteCompletionState[key]=st;renderOnsiteWorkflow();
+ try{
+  const visitId=await getLatestVisitId();
+  const upload=async(file,fileType,caption,folder)=>{
+   if(!file)return null;
+   const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'').toLowerCase()||'jpg';
+   const path='jobs/'+activeJob.id+'/'+folder+'/'+key+'-'+crypto.randomUUID()+'.'+ext;
+   const up=await db.storage.from('job-files').upload(path,file,{contentType:file.type||'image/jpeg',upsert:false});
+   if(up.error)throw up.error;
+   const ins=await db.from('job_files').insert({job_id:activeJob.id,visit_id:visitId,file_type:fileType,file_name:file.name||fileType,storage_path:path,caption:caption||null,uploaded_by:activeSession.user.id}).select('id').single();
+   if(ins.error)throw ins.error;
+   return ins.data.id;
+  };
+  if(!st.progress_photo_file_id&&st.pendingProgressPhoto){
+   st.progress_photo_file_id=await upload(st.pendingProgressPhoto,'progress_photo',progressNote,'progress');
+   st.pendingProgressPhoto=null;
+  }
+  if(!st.photo_file_id&&completionFile){
+   st.photo_file_id=await upload(completionFile,'completion_photo',completionNote,'completion');
+   st.pendingPhoto=null;
+  }
+  const current=await db.from('job_visits').select('completion_sections').eq('id',visitId).maybeSingle();
+  if(current.error)throw current.error;
+  const entry={id:key,scope_id:scope.id==='base'?null:scope.id,title:scope.title,work,progress_photo_file_id:st.progress_photo_file_id||null,progress_photo_note:progressNote||null,photo_file_id:st.photo_file_id,photo_note:completionNote};
+  const existing=Array.isArray(current.data?.completion_sections)?current.data.completion_sections:[];
+  const next=existing.filter(x=>String(x.id||'')!==key&&String(x.scope_id||'')!==String(entry.scope_id||'')).concat(entry);
+  const saved=await db.from('job_visits').update({completion_sections:next,updated_at:new Date().toISOString()}).eq('id',visitId);
+  if(saved.error)throw saved.error;
+  st.message={kind:'ok',text:'Scope pictures and notes saved.'};onsiteCompletionState[key]=st;renderOnsiteWorkflow();
+ }catch(err){
+  st.message={kind:'err',text:'Save failed: '+(err.message||String(err))};onsiteCompletionState[key]=st;renderOnsiteWorkflow();
+ }
+};
 </script></body></html>
