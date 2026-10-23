@@ -697,7 +697,7 @@ function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWork
 function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
 function syncStandardOperatorWorkflow(){
  keepOnsiteContactsVisible();
- const job=activeJob,role=activeProfile?.role,operator=['operative','admin','manager'].includes(role),onsite=!!job&&operator&&['draft','issued','accepted','on_site','completed'].includes(job.status),activeOnsite=!!job&&operator&&job.status==='on_site';
+ const job=activeJob,role=activeProfile?.role,operator=role==='operative',onsite=!!job&&operator&&['on_site','completed'].includes(job.status),activeOnsite=!!job&&operator&&job.status==='on_site';
  if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;}
  if(!activeOnsite)window.asgFinalConfirmationOpen=false;
  const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
@@ -717,7 +717,7 @@ function syncStandardOperatorWorkflow(){
 
 let onsiteScopes=[];
 let onsiteCompletionState={};
-function onsiteOperatorActive(){return !!activeJob&&['operative','admin','manager'].includes(activeProfile?.role)&&['draft','issued','accepted','on_site','completed'].includes(activeJob.status);}
+function onsiteOperatorActive(){return !!activeJob&&activeProfile?.role==='operative'&&['on_site','completed'].includes(activeJob.status);}
 function onsiteKey(id){return String(id||'base').replace(/[^a-zA-Z0-9_-]/g,'_');}
 function onsiteScopeByKey(key){return onsiteScopes.find(x=>onsiteKey(x.id)===key)||null;}
 function onsiteStateComplete(key){const state=onsiteCompletionState[key]||{};return !!String(state.work||'').trim()&&!!state.photo_file_id;}
