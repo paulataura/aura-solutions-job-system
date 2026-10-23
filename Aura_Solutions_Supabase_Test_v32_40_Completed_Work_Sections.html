@@ -2395,4 +2395,20 @@ window.asgOriginalConfirmOnsitePhotoNote=window.asgOriginalConfirmOnsitePhotoNot
   if(activeJob?.status==='on_site')setTimeout(()=>el('onsiteWorkflowPanel')?.scrollIntoView({behavior:'smooth',block:'start'}),160);
  };
 })();
+
+/* v32.46 preserve shared popup actions while keeping scope actions definitive */
+confirmOnsitePhotoNote = window.confirmOnsitePhotoNote = function(){
+ const target=window.asgPhotoModalTarget,note=el('onsitePhotoNoteInput')?.value.trim()||'';
+ if(!target||!note){el('onsitePhotoNoteMsg').innerHTML='<div class="err">Add a note for this picture.</div>';return;}
+ if(target.kind==='progress'||target.kind==='completion'){
+  const st=onsiteCompletionState[target.key]||{};
+  if(target.kind==='progress'){st.pendingProgressPhoto=target.file;st.pendingProgressNote=note;st.progress_photo_note=note;st.progress_message={kind:'ok',text:'Progress picture and note added.'};}
+  else{st.pendingPhoto=target.file;st.photo_note=note;st.message={kind:'ok',text:'Completion picture and note added.'};}
+  onsiteCompletionState[target.key]=st;cancelOnsitePhotoNote();renderOnsiteWorkflow();return;
+ }
+ if(target.kind==='disposal'){window.asgPendingDisposalPhoto=target.file;window.asgPendingDisposalNote=note;el('disposalEvidenceState')&&(el('disposalEvidenceState').textContent='Picture selected with note.');}
+ else if(target.kind==='further'){window.asgFurtherPendingPhoto=target.file;if(el('onsiteFurtherPhotoNote'))el('onsiteFurtherPhotoNote').value=note;}
+ else if(target.kind==='contractor'){window.asgContractorPhotoNote=note;const meta=window.asgContractorPhotoMeta;if(meta){if(meta.kind==='progress')contractorUploadProgressFiles(meta.input,meta.msgId);else contractorUploadFile(meta.input,meta.kind==='completion'?'completion_photo':'waste_evidence',meta.msgId);}}
+ cancelOnsitePhotoNote();
+};
 </script></body></html>
