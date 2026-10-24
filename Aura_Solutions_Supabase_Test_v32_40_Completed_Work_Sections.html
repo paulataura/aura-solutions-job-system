@@ -2280,7 +2280,7 @@ renderOnsiteWorkflow = window.renderOnsiteWorkflow = function(){
     '<div class="muted" style="margin:6px 0 10px">Optional. Add progress notes and a picture while work is in progress.</div>'+
     '<div class="field"><label>Progress notes</label><textarea data-onsite-progress-note placeholder="Add progress notes" '+(locked?'disabled':'')+'>'+esc(state.progress_photo_note||'')+'</textarea></div>'+
     '<div class="field"><label>Progress picture</label><input data-onsite-progress-photo type="file" accept="image/*" onchange="scopePhotoChosen(\''+esc(key)+'\',\'progress\')" '+(locked?'disabled':'')+'>'+progressPreview+
-    '<div class="muted" style="margin-top:7px">'+(state.pendingProgressPhoto?'Picture selected — save this scope to upload it.':'Selecting a picture opens the picture-note box.')+'<button class="btn light" type="button" onclick="addOnsiteProgressPhoto(\\''+esc(key)+'\\')" style="margin-top:8px">＋ Add another progress picture</button>'+'</div></div>'+
+    '<div class="muted" style="margin-top:7px">'+(state.pendingProgressPhoto?'Picture selected — save this scope to upload it.':'Selecting a picture opens the picture-note box.')+'<button class="btn light" type="button" onclick="addOnsiteProgressPhoto(\''+esc(key)+'\\')" style="margin-top:8px">＋ Add another progress picture</button>'+'</div></div>'+
    '</div>'+
    '<div class="onsite-complete-card '+(done?'ready':'')+'">'+
     '<h4 style="margin:0;color:#0c3e17">Job scope complete?</h4>'+
