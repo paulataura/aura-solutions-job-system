@@ -2425,6 +2425,19 @@ confirmOnsitePhotoNote=function(){
 const asgObserver=new MutationObserver(()=>asgInjectOperatorPictureControls());
 asgObserver.observe(document.body,{childList:true,subtree:true});
 asgInjectOperatorPictureControls();
+
+/* v32.48 delegated scope picture handler */
+if(!window.asgDelegatedScopePhotoHandler){
+ window.asgDelegatedScopePhotoHandler=true;
+ document.addEventListener('change',function(ev){
+  const input=ev.target;
+  if(!(input instanceof HTMLInputElement)||input.type!=='file')return;
+  const row=input.closest('[data-onsite-scope]');if(!row)return;
+  const kind=input.matches('[data-onsite-progress-photo]')?'progress':input.matches('[data-onsite-photo]')?'completion':null;
+  const file=input.files?.[0];if(!kind||!file)return;
+  openOnsitePhotoNote(kind,row.getAttribute('data-onsite-scope'),file,kind==='progress'?'Job scope progress picture':'Job scope completion picture');
+ },true);
+}
 })();
 
 /* v32.46 preserve shared popup actions while keeping scope actions definitive */
