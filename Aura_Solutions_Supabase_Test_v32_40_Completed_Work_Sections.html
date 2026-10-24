@@ -2404,9 +2404,7 @@ function asgInjectOperatorPictureControls(){
   const completion=row.querySelector('[data-onsite-photo]');
   if(progress&&!progress.dataset.asgBound){progress.dataset.asgBound='1';progress.setAttribute('capture','environment');progress.addEventListener('change',()=>{const f=progress.files?.[0];if(f)openOnsitePhotoNote('progress',key,f,'Job scope progress picture');});}
   if(completion&&!completion.dataset.asgBound){completion.dataset.asgBound='1';completion.setAttribute('capture','environment');completion.addEventListener('change',()=>{const f=completion.files?.[0];if(f)openOnsitePhotoNote('completion',key,f,'Job scope completion picture');});}
-  const progressField=progress?.closest('.field')||progress?.parentElement;
-  if(progressField&&!progressField.querySelector('[data-asg-progress-notes],[data-onsite-progress-note]')){const label=document.createElement('label');label.textContent='Progress notes';const ta=document.createElement('textarea');ta.setAttribute('data-asg-progress-notes','1');ta.placeholder='Add progress notes';ta.value=onsiteCompletionState[key]?.progress_photo_note||'';ta.addEventListener('input',()=>{onsiteCompletionState[key]=onsiteCompletionState[key]||{};onsiteCompletionState[key].progress_photo_note=ta.value;});progressField.insertBefore(label,progress);progressField.insertBefore(ta,progress);}
- });
+});
 }
 const asgOldRenderOnsiteWorkflow=renderOnsiteWorkflow;
 renderOnsiteWorkflow=function(){asgOldRenderOnsiteWorkflow();asgInjectOperatorPictureControls();};
