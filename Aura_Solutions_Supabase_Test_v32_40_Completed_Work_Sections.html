@@ -770,7 +770,7 @@ function renderWorkflow(){
  const serviceJob=!!serviceChecklistDefinition();el('serviceChecklistPanel').classList.toggle('hidden',!serviceJob||!['on_site','completed','returned','reviewed','closed'].includes(activeJob.status));
  const canComplete=(!management && ['on_site','completed'].includes(activeJob.status))||(managementCapture&&['draft','issued','accepted','on_site','completed','returned','reviewed'].includes(activeJob.status));
  el('completionSection').classList.toggle('hidden',!canComplete);
- const canSignoff=(!management && activeJob.status==='on_site')||(managementCapture&&['draft','on_site','completed'].includes(activeJob.status));
+ const canSignoff=(!management && activeJob.status==='on_site')||(managementCapture&&['on_site','completed'].includes(activeJob.status));
  el('siteSignoffSection').classList.toggle('hidden',!canSignoff);
  const canDispose=(!management && activeJob.status==='completed')||(managementCapture&&activeJob.status==='completed');
  el('disposalSection').classList.toggle('hidden',!canDispose);
