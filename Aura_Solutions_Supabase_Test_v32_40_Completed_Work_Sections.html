@@ -2394,6 +2394,37 @@ window.asgOriginalConfirmOnsitePhotoNote=window.asgOriginalConfirmOnsitePhotoNot
   await original();
   if(activeJob?.status==='on_site')setTimeout(()=>el('onsiteWorkflowPanel')?.scrollIntoView({behavior:'smooth',block:'start'}),160);
  };
+
+/* v32.47 runtime-scoped operator picture controls */
+function asgInjectOperatorPictureControls(){
+ const cards=el('onsiteScopeCards');if(!cards)return;
+ cards.querySelectorAll('[data-onsite-scope]').forEach(row=>{
+  const key=row.getAttribute('data-onsite-scope');
+  const progress=row.querySelector('[data-onsite-progress-photo]');
+  const completion=row.querySelector('[data-onsite-photo]');
+  if(progress&&!progress.dataset.asgBound){progress.dataset.asgBound='1';progress.setAttribute('capture','environment');progress.addEventListener('change',()=>{const f=progress.files?.[0];if(f)openOnsitePhotoNote('progress',key,f,'Job scope progress picture');});}
+  if(completion&&!completion.dataset.asgBound){completion.dataset.asgBound='1';completion.setAttribute('capture','environment');completion.addEventListener('change',()=>{const f=completion.files?.[0];if(f)openOnsitePhotoNote('completion',key,f,'Job scope completion picture');});}
+  const progressField=progress?.closest('.field')||progress?.parentElement;
+  if(progressField&&!progressField.querySelector('[data-asg-progress-notes]')){const label=document.createElement('label');label.textContent='Progress notes';const ta=document.createElement('textarea');ta.setAttribute('data-asg-progress-notes','1');ta.placeholder='Add progress notes';ta.value=onsiteCompletionState[key]?.progress_photo_note||'';ta.addEventListener('input',()=>{onsiteCompletionState[key]=onsiteCompletionState[key]||{};onsiteCompletionState[key].progress_photo_note=ta.value;});progressField.insertBefore(label,progress);progressField.insertBefore(ta,progress);}
+ });
+}
+const asgOldRenderOnsiteWorkflow=renderOnsiteWorkflow;
+renderOnsiteWorkflow=function(){asgOldRenderOnsiteWorkflow();asgInjectOperatorPictureControls();};
+const asgOldConfirmOnsitePhotoNote=confirmOnsitePhotoNote;
+confirmOnsitePhotoNote=function(){
+ const t=window.asgPhotoModalTarget,n=el('onsitePhotoNoteInput')?.value.trim()||'';
+ if(t&&(t.kind==='progress'||t.kind==='completion')){
+  if(!n){el('onsitePhotoNoteMsg').innerHTML='<div class="err">Add a note for this picture.</div>';return;}
+  const st=onsiteCompletionState[t.key]||{};
+  if(t.kind==='progress'){st.pendingProgressPhoto=t.file;st.pendingProgressNote=n;st.progress_photo_note=n;st.progress_message={kind:'ok',text:'Progress picture and note added.'};}
+  else{st.pendingPhoto=t.file;st.photo_note=n;st.message={kind:'ok',text:'Completion picture and note added.'};}
+  onsiteCompletionState[t.key]=st;cancelOnsitePhotoNote();renderOnsiteWorkflow();return;
+ }
+ return asgOldConfirmOnsitePhotoNote();
+};
+const asgObserver=new MutationObserver(()=>asgInjectOperatorPictureControls());
+asgObserver.observe(document.body,{childList:true,subtree:true});
+asgInjectOperatorPictureControls();
 })();
 
 /* v32.46 preserve shared popup actions while keeping scope actions definitive */
