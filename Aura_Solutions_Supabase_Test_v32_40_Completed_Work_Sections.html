@@ -703,7 +703,7 @@ function syncStandardOperatorWorkflow(){
  const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
  if(group)group.classList.toggle('hidden',onsite&&!window.asgOperatorDetailsOpen);
  if(detailsBtn){detailsBtn.classList.toggle('hidden',!onsite);detailsBtn.textContent=window.asgOperatorDetailsOpen?'Close Job Details':'Open Job Details';}
- const standardPanel=el('onsiteWorkflowPanel');if(standardPanel)standardPanel.classList.toggle('hidden',!onsite);
+ const standardPanel=el('onsiteWorkflowPanel');if(standardPanel)standardPanel.classList.toggle('hidden',!onsite); const legacyComplete=el('completionSection');if(legacyComplete)legacyComplete.classList.toggle('hidden',onsite);
  // The standard onsite workflow replaces the legacy arrival, checklist, completion and sign-off cards for operatives.
  ['siteVisitPanel','serviceChecklistPanel','completionSection'].forEach(id=>{const node=el(id);if(node)node.classList.add('hidden');});
  const workBtn=el('toggleCompleteWorkBtn'),workContent=el('completeWorkContent');
