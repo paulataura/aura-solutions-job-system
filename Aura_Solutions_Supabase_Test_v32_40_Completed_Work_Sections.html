@@ -697,7 +697,7 @@ function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWork
 function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
 function syncStandardOperatorWorkflow(){
  keepOnsiteContactsVisible();
- const job=activeJob,role=activeProfile?.role,operator=['operative','admin','manager'].includes(role),onsite=!!job&&operator&&['draft','issued','accepted','on_site','completed'].includes(job.status),activeOnsite=!!job&&operator&&job.status==='on_site';
+ const job=activeJob,role=activeProfile?.role,operator=['operative','admin','manager'].includes(role),onsite=!!job&&operator&&['on_site','completed'].includes(job.status),activeOnsite=!!job&&operator&&job.status==='on_site';
  if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;}
  if(!activeOnsite)window.asgFinalConfirmationOpen=false;
  const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
@@ -717,7 +717,7 @@ function syncStandardOperatorWorkflow(){
 
 let onsiteScopes=[];
 let onsiteCompletionState={};
-function onsiteOperatorActive(){return !!activeJob&&['operative','admin','manager'].includes(activeProfile?.role)&&['draft','issued','accepted','on_site','completed'].includes(activeJob.status);}
+function onsiteOperatorActive(){return !!activeJob&&['operative','admin','manager'].includes(activeProfile?.role)&&['on_site','completed'].includes(activeJob.status);}
 function onsiteKey(id){return String(id||'base').replace(/[^a-zA-Z0-9_-]/g,'_');}
 function onsiteScopeByKey(key){return onsiteScopes.find(x=>onsiteKey(x.id)===key)||null;}
 function onsiteStateComplete(key){const state=onsiteCompletionState[key]||{};return !!String(state.work||'').trim()&&!!state.photo_file_id;}
@@ -777,7 +777,7 @@ function renderWorkflow(){
  else if(management && activeJob.status==='reviewed') w.innerHTML='<div class="ok"><b>Reviewed</b><br>This job has passed management review and can now be closed.</div>';
  else if(management && activeJob.status==='closed') w.innerHTML='<div class="ok"><b>Closed</b><br>This job is complete and closed.</div>';
  else if(activeJob.status==='aborted') w.innerHTML='<div class="err"><b>Job Aborted</b><br>The normal job workflow is locked. See the abort record below.</div>';
- else if(management && activeJob.contractor_id && ['draft','issued','accepted','on_site','completed'].includes(activeJob.status)) w.innerHTML=contractorLinkControls();
+ else if(management && activeJob.contractor_id && ['on_site','completed'].includes(activeJob.status)) w.innerHTML=contractorLinkControls();
  else if(!management && ['issued','accepted'].includes(activeJob.status)) w.innerHTML='';
  else if(!management && activeJob.status==='on_site') w.innerHTML='<div class="ok">You are on site. Use the workflow below.</div>';
  else if(!management && activeJob.status==='returned') w.innerHTML='<div class="ok"><b>Job returned to management.</b><br>This job is complete and locked for operative editing.</div>';
@@ -957,7 +957,7 @@ async function loadCompletionDetails(){
  const canLoad=activeJob&&((!management&&['on_site','completed'].includes(activeJob.status))||(managementCapture&&['draft','issued','accepted','on_site','completed','returned','reviewed'].includes(activeJob.status)));
  el('completionSection').classList.toggle('hidden',!canLoad);
  el('managementCompletionHint').classList.toggle('hidden',!managementCapture);
- el('managementFinishJobCardBtn').classList.toggle('hidden',!managementCapture||!['draft','issued','accepted','on_site','completed'].includes(activeJob.status));
+ el('managementFinishJobCardBtn').classList.toggle('hidden',!managementCapture||!['on_site','completed'].includes(activeJob.status));
  if(!canLoad)return;
  const {data,error}=await db.from('job_visits').select('completion_notes,issues,completion_sections').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);
  if(error){el('completionMsg').innerHTML='<div class="err">Could not load completion details: '+esc(error.message)+'</div>';return;}
