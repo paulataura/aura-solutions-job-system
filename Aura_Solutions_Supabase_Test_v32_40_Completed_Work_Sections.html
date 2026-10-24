@@ -95,29 +95,7 @@
 <div class="card" style="margin-top:14px"><div class="row"><h2>Job details</h2><span id="detailStatus" class="pill"></span></div><div class="two"><div><b>Job type</b><div id="detailJobType" class="muted"></div></div><div><b>Date / time</b><div id="detailDate" class="muted"></div></div></div><div style="margin-top:16px"><b>Reference</b><div id="detailRef" class="muted"></div></div><div style="margin-top:16px"><b>Site address</b><div id="detailAddress" class="muted"></div><div id="detailExactLocation" class="detail-location hidden"></div></div><div style="margin-top:16px"><b>Instructions</b><div id="detailInstructions"></div></div><div style="margin-top:16px"><b>Scope of work</b><div id="detailScope"></div></div><div id="detailStageInfo" class="muted" style="margin-top:12px"></div><div id="detailContractInfo" class="muted" style="margin-top:8px"></div><div id="linkedStages" class="stage-list"></div><div id="detailRevisit" class="muted" style="margin-top:12px"></div><div id="detailIssueInfo" class="issue-audit hidden"></div><div id="plannedDisposalDetail" class="hidden" style="margin-top:16px"><b>Planned disposal site</b><div id="detailDisposalSite" class="muted"></div></div><div id="detailAssignmentPanel" class="hidden" style="margin-top:20px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#f8faf8"><h2 style="margin-bottom:8px">Assignment</h2><div class="muted" style="font-size:13px;margin-bottom:10px">Choose who will receive this draft job before issuing it.</div><div class="field"><label>Assign to</label><select id="detail_assignment_type" onchange="toggleDetailAssignment()"><option value="none">Unassigned for now</option><option value="employee">Employed operative</option><option value="contractor">Third-party contractor</option></select></div><div id="detailEmployeeWrap" class="field hidden"><label>Employed operative</label><select id="detail_assigned_to"><option value="">Select operative</option></select></div><div id="detailContractorWrap" class="field hidden"><label>Third-party contractor</label><select id="detail_contractor_id"><option value="">Select contractor</option></select></div><div class="actions"><button class="btn light" type="button" onclick="saveDetailAssignment()">Save Assignment</button></div><div id="detailAssignmentMsg" style="margin-top:10px"></div></div><div id="workflowActions" class="actions" style="margin-top:20px"></div></div>
 <div id="scopeSectionsPanel" class="card hidden"><h2>Scope sections & reference pictures</h2><div class="muted">Read these saved sections and reference pictures before travelling to site. They describe the work planned for this job.</div><div id="scopeSectionsList"></div></div>
 </div>
-<div id="onsiteWorkflowPanel" class="card onsite-workflow-panel hidden" aria-live="polite">
-  <div class="row"><div><h2>On-site work</h2><div class="onsite-workflow-intro muted">Work through the scope below. Save a completion picture for each scope before completing the job.</div></div><span id="onsiteWorkflowStatus" class="pill">In progress</span></div>
-  <div id="onsiteScopeCards"></div>
-  <div id="onsiteFurtherWorkBox" class="onsite-further-box">
-    <h3>Further works if required</h3>
-    <div class="muted">Add another piece of work only if something additional is found on site.</div>
-    <button id="onsiteAddFurtherWorkBtn" class="btn light" type="button" onclick="toggleOnsiteFurtherWork()" style="margin-top:10px">+ Add further works</button>
-    <div id="onsiteFurtherWorkForm" class="onsite-further-form hidden">
-      <div class="field"><label for="onsiteFurtherTitle">Further work title *</label><input id="onsiteFurtherTitle" placeholder="e.g. Repair leaking valve"></div>
-      <div class="field"><label for="onsiteFurtherWork">What was done *</label><textarea id="onsiteFurtherWork" placeholder="Describe the additional work completed"></textarea></div>
-      <div class="field"><label for="onsiteFurtherPhoto">Completion picture *</label><input id="onsiteFurtherPhoto" class="onsite-photo-input" type="file" accept="image/*"></div>
-      <div class="field"><label for="onsiteFurtherPhotoNote">Picture note *</label><textarea id="onsiteFurtherPhotoNote" class="onsite-photo-note" placeholder="What does this picture show?"></textarea></div>
-      <div class="actions"><button class="btn primary" type="button" onclick="saveOnsiteFurtherWork()">Save further work</button><button class="btn light" type="button" onclick="toggleOnsiteFurtherWork(false)">Cancel</button></div>
-      <div id="onsiteFurtherWorkMsg" style="margin-top:10px"></div>
-    </div>
-  </div>
-  <div id="onsiteFinishBox" class="onsite-finish-box">
-    <h3>Complete job and confirm waste</h3>
-    <div id="onsiteFinishStatus" class="onsite-status onsite-status-red">🔴 Complete and save every scope above before continuing.</div>
-    <button id="onsiteFinishBtn" class="btn primary" type="button" onclick="onsiteOpenFinalConfirmation()">Complete job and confirm waste</button>
-    <div id="onsiteFinishMsg" style="margin-top:10px"></div>
-  </div>
-</div>
+
 <div id="arrivalCapture" class="card hidden">
   <h2>Arrive on Site</h2>
   <p class="muted">Take or upload one arrival picture. Add a note when prompted, then save to record your arrival and open the job.</p>
