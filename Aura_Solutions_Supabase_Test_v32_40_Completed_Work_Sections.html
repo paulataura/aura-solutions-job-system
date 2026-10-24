@@ -2436,6 +2436,8 @@ if(!window.asgDelegatedScopePhotoHandler){
   openOnsitePhotoNote(kind,row.getAttribute('data-onsite-scope'),file,kind==='progress'?'Job scope progress picture':'Job scope completion picture');
  },true);
 }
+})();
+
 /* v32.46 preserve shared popup actions while keeping scope actions definitive */
 confirmOnsitePhotoNote = window.confirmOnsitePhotoNote = function(){
  const target=window.asgPhotoModalTarget,note=el('onsitePhotoNoteInput')?.value.trim()||'';
