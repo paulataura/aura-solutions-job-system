@@ -543,7 +543,7 @@ async function openJob(id){
  el('siteVisitThanks').classList.add('hidden');el('dash').classList.add('hidden');el('createJob').classList.add('hidden');el('jobDetail').classList.remove('hidden');el('detailMsg').innerHTML='<div class="muted">Loading job…</div>';
  const {data:j,error}=await db.from('jobs').select('id,job_number,customer_id,customer_site_id,job_type_id,site_address,postcode,site_latitude,site_longitude,google_place_id,what3words,site_location_notes,site_contact_name,site_contact_phone,reference,job_date,job_time,instructions,scope_of_work,status,issued_by,issued_by_name,issued_at,aborted_at,aborted_by,aborted_by_name,aborted_from_status,abort_reason,abort_notes,waste_expected,disposal_site_id,assigned_to,contractor_id,converted_from_contractor_id,planned_waste_description,planned_ewc_code,planned_sic_code,planned_waste_quantity,planned_waste_unit,planned_container_type,revisit_interval_value,revisit_interval_unit,revisit_due_on,revisit_source_job_id,stage_parent_job_id,stage_number,stage_title,maintenance_plan_id,maintenance_due_month,job_types(name,code,description,requires_waste_workflow),customers(company_name,contact_name,email,phone,address,postcode),disposal_sites(site_name,address,postcode,email)').eq('id',id).single();
  if(error||!j){el('detailMsg').innerHTML='<div class="err">Could not open this job: '+esc(error?.message||'Job not found')+'</div>';return;}
- activeJob=j;updateEditJobButton();el('duplicateJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('addStageJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('detailJobNo').textContent=j.job_number;el('detailStatus').textContent=statusLabel(j.status);el('detailJobType').textContent=displayJobTypeName(j.job_types)||'Bulk Waste Removal';el('detailDate').textContent=(j.job_date||'No date')+(j.job_time?' · '+j.job_time.slice(0,5):'');el('detailRef').textContent=j.reference||'—';el('detailAddress').textContent=(j.site_address||'')+(j.postcode?' · '+j.postcode:'');renderDetailLocation(j);el('detailInstructions').textContent=j.instructions||'—';el('detailScope').textContent=j.scope_of_work||'—';el('detailStageInfo').textContent=j.stage_parent_job_id?'Stage '+j.stage_number+' · '+(j.stage_title||'Follow-up works'):'';el('detailContractInfo').textContent=j.maintenance_plan_id?'Contract maintenance · due '+new Date(j.maintenance_due_month+'T12:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';el('detailRevisit').textContent=j.revisit_interval_value?'🔔 Suggested revisit: every '+j.revisit_interval_value+' '+j.revisit_interval_unit+(j.revisit_due_on?' · due '+new Date(j.revisit_due_on+'T12:00:00').toLocaleDateString('en-GB',{dateStyle:'medium'}):' after completion'):'';el('detailRevisit').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));const ds=j.disposal_sites;el('plannedDisposalDetail').classList.toggle('hidden',!j.waste_expected);el('detailDisposalSite').textContent=ds?[ds.site_name,ds.address,ds.postcode].filter(Boolean).join(' · '):'To be confirmed';await refreshActiveJobAssignee();await renderIssueInfo();renderOperatorJobBrief();el('jobBriefingGroup')?.classList.add('hidden');el('toggleJobDetailsBtn')?.classList.remove('hidden');await loadDetailAssignment();renderWorkflow();renderAbortAudit();await loadArrivalNotes();await loadCompletionDetails();await loadServiceChecklist();await loadSiteSignoff();await loadManagementReview();await Promise.all([loadLinkedStages(),loadScopeSections(),loadSiteVisit()]);await loadOnsiteWorkflow();el('detailMsg').innerHTML='';
+ activeJob=j;updateEditJobButton();el('duplicateJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('addStageJobBtn').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));el('detailJobNo').textContent=j.job_number;el('detailStatus').textContent=statusLabel(j.status);el('detailJobType').textContent=displayJobTypeName(j.job_types)||'Bulk Waste Removal';el('detailDate').textContent=(j.job_date||'No date')+(j.job_time?' · '+j.job_time.slice(0,5):'');el('detailRef').textContent=j.reference||'—';el('detailAddress').textContent=(j.site_address||'')+(j.postcode?' · '+j.postcode:'');renderDetailLocation(j);el('detailInstructions').textContent=j.instructions||'—';el('detailScope').textContent=j.scope_of_work||'—';el('detailStageInfo').textContent=j.stage_parent_job_id?'Stage '+j.stage_number+' · '+(j.stage_title||'Follow-up works'):'';el('detailContractInfo').textContent=j.maintenance_plan_id?'Contract maintenance · due '+new Date(j.maintenance_due_month+'T12:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';el('detailRevisit').textContent=j.revisit_interval_value?'🔔 Suggested revisit: every '+j.revisit_interval_value+' '+j.revisit_interval_unit+(j.revisit_due_on?' · due '+new Date(j.revisit_due_on+'T12:00:00').toLocaleDateString('en-GB',{dateStyle:'medium'}):' after completion'):'';el('detailRevisit').classList.toggle('hidden',!['admin','manager'].includes(activeProfile?.role));const ds=j.disposal_sites;el('plannedDisposalDetail').classList.toggle('hidden',!j.waste_expected);el('detailDisposalSite').textContent=ds?[ds.site_name,ds.address,ds.postcode].filter(Boolean).join(' · '):'To be confirmed';await refreshActiveJobAssignee();await renderIssueInfo();renderOperatorJobBrief();el('jobBriefingGroup')?.classList.add('hidden');el('toggleJobDetailsBtn')?.classList.remove('hidden');await loadDetailAssignment();renderWorkflow();renderAbortAudit();await loadArrivalNotes();await loadCompletionDetails();await loadServiceChecklist();await loadSiteSignoff();await loadManagementReview();await Promise.all([loadLinkedStages(),loadScopeSections(),loadSiteVisit()]);el('detailMsg').innerHTML='';
 }
 
 
@@ -670,9 +670,9 @@ function displayJobTypeName(type){
  return labels[key]||labels[String(name).toLowerCase().replace(/[^a-z0-9]+/g,'_')]||name||'Job';
 }
 window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;window.asgWorkflowJobId=null;
-function toggleOperatorJobDetails(){window.asgOperatorDetailsOpen=!window.asgOperatorDetailsOpen;syncStandardOperatorWorkflow();}
-function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWorkOpen;syncStandardOperatorWorkflow();}
-function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
+function toggleOperatorJobDetails(){window.asgOperatorDetailsOpen=!window.asgOperatorDetailsOpen;}
+function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWorkOpen;}
+function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;}
 
 
 let onsiteScopes=[];
@@ -726,7 +726,7 @@ function renderWorkflow(){
  el('disposalSection').classList.toggle('hidden',!canDispose);
  const canAbort=canAbortActiveJob();el('abortSection').classList.toggle('hidden',!canAbort);if(canAbort){el('abort_reason').value='';el('abort_notes').value='';el('abortMsg').innerHTML='';}
  if(canSignoff||canDispose) setTimeout(initSignaturePads,50);
- syncStandardOperatorWorkflow();
+ 
 }
 function beginArrivalPhoto(){
  el('arrivalCapture').classList.remove('hidden');
@@ -782,7 +782,7 @@ async function confirmArrival(){
    // Rebuild every status-dependent work panel now that the job is on site.
    // These panels were initially loaded while the job was still issued.
    renderWorkflow();
-   await Promise.all([loadArrivalNotes(),loadCompletionDetails(),loadServiceChecklist(),loadSiteSignoff(),loadSiteVisit()]);await loadOnsiteWorkflow();
+   await Promise.all([loadArrivalNotes(),loadCompletionDetails(),loadServiceChecklist(),loadSiteSignoff(),loadSiteVisit()]);
    el('detailMsg').innerHTML='<div class="ok">Arrival picture saved. You are now in the job.</div>';
    const nextPanel=isSiteVisitJob()?el('siteVisitPanel'):(serviceChecklistDefinition()?el('serviceChecklistPanel'):el('arrivalSection'));
    if(nextPanel&&!nextPanel.classList.contains('hidden'))setTimeout(()=>nextPanel.scrollIntoView({behavior:'smooth',block:'start'}),80);
@@ -2026,11 +2026,11 @@ async function signOut(){await db.auth.signOut();activeSession=null;activeProfil
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('./Aura_Solutions_Contractor_Offline_v4.js').catch(e=>console.warn('Offline worker could not register',e));}
 (async()=>{try{restoreRememberedLogin();const token=new URLSearchParams(location.search).get('contractor_token');if(token){el('conn').textContent='Secure Contractor Link';await loadContractorPortal(token);return;}const {data:{session}}=await db.auth.getSession();el('conn').textContent='Ready';if(session)await loadApp(session);else showLogin();}catch(e){el('conn').textContent='Error';showLogin('Could not connect to Supabase. '+e.message);}function toggleAbortForm(open=true){const f=el('abortForm');if(!f)return;f.classList.toggle('hidden',!open);if(open)el('abort_reason')?.focus();}function renderOperatorJobBrief(){const box=el('operatorJobBrief');if(!box||!activeJob)return;const show=!!activeJob;box.classList.remove('hidden');if(!show)return;el('operatorBriefCustomer').textContent=activeJob.customer_name||activeJob.customer?.name||'';el('operatorBriefType').textContent=activeJob.job_type_name||activeJob.job_type?.name||'';el('operatorBriefReference').textContent=activeJob.reference||activeJob.job_number||'';el('operatorBriefDate').textContent=[activeJob.job_date,activeJob.job_time].filter(Boolean).join(' · ')||'No date';el('operatorBriefAddress').textContent=[activeJob.site_address,activeJob.postcode].filter(Boolean).join(' · ');el('operatorBriefW3W').textContent=activeJob.what3words?('///'+activeJob.what3words.replace(/^\/*/,'')):'Not provided';el('operatorBriefLocationNotes').textContent=activeJob.site_location_notes||'No site location notes provided';el('operatorBriefSiteContact').textContent=activeJob.site_contact_name||'Site contact not provided';const phone=String(activeJob.site_contact_phone||'').replace(/[^+0-9]/g,'');const call=el('operatorBriefSiteCall');if(call&&phone){call.href='tel:'+phone;call.textContent='☎ Call '+activeJob.site_contact_phone;call.classList.remove('hidden');}el('operatorBriefInstructions').textContent=activeJob.instructions||'No instructions provided';el('operatorBriefScope').textContent=activeJob.scope_of_work||'No scope of work provided';}})();
 
-function syncStandardOperatorWorkflow(){const p=el('onsiteWorkflowPanel');if(p)p.classList.add('hidden');}
-function loadOnsiteWorkflow(){}
-function renderOnsiteWorkflow(){}
-function saveOnsiteScope(){}
-function onsiteOperatorActive(){return false;}
-function onsiteStateComplete(){return false;}
-function onsiteOpenFinalConfirmation(){}
+
+
+
+
+
+
+
 </script></body></html>
