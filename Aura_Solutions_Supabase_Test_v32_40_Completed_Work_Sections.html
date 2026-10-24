@@ -669,14 +669,14 @@ function displayJobTypeName(type){
  const labels={pump_station_service:'Pump Station Minor Service',pump_station_minor_service:'Pump Station Minor Service',minor_site_service:'Pump Station Minor Service',minor_service:'Pump Station Minor Service',pump_station_major_service:'Pump Station Major Service',major_site_service:'Pump Station Major Service',major_service:'Pump Station Major Service',pump_station_compound_maintenance:'Pump Station Compound Maintenance',compound_maintenance:'Pump Station Compound Maintenance',bulk_liquid_waste:'Bulk Waste Removal',bulk_liquid_waste_removal:'Bulk Waste Removal',bulk_liquid_removal:'Bulk Waste Removal',bulk_waste_removal:'Bulk Waste Removal',site_visit:'Site Visit',remedial_works:'Remedial Works'};
  return labels[key]||labels[String(name).toLowerCase().replace(/[^a-z0-9]+/g,'_')]||name||'Job';
 }
-window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;window.asgWorkflowJobId=null;
+window.asgOperatorDetailsOpen=true;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;window.asgWorkflowJobId=null;
 function toggleOperatorJobDetails(){window.asgOperatorDetailsOpen=!window.asgOperatorDetailsOpen;syncStandardOperatorWorkflow();}
 function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWorkOpen;syncStandardOperatorWorkflow();}
 function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
 function syncStandardOperatorWorkflow(){
  keepOnsiteContactsVisible();
  const job=activeJob,role=activeProfile?.role,operator=['operative','admin','manager'].includes(role),onsite=!!job&&operator&&['on_site','completed'].includes(job.status),activeOnsite=!!job&&operator&&job.status==='on_site';
- if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;}
+ if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=true;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;}
  if(!activeOnsite)window.asgFinalConfirmationOpen=false;
  const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
  if(group)group.classList.toggle('hidden',onsite&&!window.asgOperatorDetailsOpen);
