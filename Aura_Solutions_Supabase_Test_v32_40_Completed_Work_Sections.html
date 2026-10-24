@@ -673,71 +673,21 @@ window.asgOperatorDetailsOpen=false;window.asgCompleteWorkOpen=true;window.asgCo
 function toggleOperatorJobDetails(){window.asgOperatorDetailsOpen=!window.asgOperatorDetailsOpen;syncStandardOperatorWorkflow();}
 function toggleCompleteWork(){window.asgCompleteWorkOpen=!window.asgCompleteWorkOpen;syncStandardOperatorWorkflow();}
 function toggleConfirmWaste(){window.asgConfirmWasteOpen=!window.asgConfirmWasteOpen;syncStandardOperatorWorkflow();}
-function syncStandardOperatorWorkflow(){
- keepOnsiteContactsVisible();
- const job=activeJob,role=activeProfile?.role,operator=['operative','admin','manager'].includes(role),onsite=!!job&&operator&&['on_site','completed'].includes(job.status),activeOnsite=!!job&&operator&&job.status==='on_site';
- if(window.asgWorkflowJobId!==(job?.id||null)){window.asgWorkflowJobId=job?.id||null;window.asgOperatorDetailsOpen=true;window.asgCompleteWorkOpen=true;window.asgConfirmWasteOpen=false;window.asgFinalConfirmationOpen=false;}
- if(!activeOnsite)window.asgFinalConfirmationOpen=false;
- const group=el('jobBriefingGroup'),detailsBtn=el('toggleJobDetailsBtn');
- if(group)group.classList.toggle('hidden',onsite&&!window.asgOperatorDetailsOpen);
- if(detailsBtn){detailsBtn.classList.toggle('hidden',!onsite);detailsBtn.textContent=window.asgOperatorDetailsOpen?'Close Job Details':'Open Job Details';}
- const compact=!!job&&['issued','accepted','on_site'].includes(job.status);if(group)group.classList.toggle('hidden',compact&&!window.asgOperatorDetailsOpen);const brief=el('operatorJobBrief');if(brief)brief.classList.remove('hidden'); const standardPanel=el('onsiteWorkflowPanel');if(standardPanel)standardPanel.classList.toggle('hidden',!onsite); const legacyComplete=el('completionSection');if(legacyComplete)legacyComplete.classList.toggle('hidden',onsite);
- // The standard onsite workflow replaces the legacy arrival, checklist, completion and sign-off cards for operatives.
- ['siteVisitPanel','serviceChecklistPanel','completionSection'].forEach(id=>{const node=el(id);if(node)node.classList.add('hidden');});
- const workBtn=el('toggleCompleteWorkBtn'),workContent=el('completeWorkContent');
- if(workBtn)workBtn.classList.add('hidden');
- if(workContent&&onsite)workContent.classList.add('hidden');
- const wasteBtn=el('toggleConfirmWasteBtn'),wasteContent=el('confirmWasteContent'),signoff=el('siteSignoffSection');
- if(wasteBtn)wasteBtn.classList.add('hidden');
- if(wasteContent&&onsite)wasteContent.classList.toggle('hidden',!window.asgFinalConfirmationOpen);
- if(signoff&&onsite)signoff.classList.toggle('hidden',!window.asgFinalConfirmationOpen);
-}
+
 
 let onsiteScopes=[];
 let onsiteCompletionState={};
-function onsiteOperatorActive(){return !!activeJob&&['operative','admin','manager'].includes(activeProfile?.role)&&['on_site','completed'].includes(activeJob.status);}
+
 function onsiteKey(id){return String(id||'base').replace(/[^a-zA-Z0-9_-]/g,'_');}
 function onsiteScopeByKey(key){return onsiteScopes.find(x=>onsiteKey(x.id)===key)||null;}
-function onsiteStateComplete(key){const state=onsiteCompletionState[key]||{};return !!String(state.work||'').trim()&&!!state.photo_file_id;}
-async function loadOnsiteWorkflow(){
- const panel=el('onsiteWorkflowPanel');if(!panel||!activeJob)return;
- if(!onsiteOperatorActive()){panel.classList.add('hidden');syncStandardOperatorWorkflow();return;}
- const [sr,vr,fr]=await Promise.all([
-  db.from('job_scope_sections').select('id,position,title,details').eq('job_id',activeJob.id).order('position'),
-  db.from('job_visits').select('completion_sections').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1),
-  db.from('job_files').select('id,file_name,file_type,caption').eq('job_id',activeJob.id).eq('file_type','completion_photo').order('created_at',{ascending:true})
- ]);
- const sections=(sr.data||[]).map(x=>({id:x.id,title:x.title||('Scope '+x.position),details:x.details||''}));
- if(!sections.length)sections.push({id:'base',title:'Scope of work',details:activeJob.scope_of_work||'No scope of work has been added.'});
- onsiteScopes=sections;
- const saved=Array.isArray(vr.data?.[0]?.completion_sections)?vr.data[0].completion_sections:[];
- const files=fr.data||[];onsiteCompletionState={};
- sections.forEach((scope,index)=>{
-  const key=onsiteKey(scope.id),match=saved.find(x=>String(x.scope_id||'')===String(scope.id)||String(x.id||'')===key||(!x.scope_id&&!x.id&&index===0));
-  const file=match?.photo_file_id?files.find(x=>x.id===match.photo_file_id):null;
-  onsiteCompletionState[key]={id:key,scope_id:scope.id==='base'?null:scope.id,title:scope.title,work:match?.work||'',issues:match?.issues||'',photo_file_id:file?.id||match?.photo_file_id||null,photo_note:match?.photo_note||file?.caption||'',message:''};
- });
- renderOnsiteWorkflow();syncStandardOperatorWorkflow();
-}
-function renderOnsiteWorkflow(){
- const panel=el('onsiteWorkflowPanel'),cards=el('onsiteScopeCards');if(!panel||!cards)return;
- const locked=activeJob?.status!=='on_site';
- cards.innerHTML=onsiteScopes.map((scope,index)=>{const key=onsiteKey(scope.id),state=onsiteCompletionState[key]||{id:key,scope_id:scope.id,title:scope.title,work:'',issues:'',photo_file_id:null,photo_note:'',message:''},done=onsiteStateComplete(key);return `<div class="onsite-scope-card" data-onsite-scope="${esc(key)}"><h3>Scope ${index+1}: ${esc(scope.title)}</h3><div class="onsite-scope-details">${esc(scope.details||'No details added')}</div>${activeJob?.instructions?`<div class="onsite-scope-extra"><b>Job instruction:</b> ${esc(activeJob.instructions)}</div>`:''}<div class="onsite-complete-card ${done?'ready':''}"><div class="onsite-status ${done?'onsite-status-green':'onsite-status-red'}">${done?'🟢 Scope completed and picture saved':'🔴 Completion picture and work record required'}</div><div class="field"><label>Work completed for this scope *</label><textarea data-onsite-work placeholder="Describe what was completed for this scope" ${locked?'disabled':''}>${esc(state.work||'')}</textarea></div><div class="field"><label>Further works / issues for this scope</label><textarea data-onsite-issues placeholder="Leave blank if none" ${locked?'disabled':''}>${esc(state.issues||'')}</textarea></div><div class="field"><label>Completion picture ${state.photo_file_id?'saved':'*'}</label><input data-onsite-photo class="onsite-photo-input" type="file" accept="image/*" onchange="onsiteCompletionPhotoChosen('${esc(key)}')" ${locked?'disabled':''}><div data-onsite-photo-state class="onsite-status ${state.photo_file_id?'onsite-status-green':'onsite-status-red'}">${state.photo_file_id?'🟢 Completion picture saved':'🔴 Completion picture required'}</div></div><div class="field"><label>Picture note *</label><textarea data-onsite-photo-note class="onsite-photo-note" placeholder="What does this picture show?" ${locked?'disabled':''}>${esc(state.photo_note||'')}</textarea></div><div class="actions"><button class="btn primary" type="button" onclick="saveOnsiteScope('${esc(key)}')" ${locked?'disabled':''}>Save completed work</button></div>${state.message?`<div class="${state.message.kind||'ok'}" style="margin-top:10px">${esc(state.message.text||'')}</div>`:''}</div></div>`;}).join('');
- const complete=onsiteScopes.length>0&&onsiteScopes.every(s=>onsiteStateComplete(onsiteKey(s.id)));
- const status=el('onsiteFinishStatus'),btn=el('onsiteFinishBtn');if(status){status.className='onsite-status '+(complete?'onsite-status-green':'onsite-status-red');status.textContent=complete?'🟢 All scopes saved — confirm waste to finish.':'🔴 Complete and save every scope above before continuing.';}if(btn)btn.disabled=!complete||locked;
- const pill=el('onsiteWorkflowStatus');if(pill){pill.textContent=locked?'Completed':'In progress';pill.classList.toggle('status-completed',locked);}
-}
-function onsiteCompletionPhotoChosen(key){const row=document.querySelector('[data-onsite-scope="'+key+'"]'),file=row?.querySelector('[data-onsite-photo]')?.files?.[0];if(!row||!file)return;const state=onsiteCompletionState[key]||{};state.pendingPhoto=file;state.message={kind:'ok',text:'Picture selected. Save this completed scope to store it.'};onsiteCompletionState[key]=state;const note=row.querySelector('[data-onsite-photo-note]')?.value.trim()||'';const badge=row.querySelector('[data-onsite-photo-state]');if(badge){badge.className='onsite-status onsite-status-green';badge.textContent='🟢 Picture selected — save this scope';}const msg=row.querySelector('.ok');if(msg)msg.textContent=state.message.text;}
-async function saveOnsiteScope(key){
- if(!activeJob||activeJob.status!=='on_site')return;const scope=onsiteScopeByKey(key),row=document.querySelector('[data-onsite-scope="'+key+'"]');if(!scope||!row)return;const state=onsiteCompletionState[key]||{};const work=row.querySelector('[data-onsite-work]')?.value.trim()||'',issues=row.querySelector('[data-onsite-issues]')?.value.trim()||'',file=state.pendingPhoto||row.querySelector('[data-onsite-photo]')?.files?.[0]||null,photoNote=row.querySelector('[data-onsite-photo-note]')?.value.trim()||state.photo_note||'';if(!work){state.message={kind:'err',text:'Add what was completed for this scope.'};onsiteCompletionState[key]=state;renderOnsiteWorkflow();return;}if(!state.photo_file_id&&!file){state.message={kind:'err',text:'Add the mandatory completion picture for this scope.'};onsiteCompletionState[key]=state;renderOnsiteWorkflow();return;}if(!state.photo_file_id&&!photoNote){state.message={kind:'err',text:'Add a note for the completion picture.'};onsiteCompletionState[key]=state;renderOnsiteWorkflow();return;}
- const msgState={kind:'muted',text:'Saving completed work…'};state.message=msgState;state.work=work;state.issues=issues;state.photo_note=photoNote;onsiteCompletionState[key]=state;renderOnsiteWorkflow();
- try{const visitId=await getLatestVisitId();let photoId=state.photo_file_id;if(!photoId&&file){const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'').toLowerCase()||'jpg';const path='jobs/'+activeJob.id+'/completion/'+key+'-'+crypto.randomUUID()+'.'+ext;const up=await db.storage.from('job-files').upload(path,file,{contentType:file.type||'image/jpeg',upsert:false});if(up.error)throw up.error;const ins=await db.from('job_files').insert({job_id:activeJob.id,visit_id:visitId,file_type:'completion_photo',file_name:'scope_'+key+'__'+(file.name||'completion-photo.jpg'),storage_path:path,caption:photoNote,uploaded_by:activeSession.user.id}).select('id').single();if(ins.error)throw ins.error;photoId=ins.data.id;}
- const current=await db.from('job_visits').select('completion_sections').eq('id',visitId).maybeSingle();if(current.error)throw current.error;const sections=Array.isArray(current.data?.completion_sections)?current.data.completion_sections:[];const entry={id:key,scope_id:scope.id==='base'?null:scope.id,title:scope.title,work,issues,photo_file_id:photoId,photo_note:photoNote};const next=sections.filter(x=>String(x.id||'')!==key&&String(x.scope_id||'')!==String(entry.scope_id||'')).concat(entry);const saved=await db.from('job_visits').update({completion_sections:next,updated_at:new Date().toISOString()}).eq('id',visitId);if(saved.error)throw saved.error;state.photo_file_id=photoId;state.pendingPhoto=null;state.message={kind:'ok',text:'Completed work and picture saved.'};onsiteCompletionState[key]=state;renderOnsiteWorkflow();
- }catch(err){state.message={kind:'err',text:'Could not save this scope: '+(err.message||String(err))};onsiteCompletionState[key]=state;renderOnsiteWorkflow();}
-}
-function toggleOnsiteFurtherWork(open=true){const form=el('onsiteFurtherWorkForm');if(!form)return;form.classList.toggle('hidden',!open);if(open)el('onsiteFurtherTitle')?.focus();}
-async function saveOnsiteFurtherWork(){if(!activeJob||activeJob.status!=='on_site')return;const title=el('onsiteFurtherTitle')?.value.trim()||'',work=el('onsiteFurtherWork')?.value.trim()||'',file=el('onsiteFurtherPhoto')?.files?.[0]||null,note=el('onsiteFurtherPhotoNote')?.value.trim()||'',msg=el('onsiteFurtherWorkMsg');if(!title||!work||!file||!note){if(msg)msg.innerHTML='<div class="err">Complete the title, work description, picture and picture note.</div>';return;}const key='extra_'+crypto.randomUUID(),scope={id:key,title,details:'Further work added on site'};onsiteScopes.push(scope);onsiteCompletionState[key]={id:key,scope_id:null,title,work,issues:'',photo_file_id:null,photo_note:note,pendingPhoto:file,message:{kind:'muted',text:'Saving further work…'}};renderOnsiteWorkflow();const row=document.querySelector('[data-onsite-scope="'+onsiteKey(key)+'"]');if(row){row.querySelector('[data-onsite-work]').value=work;row.querySelector('[data-onsite-issues]').value='';row.querySelector('[data-onsite-photo-note]').value=note;}await saveOnsiteScope(onsiteKey(key));toggleOnsiteFurtherWork(false);el('onsiteFurtherTitle').value='';el('onsiteFurtherWork').value='';el('onsiteFurtherPhoto').value='';el('onsiteFurtherPhotoNote').value='';if(msg)msg.innerHTML='';}
-function onsiteOpenFinalConfirmation(){const incomplete=onsiteScopes.filter(s=>!onsiteStateComplete(onsiteKey(s.id)));if(incomplete.length){el('onsiteFinishMsg').innerHTML='<div class="err">Complete and save every scope picture before confirming waste.</div>';document.querySelector('[data-onsite-scope="'+onsiteKey(incomplete[0].id)+'"]')?.scrollIntoView({behavior:'smooth',block:'center'});return;}window.asgFinalConfirmationOpen=true;window.asgConfirmWasteOpen=true;syncStandardOperatorWorkflow();el('siteSignoffSection')?.scrollIntoView({behavior:'smooth',block:'start'});}
+
+
+
+
+
+
+
+
 
 function renderServiceChecklist(data={}){const def=serviceChecklistDefinition(),body=el('serviceChecklistBody');if(!def||!body)return;el('serviceChecklistTitle').textContent=def.title+' checklist';el('serviceChecklistComments').value=data.general_comments||'';body.innerHTML=def.sections.map((sec,si)=>'<div class="scope-section"><h3 style="margin-top:0">'+esc(sec.title)+'</h3>'+sec.items.map((item,ii)=>{const key=si+'_'+ii,a=data.answers?.[key]||{};return '<div class="service-check-row" style="display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:8px;align-items:start;padding:9px 0;border-top:1px solid var(--line)"><div><label style="font-weight:700">'+esc(item)+'</label><input data-check-note="'+key+'" value="'+esc(a.note||'')+'" placeholder="Reading / note" style="margin-top:6px"></div><select data-check-status="'+key+'"><option value="">Not checked</option><option value="pass" '+(a.status==='pass'?'selected':'')+'>Pass</option><option value="issue" '+(a.status==='issue'?'selected':'')+'>Issue</option><option value="na" '+(a.status==='na'?'selected':'')+'>N/A</option></select></div>';}).join('')+'</div>').join('');}
 async function loadServiceChecklist(){const panel=el('serviceChecklistPanel'),def=serviceChecklistDefinition();if(!panel)return;const show=!!def&&['on_site','completed','returned','reviewed','closed'].includes(activeJob?.status);panel.classList.toggle('hidden',!show);if(!show)return;const {data,error}=await db.from('job_service_checklists').select('*').eq('job_id',activeJob.id).maybeSingle();if(error){el('serviceChecklistMsg').innerHTML='<div class="err">Checklist table is not ready. Run the v32.27 SQL first.</div>';renderServiceChecklist();return;}renderServiceChecklist(data||{});}
@@ -2075,4 +2025,12 @@ el('loginForm').addEventListener('submit',async e=>{e.preventDefault();const ema
 async function signOut(){await db.auth.signOut();activeSession=null;activeProfile=null;el('password').value='';restoreRememberedLogin();showLogin();el('conn').textContent='Ready';}
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('./Aura_Solutions_Contractor_Offline_v4.js').catch(e=>console.warn('Offline worker could not register',e));}
 (async()=>{try{restoreRememberedLogin();const token=new URLSearchParams(location.search).get('contractor_token');if(token){el('conn').textContent='Secure Contractor Link';await loadContractorPortal(token);return;}const {data:{session}}=await db.auth.getSession();el('conn').textContent='Ready';if(session)await loadApp(session);else showLogin();}catch(e){el('conn').textContent='Error';showLogin('Could not connect to Supabase. '+e.message);}function toggleAbortForm(open=true){const f=el('abortForm');if(!f)return;f.classList.toggle('hidden',!open);if(open)el('abort_reason')?.focus();}function renderOperatorJobBrief(){const box=el('operatorJobBrief');if(!box||!activeJob)return;const show=['issued','accepted','on_site'].includes(activeJob.status);box.classList.toggle('hidden',!show);if(!show)return;el('operatorBriefCustomer').textContent=activeJob.customer_name||activeJob.customer?.name||'';el('operatorBriefType').textContent=activeJob.job_type_name||activeJob.job_type?.name||'';el('operatorBriefReference').textContent=activeJob.reference||activeJob.job_number||'';el('operatorBriefDate').textContent=[activeJob.job_date,activeJob.job_time].filter(Boolean).join(' · ')||'No date';el('operatorBriefAddress').textContent=[activeJob.site_address,activeJob.postcode].filter(Boolean).join(' · ');el('operatorBriefW3W').textContent=activeJob.what3words?('///'+activeJob.what3words.replace(/^\/*/,'')):'Not provided';el('operatorBriefLocationNotes').textContent=activeJob.site_location_notes||'No site location notes provided';el('operatorBriefSiteContact').textContent=activeJob.site_contact_name||'Site contact not provided';const phone=String(activeJob.site_contact_phone||'').replace(/[^+0-9]/g,'');const call=el('operatorBriefSiteCall');if(call&&phone){call.href='tel:'+phone;call.textContent='☎ Call '+activeJob.site_contact_phone;call.classList.remove('hidden');}el('operatorBriefInstructions').textContent=activeJob.instructions||'No instructions provided';el('operatorBriefScope').textContent=activeJob.scope_of_work||'No scope of work provided';}})();
+
+function syncStandardOperatorWorkflow(){const p=el('onsiteWorkflowPanel');if(p)p.classList.add('hidden');}
+function loadOnsiteWorkflow(){}
+function renderOnsiteWorkflow(){}
+function saveOnsiteScope(){}
+function onsiteOperatorActive(){return false;}
+function onsiteStateComplete(){return false;}
+function onsiteOpenFinalConfirmation(){}
 </script></body></html>
