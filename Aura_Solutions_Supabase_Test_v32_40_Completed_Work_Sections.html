@@ -786,7 +786,7 @@ function renderWorkflow(){
  const canArrival=(!management && ['on_site','completed'].includes(activeJob.status))||(managementCapture&&['draft','issued','accepted','on_site','completed','returned','reviewed'].includes(activeJob.status));
  el('arrivalSection').classList.toggle('hidden',!canArrival);
  el('continueSiteVisitBtn').classList.toggle('hidden',!canArrival||!isSiteVisitJob());
- const showArrivalCapture=!management && ['issued','accepted'].includes(activeJob.status);
+ const showArrivalCapture=['issued','accepted'].includes(activeJob.status);
  el('arrivalCapture').classList.toggle('hidden',!showArrivalCapture);
  const siteVisit=isSiteVisitJob();
  const serviceJob=!!serviceChecklistDefinition();el('serviceChecklistPanel').classList.toggle('hidden',!serviceJob||!['on_site','completed','returned','reviewed','closed'].includes(activeJob.status));
