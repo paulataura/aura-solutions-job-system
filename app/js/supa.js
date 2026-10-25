@@ -1,5 +1,5 @@
 // Supabase client and every read/write the app makes, in one place.
-import { SUPABASE_URL, SUPABASE_KEY, BUCKET } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY, BUCKET } from './config.js?v=1.0.1';
 
 // The Supabase library is loaded by index.html (window.supabase)
 export const sb = window.AURA_TEST_CLIENT || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {

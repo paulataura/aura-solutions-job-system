@@ -1,10 +1,10 @@
 // Operator view: My jobs list and the step-by-step job screen.
-import * as db from './supa.js';
-import { shell, state, isManagement, managementTabs } from './main.js';
+import * as db from './supa.js?v=1.0.1';
+import { shell, state, isManagement, managementTabs } from './main.js?v=1.0.1';
 import { esc, has, nl2br, fmtDate, fmtTime, fmtDateTime, fmtLongDate, todayISO, toLocalInput, fromLocalInput, num, fmtKg,
-  $, $$, toast, busy, confirmBox, isHazardousEwc, ewcFmt, errText } from './util.js';
-import { signaturePad } from './signature.js';
-import { WEIGHT_UNITS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, STATUS_LABELS } from './config.js';
+  $, $$, toast, busy, confirmBox, isHazardousEwc, ewcFmt, errText } from './util.js?v=1.0.1';
+import { signaturePad } from './signature.js?v=1.0.1';
+import { WEIGHT_UNITS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, STATUS_LABELS } from './config.js?v=1.0.1';
 
 // ====================================================================
 // My jobs

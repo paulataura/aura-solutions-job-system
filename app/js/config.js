@@ -3,7 +3,7 @@
 export const SUPABASE_URL = 'https://tatuejkauahqsgzwalid.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_J1__8GTEG2cDHKtPYQir9w_lgQALvxt';
 export const BUCKET = 'job-files';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 
 // Units that are already a weight. Anything else needs an estimated weight.
 export const WEIGHT_UNITS = ['kg', 'tonnes'];

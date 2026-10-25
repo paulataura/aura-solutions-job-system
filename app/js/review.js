@@ -1,10 +1,10 @@
 // Management: review lists, the review screen, approval and documents.
-import * as db from './supa.js';
-import { shell, state, managementTabs } from './main.js';
-import { esc, has, nl2br, fmtDate, fmtDateTime, fmtLongDate, toLocalInput, fromLocalInput, num, fmtKg, $, $$, toast, busy, confirmBox, ewcFmt, errText } from './util.js';
-import { STATUS_LABELS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, WEIGHT_UNITS } from './config.js';
-import { loadKg, unitLabel, loadComplete } from './operator.js';
-import { parties, wtnProblems, jobSheetHTML, wtnHTML, pagesToPdf, previewHTML } from './documents.js';
+import * as db from './supa.js?v=1.0.1';
+import { shell, state, managementTabs } from './main.js?v=1.0.1';
+import { esc, has, nl2br, fmtDate, fmtDateTime, fmtLongDate, toLocalInput, fromLocalInput, num, fmtKg, $, $$, toast, busy, confirmBox, ewcFmt, errText } from './util.js?v=1.0.1';
+import { STATUS_LABELS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, WEIGHT_UNITS } from './config.js?v=1.0.1';
+import { loadKg, unitLabel, loadComplete } from './operator.js?v=1.0.1';
+import { parties, wtnProblems, jobSheetHTML, wtnHTML, pagesToPdf, previewHTML } from './documents.js?v=1.0.1';
 
 const LOGO = 'img/logo.png';
 const LISTS = {

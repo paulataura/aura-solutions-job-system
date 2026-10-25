@@ -1,7 +1,7 @@
 // App entry: sign-in, role-based routing (#/...), shared page shell.
-import { currentProfile, signIn, signOut } from './supa.js';
-import { esc, toast, errText, busy } from './util.js';
-import { APP_VERSION } from './config.js';
+import { currentProfile, signIn, signOut } from './supa.js?v=1.0.1';
+import { esc, toast, errText, busy } from './util.js?v=1.0.1';
+import { APP_VERSION } from './config.js?v=1.0.1';
 
 const app = document.getElementById('app');
 export const state = { profile: null };
@@ -71,10 +71,10 @@ async function doRoute() {
     const mgmt = isManagement();
     if (!page) { location.hash = mgmt ? '#/review' : '#/jobs'; return; }
 
-    if (page === 'jobs') return (await import('./operator.js')).jobList();
-    if (page === 'job' && id) return (await import('./operator.js')).jobPage(id);
-    if (mgmt && ['review', 'approved', 'live'].includes(page)) return (await import('./review.js')).reviewList(page);
-    if (mgmt && page === 'check' && id) return (await import('./review.js')).reviewPage(id);
+    if (page === 'jobs') return (await import('./operator.js?v=1.0.1')).jobList();
+    if (page === 'job' && id) return (await import('./operator.js?v=1.0.1')).jobPage(id);
+    if (mgmt && ['review', 'approved', 'live'].includes(page)) return (await import('./review.js?v=1.0.1')).reviewList(page);
+    if (mgmt && page === 'check' && id) return (await import('./review.js?v=1.0.1')).reviewPage(id);
     location.hash = mgmt ? '#/review' : '#/jobs';
   } catch (e) {
     console.error(e);
