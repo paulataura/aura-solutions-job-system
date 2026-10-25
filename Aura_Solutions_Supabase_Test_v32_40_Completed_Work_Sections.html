@@ -538,6 +538,7 @@ async function siteVisitPrintReport(){
   popup.document.open();popup.document.write(html);popup.document.close();
  }catch(error){popup.document.open();popup.document.write('<p>Could not prepare Site Visit job card: '+esc(error.message||String(error))+'</p>');popup.document.close();}
 }
+async function loadOnsiteWorkflow(){return;}
 async function openJob(id){
  contractorShareLink='';
  el('siteVisitThanks').classList.add('hidden');el('dash').classList.add('hidden');el('createJob').classList.add('hidden');el('jobDetail').classList.remove('hidden');el('detailMsg').innerHTML='<div class="muted">Loading job…</div>';
