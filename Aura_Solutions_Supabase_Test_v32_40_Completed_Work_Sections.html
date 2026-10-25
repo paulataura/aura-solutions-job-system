@@ -564,22 +564,19 @@ async function renderIssueInfo(){
  keepOnsiteContactsVisible();
  const box=el('detailIssueInfo');if(!box||!activeJob)return;
  const management=['admin','manager'].includes(activeProfile?.role);
- if(!management){
-  const siteName=activeJob.site_contact_name||'Site contact not provided';
-  const sitePhone=activeJob.site_contact_phone||'';
-  const auraPhone='01386 571556';
-  const telValue=v=>String(v||'').replace(/[^+0-9]/g,'');
-  box.classList.remove('hidden');
-  box.innerHTML='<h2 style="margin-bottom:8px">Site & support contacts</h2><div class="issue-audit-grid"><div class="issue-audit-box"><b>Site contact</b><div class="muted">'+esc(siteName)+'</div>'+(sitePhone?'<a class="contact-call-link" href="tel:'+esc(telValue(sitePhone))+'">☎ Call '+esc(sitePhone)+'</a>':'<div class="muted">No site phone number provided</div>')+'</div><div class="issue-audit-box"><b>Aura Solutions contact</b><div class="muted">Aura Solutions support</div><a class="contact-call-link" href="tel:'+telValue(auraPhone)+'">☎ Call '+auraPhone+'</a></div></div>';
-  return;
+ const siteName=activeJob.site_contact_name||'Site contact not provided';
+ const sitePhone=activeJob.site_contact_phone||'';
+ const auraPhone='01386 571556';
+ const telValue=v=>String(v||'').replace(/[^+0-9]/g,'');
+ let html='<h2 style="margin-bottom:8px">Site & support contacts</h2><div class="issue-audit-grid"><div class="issue-audit-box"><b>Site contact</b><div class="muted">'+esc(siteName)+'</div>'+(sitePhone?'<a class="contact-call-link" href="tel:'+esc(telValue(sitePhone))+'">☎ Call '+esc(sitePhone)+'</a>':'<div class="muted">No site phone number provided</div>')+'</div><div class="issue-audit-box"><b>Aura Solutions contact</b><div class="muted">Aura Solutions support</div><a class="contact-call-link" href="tel:'+telValue(auraPhone)+'">☎ Call '+auraPhone+'</a></div></div>';
+ if(management&&activeJob.status!=='draft'){
+  let issuer=activeJob.issued_by_name||'Not recorded';
+  if(!activeJob.issued_by_name&&activeJob.issued_by&&activeSession?.user?.id===activeJob.issued_by)issuer=(activeProfile?.full_name||activeSession.user.email||'Management');
+  const issuedTo=activeJob.assigneeLabel||'Unassigned';
+  const when=activeJob.issued_at?new Date(activeJob.issued_at).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):'Not recorded';
+  html+='<div class="issue-audit" style="margin-top:12px"><h2 style="margin-bottom:8px">Issue details</h2><div class="issue-audit-grid"><div class="issue-audit-box"><b>Issued by</b><div class="muted">'+esc(issuer)+'</div></div><div class="issue-audit-box"><b>Issued to</b><div class="muted">'+esc(issuedTo)+'</div></div></div><div class="muted" style="font-size:12px;margin-top:8px">Issued: '+esc(when)+'</div></div>';
  }
- if(activeJob.status==='draft'){box.classList.add('hidden');box.innerHTML='';return;}
- let issuer=activeJob.issued_by_name||'Not recorded';
- if(!activeJob.issued_by_name&&activeJob.issued_by&&activeSession?.user?.id===activeJob.issued_by) issuer=(activeProfile?.full_name||activeSession.user.email||'Management');
- const issuedTo=activeJob.assigneeLabel||'Unassigned';
- const when=activeJob.issued_at?new Date(activeJob.issued_at).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):'Not recorded';
- box.classList.remove('hidden');
- box.innerHTML='<h2 style="margin-bottom:8px">Issue details</h2><div class="issue-audit-grid"><div class="issue-audit-box"><b>Issued by</b><div class="muted">'+esc(issuer)+'</div></div><div class="issue-audit-box"><b>Issued to</b><div class="muted">'+esc(issuedTo)+'</div></div></div><div class="muted" style="font-size:12px;margin-top:8px">Issued: '+esc(when)+'</div>';
+ box.classList.remove('hidden');box.innerHTML=html;
 }
 
 async function loadDetailAssignment(){
