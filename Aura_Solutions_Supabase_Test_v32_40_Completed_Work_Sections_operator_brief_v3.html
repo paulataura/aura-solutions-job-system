@@ -2081,38 +2081,4 @@ if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.service
 
 async function cleanOperatorLoad(){const panel=el('cleanOperatorPanel');if(!panel||!activeJob)return;const active=['on_site','completed'].includes(activeJob.status)&&['operative','admin','manager'].includes(activeProfile?.role);panel.classList.toggle('hidden',!active);if(!active)return;const q=await db.from('job_scope_sections').select('id,position,title,details,photo_path').eq('job_id',activeJob.id).order('position');const scopes=q.data||[];const visitQ=await db.from('job_visits').select('id,completion_sections').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);const saved=Array.isArray(visitQ.data?.[0]?.completion_sections)?visitQ.data[0].completion_sections:[];if(!scopes.length){el('cleanOperatorScopes').innerHTML='<div class="notice">No saved scope sections were found on this job.</div>';return;}el('cleanOperatorScopes').innerHTML=scopes.map((x,i)=>{const key=String(x.id),v=saved.find(z=>String(z.scope_id||z.id)===key)||{};return '<div class="saved-site-card" data-clean-scope="'+esc(key)+'"><h3>Scope '+(i+1)+': '+esc(x.title||'Untitled scope')+'</h3><div class="kv" style="white-space:pre-wrap"><b>Work required</b><br>'+esc(x.details||'')+'</div><div class="field"><label>Progress notes</label><textarea data-clean-progress>'+esc(v.progress_notes||'')+'</textarea></div><div class="field"><label>Progress picture</label><input data-clean-progress-photo type="file" accept="image/*"></div><div class="field"><label>Completed work notes *</label><textarea data-clean-work>'+esc(v.work||'')+'</textarea></div><div class="field"><label>Completed scope picture *</label><input data-clean-photo type="file" accept="image/*"></div><div class="actions" style="margin-top:8px"><button class="btn primary" type="button" onclick="cleanOperatorSaveScope(\''+esc(key)+'\')">Save scope</button></div><div data-clean-state class="onsite-status onsite-status-red" style="margin-top:8px">🔴 Completion picture and work record required</div></div>';}).join('');}
 async function cleanOperatorSaveScope(key){const row=document.querySelector('[data-clean-scope="'+key+'"]');if(!row||!activeJob)return;const work=row.querySelector('[data-clean-work]').value.trim(),progress=row.querySelector('[data-clean-progress]').value.trim(),photo=row.querySelector('[data-clean-photo]').files?.[0],progressPhoto=row.querySelector('[data-clean-progress-photo]').files?.[0];if(!work||!photo){row.querySelector('[data-clean-state]').textContent='🔴 Completed work notes and picture are required';return;}const state=row.querySelector('[data-clean-state]');state.className='onsite-status';state.textContent='Saving…';try{const visitQ=await db.from('job_visits').select('id,completion_sections').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);let vid=visitQ.data?.[0]?.id;if(!vid){const made=await db.from('job_visits').insert({job_id:activeJob.id}).select('id').single();if(made.error)throw made.error;vid=made.data.id;}const upload=async(f,type,note)=>{const ext=(f.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase()||'jpg',path='jobs/'+activeJob.id+'/operator/'+type+'-'+Date.now()+'.'+ext;const up=await db.storage.from('job-files').upload(path,f,{contentType:f.type||'image/jpeg',upsert:false});if(up.error)throw up.error;const ins=await db.from('job_files').insert({job_id:activeJob.id,visit_id:vid,file_type:type,file_name:f.name||type+'.jpg',storage_path:path,caption:note||null,uploaded_by:activeSession.user.id}).select('id').single();if(ins.error)throw ins.error;return ins.data.id};const photoId=await upload(photo,'completion_photo',prompt('Picture note for completed scope')||'');const progressId=progressPhoto?await upload(progressPhoto,'progress_photo',prompt('Picture note for progress picture')||''):null;const current=await db.from('job_visits').select('completion_sections').eq('id',vid).single();if(current.error)throw current.error;const arr=Array.isArray(current.data.completion_sections)?current.data.completion_sections:[];const entry={id:key,scope_id:key,work,progress_notes:progress,photo_file_id:photoId,progress_photo_file_id:progressId};const next=arr.filter(x=>String(x.scope_id||x.id)!==key).concat(entry);const upv=await db.from('job_visits').update({completion_sections:next,updated_at:new Date().toISOString()}).eq('id',vid);if(upv.error)throw upv.error;state.className='onsite-status onsite-status-green';state.textContent='🟢 Scope saved with completion picture';}catch(e){state.className='onsite-status onsite-status-red';state.textContent='🔴 Could not save scope: '+(e.message||String(e));}}
-</script>
-<script id="aura-v1-bridge">
-/* Link-up with the new screens in app/ (added 25 Oct 2026).
-   - Operatives are sent to the new step-by-step job screens.
-   - Management keeps this dashboard; a returned job shows a button to the new review / job sheet / WTN screen. */
-(function(){
- var APP='app/';
- var origLoad=window.loadApp, origOpen=window.openJob;
- if(typeof origLoad==='function') window.loadApp=async function(){
-  var r=await origLoad.apply(this,arguments);
-  try{ if(activeProfile&&activeProfile.role==='operative') location.replace(APP+'#/jobs'); }catch(e){}
-  return r;
- };
- // in case sign-in finished before this script loaded
- var tries=0, t=setInterval(function(){ tries++; try{ if(activeProfile){ clearInterval(t); if(activeProfile.role==='operative') location.replace(APP+'#/jobs'); } }catch(e){} if(tries>60) clearInterval(t); },250);
- if(typeof origOpen==='function') window.openJob=async function(id){
-  var r=await origOpen.apply(this,arguments);
-  try{ addCard(); }catch(e){ console.warn('v1 bridge',e); }
-  return r;
- };
- function addCard(){
-  var j=activeJob, host=document.getElementById('jobDetail');
-  var old=document.getElementById('auraV1Card'); if(old) old.remove();
-  if(!j||!host||!activeProfile||['admin','manager'].indexOf(activeProfile.role)<0) return;
-  var done=['returned','completed','reviewed','closed'].indexOf(j.status)>=0, live=['issued','accepted','on_site'].indexOf(j.status)>=0;
-  if(!done&&!live) return;
-  var card=document.createElement('div');
-  card.id='auraV1Card'; card.className='card'; card.style.cssText='margin-top:14px;border:2px solid #2f6b3a;background:#f4f8f5';
-  card.innerHTML=done
-   ? '<h2 style="margin-bottom:6px">Job sheet &amp; WTN</h2><div class="muted" style="margin-bottom:10px">'+(j.status==='reviewed'||j.status==='closed'?'Approved. Open to see, re-create or share the job sheet and WTNs.':'The operator has sent this job back. Review it, correct anything, then approve to create the job sheet and WTNs.')+'</div><a class="btn" href="'+APP+'#/check/'+j.id+'">Review &amp; create job sheet / WTN</a>'
-   : '<h2 style="margin-bottom:6px">Operator progress</h2><div class="muted" style="margin-bottom:10px">See what the operator has recorded so far on the new job screens.</div><a class="btn light" href="'+APP+'#/job/'+j.id+'">View operator progress</a>';
-  var first=host.querySelector('.row'); if(first&&first.nextSibling) host.insertBefore(card, first.nextSibling); else host.prepend(card);
- }
-})();
 </script></body></html>
