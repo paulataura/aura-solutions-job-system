@@ -2006,11 +2006,14 @@ async function duplicateActiveJob(){
  await showCreateJob(source);
  if(el('createJob').classList.contains('hidden')||el('jobMsg').querySelector('.err'))return;
  editingJobId=null;
+ // The copied scopes belong to the new job: drop their links to the original job's scope records
+ el('draftScopeList').querySelectorAll('.draft-scope').forEach(x=>{delete x.dataset.scopeId;delete x.dataset.photoPath;const p=x.querySelector('.draft-scope-current-photo');if(p)p.textContent='';});
+ if(el('jobReferencePhotosInfo'))el('jobReferencePhotosInfo').textContent='';
  el('jobFormTitle').textContent='Duplicate '+source.job_number+' as a new job';
  el('jobFormSubtitle').textContent='Review the copied details. This creates a separate draft; job history, photos and signatures are not copied.';
  el('jobFormSubmitBtn').textContent='Save duplicated draft';
  el('job_date').value='';el('job_time').value='';
- el('jobMsg').innerHTML='<div class="ok">Job details copied. Choose a new date and check the assignment and revisit frequency before saving.</div>';
+ el('jobMsg').innerHTML='<div class="ok">Job details copied. Choose a new date and check the assignment before saving.</div>';
 }
 async function editActiveJob(){
  if(!activeJob||!['admin','manager'].includes(activeProfile?.role)||!['draft','issued','accepted','on_site','completed','returned','reviewed','closed'].includes(activeJob.status))return;
