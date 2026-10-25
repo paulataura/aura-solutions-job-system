@@ -1,10 +1,10 @@
 // Management: review lists, the review screen, approval and documents.
-import * as db from './supa.js?v=1.0.1';
-import { shell, state, managementTabs } from './main.js?v=1.0.1';
-import { esc, has, nl2br, fmtDate, fmtDateTime, fmtLongDate, toLocalInput, fromLocalInput, num, fmtKg, $, $$, toast, busy, confirmBox, ewcFmt, errText } from './util.js?v=1.0.1';
-import { STATUS_LABELS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, WEIGHT_UNITS } from './config.js?v=1.0.1';
-import { loadKg, unitLabel, loadComplete } from './operator.js?v=1.0.1';
-import { parties, wtnProblems, jobSheetHTML, wtnHTML, pagesToPdf, previewHTML } from './documents.js?v=1.0.1';
+import * as db from './supa.js?v=1.0.2';
+import { shell, state, managementTabs, DASHBOARD } from './main.js?v=1.0.2';
+import { esc, has, nl2br, fmtDate, fmtDateTime, fmtLongDate, toLocalInput, fromLocalInput, num, fmtKg, $, $$, toast, busy, confirmBox, ewcFmt, errText } from './util.js?v=1.0.2';
+import { STATUS_LABELS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, WEIGHT_UNITS } from './config.js?v=1.0.2';
+import { loadKg, unitLabel, loadComplete } from './operator.js?v=1.0.2';
+import { parties, wtnProblems, jobSheetHTML, wtnHTML, pagesToPdf, previewHTML } from './documents.js?v=1.0.2';
 
 const LOGO = 'img/logo.png';
 const LISTS = {
@@ -45,7 +45,7 @@ export async function reviewList(kind) {
 let R = null; // { ...bundle, sites, company, urls }
 
 export async function reviewPage(jobId) {
-  const main = shell({ title: 'Review job', back: '#/review', wide: true });
+  const main = shell({ title: 'Review job', back: DASHBOARD, wide: true });
   main.innerHTML = '<div class="loading">Loading job…</div>';
   const [bundle, sites, company] = await Promise.all([db.getJobBundle(jobId), db.sb.from('disposal_sites').select('*').order('site_name').then(r => r.data || []), db.getCompany()]);
   const imgs = bundle.files.filter(f => /\.(jpe?g|png|webp)$/i.test(f.storage_path)).map(f => f.storage_path);
@@ -59,7 +59,7 @@ function draw() {
   const { job, visit, loads } = R;
   const v = visit || {};
   const p = parties(R, R.company);
-  const back = job.status === 'reviewed' ? '#/approved' : '#/review';
+  const back = DASHBOARD;
   const main = shell({ title: `${job.job_number} · ${job.customer?.company_name || ''}`, sub: `${job.job_type?.name || ''} · ${STATUS_LABELS[job.status] || job.status}`, back, wide: true });
   const problems = allProblems();
   const docs = R.files.filter(f => ['job_sheet_pdf', 'wtn_pdf'].includes(f.file_type));
@@ -270,7 +270,7 @@ function wire(main) {
   const cl = $('[data-close]', main);
   if (cl) cl.onclick = () => busy(cl, async () => {
     if (!await confirmBox('Close this job? It moves out of your lists.', 'Close job')) return;
-    await db.setStatus(R.job.id, 'closed'); toast('Job closed'); location.hash = '#/approved';
+    await db.setStatus(R.job.id, 'closed'); toast('Job closed'); setTimeout(() => location.href = DASHBOARD, 800);
   });
   $$('[data-doc]', main).forEach(a => a.onclick = async e => {
     e.preventDefault();
@@ -313,7 +313,7 @@ function sendBack() {
     if (!note) return toast('Say what needs doing', 'err');
     await db.updateJob(R.job.id, { status: 'on_site', review_notes: note, returned_to_operator_at: new Date().toISOString() });
     if (R.visit) await db.updateVisit(R.visit.id, { submitted_at: null });
-    wrap.remove(); toast('Sent back to the operator'); location.hash = '#/review';
+    wrap.remove(); toast('Sent back to the operator'); setTimeout(() => location.href = DASHBOARD, 800);
   });
 }
 

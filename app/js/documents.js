@@ -1,7 +1,7 @@
 // Job sheet and Waste Transfer Note documents: data rules, HTML layout and PDF output.
-import { esc, has, nl2br, fmtDate, fmtTime, fmtDateTime, fmtKg, num, ewcFmt, isHazardousEwc } from './util.js?v=1.0.1';
-import { WEIGHT_UNITS } from './config.js?v=1.0.1';
-import { loadKg, unitLabel } from './operator.js?v=1.0.1';
+import { esc, has, nl2br, fmtDate, fmtTime, fmtDateTime, fmtKg, num, ewcFmt, isHazardousEwc } from './util.js?v=1.0.2';
+import { WEIGHT_UNITS } from './config.js?v=1.0.2';
+import { loadKg, unitLabel } from './operator.js?v=1.0.2';
 
 // Join address parts, skipping a postcode the address already contains
 const join = (...a) => a.filter(has).reduce((acc, part) => {

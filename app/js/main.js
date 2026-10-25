@@ -1,10 +1,11 @@
 // App entry: sign-in, role-based routing (#/...), shared page shell.
-import { currentProfile, signIn, signOut } from './supa.js?v=1.0.1';
-import { esc, toast, errText, busy } from './util.js?v=1.0.1';
-import { APP_VERSION } from './config.js?v=1.0.1';
+import { currentProfile, signIn, signOut } from './supa.js?v=1.0.2';
+import { esc, toast, errText, busy } from './util.js?v=1.0.2';
+import { APP_VERSION } from './config.js?v=1.0.2';
 
 const app = document.getElementById('app');
 export const state = { profile: null };
+export const DASHBOARD = '../'; // the main Aura dashboard (customers, sites, calendar, job creation)
 export const isManagement = () => ['admin', 'manager'].includes(state.profile?.role);
 
 export function shell({ title, sub = '', back = null, tabs = '', wide = false, body = '' }) {
@@ -19,7 +20,7 @@ export function shell({ title, sub = '', back = null, tabs = '', wide = false, b
     ${tabs}
     <main class="${wide ? 'wide' : ''}">${body}</main>`;
   const b = app.querySelector('[data-back]');
-  if (b) b.onclick = () => { location.hash = back; };
+  if (b) b.onclick = () => { if (back.startsWith('#')) location.hash = back; else location.href = back; };
   const so = app.querySelector('[data-signout]');
   if (so) so.onclick = async () => { await signOut().catch(() => {}); state.profile = null; history.replaceState(null, '', location.pathname); location.reload(); };
   return app.querySelector('main');
@@ -52,7 +53,10 @@ function loginPage(msg = '') {
       try {
         await signIn(f.email.value.trim(), f.password.value);
         state.profile = await currentProfile();
-        const target = isManagement() ? '#/review' : '#/jobs';
+        // Opened from a dashboard link (e.g. a job to review)? Go there after signing in.
+        if (/^#\/(check|job)\//.test(location.hash)) { route(); return; }
+        if (isManagement()) { location.replace(DASHBOARD); return; }
+        const target = '#/jobs';
         if (location.hash === target) route(); else location.hash = target;
       } catch (err) { loginPage(/invalid/i.test(err.message) ? 'Email or password not recognised.' : errText(err)); }
     }, 'Signing in…');
@@ -69,13 +73,15 @@ async function doRoute() {
 
     const [, page, id] = (location.hash || '').split('/');
     const mgmt = isManagement();
-    if (!page) { location.hash = mgmt ? '#/review' : '#/jobs'; return; }
+    // Management works from the main dashboard; this app only provides the job and review screens.
+    if (mgmt && (!page || ['review', 'approved', 'live', 'jobs', 'login'].includes(page))) { location.replace(DASHBOARD); return; }
+    if (!page) { location.hash = '#/jobs'; return; }
 
-    if (page === 'jobs') return (await import('./operator.js?v=1.0.1')).jobList();
-    if (page === 'job' && id) return (await import('./operator.js?v=1.0.1')).jobPage(id);
-    if (mgmt && ['review', 'approved', 'live'].includes(page)) return (await import('./review.js?v=1.0.1')).reviewList(page);
-    if (mgmt && page === 'check' && id) return (await import('./review.js?v=1.0.1')).reviewPage(id);
-    location.hash = mgmt ? '#/review' : '#/jobs';
+    if (page === 'jobs') return (await import('./operator.js?v=1.0.2')).jobList();
+    if (page === 'job' && id) return (await import('./operator.js?v=1.0.2')).jobPage(id);
+    if (mgmt && ['review', 'approved', 'live'].includes(page)) return (await import('./review.js?v=1.0.2')).reviewList(page);
+    if (mgmt && page === 'check' && id) return (await import('./review.js?v=1.0.2')).reviewPage(id);
+    if (mgmt) location.replace(DASHBOARD); else location.hash = '#/jobs';
   } catch (e) {
     console.error(e);
     app.innerHTML = `<main><div class="card"><h2>Something went wrong</h2><p class="danger">${esc(errText(e))}</p><button class="btn" onclick="location.reload()">Try again</button></div></main>`;

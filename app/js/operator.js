@@ -1,10 +1,10 @@
 // Operator view: My jobs list and the step-by-step job screen.
-import * as db from './supa.js?v=1.0.1';
-import { shell, state, isManagement, managementTabs } from './main.js?v=1.0.1';
+import * as db from './supa.js?v=1.0.2';
+import { shell, state, isManagement, managementTabs, DASHBOARD } from './main.js?v=1.0.2';
 import { esc, has, nl2br, fmtDate, fmtTime, fmtDateTime, fmtLongDate, todayISO, toLocalInput, fromLocalInput, num, fmtKg,
-  $, $$, toast, busy, confirmBox, isHazardousEwc, ewcFmt, errText } from './util.js?v=1.0.1';
-import { signaturePad } from './signature.js?v=1.0.1';
-import { WEIGHT_UNITS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, STATUS_LABELS } from './config.js?v=1.0.1';
+  $, $$, toast, busy, confirmBox, isHazardousEwc, ewcFmt, errText } from './util.js?v=1.0.2';
+import { signaturePad } from './signature.js?v=1.0.2';
+import { WEIGHT_UNITS, QUANTITY_UNITS, CONTAINER_TYPES, PHYSICAL_FORMS, STATUS_LABELS } from './config.js?v=1.0.2';
 
 // ====================================================================
 // My jobs
@@ -65,7 +65,7 @@ export const unitLabel = u => (QUANTITY_UNITS.find(([k]) => k === String(u || ''
 let ctx = null;  // { job, scope, visit, loads, files, urls, step, sites }
 
 export async function jobPage(jobId, stepOverride) {
-  const main = shell({ title: 'Loading job…', back: '#/jobs' });
+  const main = shell({ title: 'Loading job…', back: isManagement() ? DASHBOARD : '#/jobs' });
   main.innerHTML = '<div class="loading">Loading job…</div>';
   const [bundle, sites] = await Promise.all([db.getJobBundle(jobId), db.getDisposalSites().catch(() => [])]);
   const urls = await db.signedUrls(bundle.files.filter(f => /\.(jpe?g|png|webp|heic)$/i.test(f.storage_path)).map(f => f.storage_path)).catch(() => ({}));
@@ -116,7 +116,7 @@ function render() {
   const { job } = ctx;
   const st = steps();
   const idx = st.findIndex(s => s.key === ctx.step);
-  const main = shell({ title: job.customer?.company_name || 'Job', sub: `${job.job_number} · ${job.job_type?.name || ''}`, back: isManagement() && !location.hash.startsWith('#/job') ? '#/review' : '#/jobs' });
+  const main = shell({ title: job.customer?.company_name || 'Job', sub: `${job.job_number} · ${job.job_type?.name || ''}`, back: isManagement() ? DASHBOARD : '#/jobs' });
   const sentBack = job.status === 'on_site' && job.returned_to_operator_at && job.review_notes;
   main.innerHTML = `
     ${sentBack ? `<div class="danger" style="margin-bottom:12px"><b>Sent back by the office:</b><br>${nl2br(job.review_notes)}</div>` : ''}
