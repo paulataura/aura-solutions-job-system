@@ -2329,7 +2329,8 @@ async function printJobCardV2(){
  const dOnly=d=>d?new Date(String(d).length===10?d+'T12:00:00Z':d).toLocaleDateString('en-GB',{timeZone:'Europe/London',day:'2-digit',month:'2-digit',year:'numeric'}):'';
  const nl=x=>esc2(x).replace(/\n/g,'<br>');
  const kv=rows=>'<table class="kv">'+rows.filter(r=>r[1]!==null&&r[1]!==undefined&&String(r[1]).trim()).map(r=>'<tr><td class="k">'+esc2(r[0])+'</td><td class="v">'+(r[2]?r[1]:nl(r[1]))+'</td></tr>').join('')+'</table>';
- const photos=(list,emptyText)=>{const ok=list.filter(f=>url[f.storage_path]);return ok.length?'<div class="photos">'+ok.map(f=>'<figure><img src="'+esc2(url[f.storage_path])+'" alt=""><figcaption>'+(f.caption?esc2(f.caption)+'<br>':'')+'<span>'+esc2(dt(f.created_at))+'</span></figcaption></figure>').join('')+'</div>':(emptyText?'<div class="none">'+esc2(emptyText)+'</div>':'');};
+ let photoNo=0;
+ const photos=(list,emptyText)=>{const ok=list.filter(f=>url[f.storage_path]);return ok.length?'<div class="photos">'+ok.map(f=>'<figure><img src="'+esc2(url[f.storage_path])+'" alt=""><figcaption><b>Photo '+(++photoNo)+'</b>'+(f.caption?' · '+esc2(f.caption):'')+'<br><span>'+esc2(dt(f.created_at))+'</span></figcaption></figure>').join('')+'</div>':(emptyText?'<div class="none">'+esc2(emptyText)+'</div>':'');};
  const sigBox=(label,img,name,at,none)=>'<div class="sig"><div class="lbl">'+esc2(label)+'</div><div class="img">'+(img?'<img src="'+img+'">':'<span class="none">'+esc2(none||'Not signed')+'</span>')+'</div><b>'+esc2(name||'')+'</b>'+(at?'<div class="muted">Signed '+esc2(dt(at))+'</div>':'')+'</div>';
  const sec=(n,title,inner,cls)=>'<section class="sec'+(cls?' '+cls:'')+'"><h2><span class="n">'+n+'</span>'+esc2(title)+'</h2>'+inner+'</section>';
 
@@ -2355,16 +2356,23 @@ async function printJobCardV2(){
  const logo=document.querySelector('.brand img, header img')?.src||'';
 
  /* 1. as issued */
+ const equip=String(parts.equipment||'').split(/\n+/).map(x=>x.trim()).filter(Boolean).join(' · ');
  const s1='<div class="grid2">'
-  +'<div class="box"><h3>Customer</h3>'+kv([['Company',cu.company_name],['Contact',cu.contact_name],['Address',addr(cu.address,cu.postcode)],['Phone / email',join(cu.phone,cu.email)]])+'</div>'
-  +'<div class="box"><h3>Site</h3>'+kv([['Site',siteName],['Address',addr(j.site_address,j.postcode)],['Site contact',join(j.site_contact_name,j.site_contact_phone)],['what3words',j.what3words?'///'+String(j.what3words).replace(/^\/+/,''):'']])+'</div></div>'
-  +'<div class="box"><h3>Job brief</h3>'+kv([['Job type',j.job_types?.name],['Scheduled',join(dOnly(j.job_date),j.job_time?String(j.job_time).slice(0,5):'')],['Your reference',j.reference],['Key information',parts.keyInfo],['Equipment',parts.equipment],['Issued by',join(j.issued_by_name,dt(j.issued_at))]])
-  +(scopes.length?'<div class="scopelist">'+scopes.map((x,i)=>'<div><b>Scope '+(i+1)+'</b> '+nl(x.details)+'</div>').join('')+'</div>':'')+'</div>'
-  +(j.waste_expected?'<div class="box"><h3>Planned waste</h3>'+kv([['Waste',j.planned_waste_description],['EWC code',j.planned_ewc_code],['Expected quantity',plannedQty],['Container',j.planned_container_type],['Disposal site',ds?join(ds.site_name,ds.postcode):'To be confirmed']])+'</div>':'')
+  +'<div class="box"><h3>Customer</h3>'+kv([['Company',cu.company_name],['Contact',cu.contact_name],['Address',addr(cu.address,cu.postcode)]])+'</div>'
+  +'<div class="box"><h3>Site</h3>'+kv([['Site',siteName],['Address',addr(j.site_address,j.postcode)],['Site contact',join(j.site_contact_name,j.site_contact_phone)]])+'</div></div>'
+  +'<div class="box brief"><h3>Job brief</h3><div class="chips">'+[['Job type',j.job_types?.name],['Scheduled',join(dOnly(j.job_date),j.job_time?String(j.job_time).slice(0,5):'')],['Your reference',j.reference],['Issued',join(j.issued_by_name,dOnly(j.issued_at))]].filter(r=>r[1]).map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1])+'</b></div>').join('')+'</div>'
+  +(parts.keyInfo?'<div class="line"><span class="lbl">Key information</span>'+nl(parts.keyInfo)+'</div>':'')
+  +(equip?'<div class="line"><span class="lbl">Equipment</span>'+esc2(equip)+'</div>':'')
+  +(scopes.length?'<div class="line"><span class="lbl">Scope of work</span><ol class="scopes">'+scopes.map(x=>'<li>'+nl(x.details)+'</li>').join('')+'</ol></div>':'')
+  +'</div>'
   +(ofType('reference_photo').length?'<div class="box"><h3>Reference pictures</h3>'+photos(ofType('reference_photo'))+'</div>':'');
 
- /* 2. arrival */
- const s2=kv([['Arrived on site',dt(v.arrived_at)],['Arrival notes',v.arrival_notes]])+photos(ofType('arrival_photo'),'No arrival picture recorded.');
+ /* 2. arrival (with site map) */
+ const lat=Number(j.site_latitude),lng=Number(j.site_longitude);let mapHtml='';
+ if(Number.isFinite(lat)&&Number.isFinite(lng)&&(lat||lng)){const z=16,n=2**z,W=710,H=210,px=(lng+180)/360*n*256,rad=lat*Math.PI/180,py=(1-Math.log(Math.tan(rad)+1/Math.cos(rad))/Math.PI)/2*n*256;let tiles='';
+  for(let tx=Math.floor((px-W/2)/256);tx<=Math.floor((px+W/2)/256);tx++)for(let ty=Math.floor((py-H/2)/256);ty<=Math.floor((py+H/2)/256);ty++)tiles+='<img src="https://tile.openstreetmap.org/'+z+'/'+tx+'/'+ty+'.png" style="left:'+Math.round(tx*256-(px-W/2))+'px;top:'+Math.round(ty*256-(py-H/2))+'px" alt="">';
+  mapHtml='<div class="map">'+tiles+'<div class="pin"></div><div class="attr">© OpenStreetMap contributors</div></div>';}
+ const s2='<div class="keepblock">'+mapHtml+kv([['Arrived on site',dt(v.arrived_at)],['Arrival notes',v.arrival_notes]])+'</div>'+photos(ofType('arrival_photo'),'No arrival picture recorded.');
 
  /* 3. work, one block per scope */
  let s3;
@@ -2387,9 +2395,10 @@ async function printJobCardV2(){
  if(v.waste_removed===false)s5='<div class="okline">No waste removed from site.</div>';
  else if(v.waste_removed){
   const tipped=!!(v.tipping_site_signature||v.tipping_signed_at||v.disposal_date&&v.transfer_note);
-  s5='<div class="grid2"><div class="box"><h3>Waste collected · '+esc2(v.waste_transfer_note_number||'')+'</h3>'+kv([['Waste',v.waste_description||v.waste_type],['EWC code',(v.waste_ewc_code||v.ewc_code||'')+(v.waste_hazardous?' (hazardous)':' (non-hazardous)')],['Quantity',wasteQty],['Container',v.waste_container_type],['SIC code',v.waste_sic_code],['Collected',dt(v.waste_transfer_at||v.customer_signed_at)]])+'</div>'
+  s5='<div class="keepblock"><div class="note">This is a summary only. The full Waste Transfer Note'+(v.waste_transfer_note_number?' <b>'+esc2(v.waste_transfer_note_number)+'</b>':'')+' is issued as a separate document.</div>'
+   +'<div class="grid2"><div class="box"><h3>Waste collected</h3>'+kv([['Waste',v.waste_description||v.waste_type],['EWC code',(v.waste_ewc_code||v.ewc_code||'')+(v.waste_hazardous?' (hazardous)':' (non-hazardous)')],['Quantity',wasteQty],['Container',v.waste_container_type],['Collected',dt(v.waste_transfer_at||v.customer_signed_at)]])+'</div>'
    +'<div class="box"><h3>Disposal</h3>'+(tipped?kv([['Receiving site',ds?ds.site_name:(v.waste_transferee_company||v.disposal_site)],['Type',ds?.site_type],['Address',ds?addr(ds.address,ds.postcode):v.waste_transferee_address],['Permit no.',ds?.permit_number],['Date tipped',dOnly(v.disposal_date)||dt(v.tipping_signed_at)],['Received by',v.waste_transferee_name],['Weighbridge / transfer ref.',v.transfer_note]]):'<div class="flag">Awaiting disposal'+(v.disposal_hold_note?' — held: '+esc2(v.disposal_hold_note):'')+'</div>'+kv([['Going to',ds?join(ds.site_name,ds.postcode):'To be confirmed']]))
-   +(v.tipping_site_signature?'<div class="minisig"><span class="lbl">Receiving site signature</span><img src="'+v.tipping_site_signature+'"></div>':'')+'</div></div>'
+   +(v.tipping_site_signature?'<div class="minisig"><span class="lbl">Receiving site signature</span><img src="'+v.tipping_site_signature+'"></div>':'')+'</div></div></div>'
    +(ofType('waste_evidence').length?'<div class="box"><h3>Tipping ticket / disposal evidence</h3>'+photos(ofType('waste_evidence'))+'</div>':'');
  }
 
@@ -2401,28 +2410,28 @@ async function printJobCardV2(){
 
  const head='<header class="top">'+(logo?'<img src="'+esc2(logo)+'">':'<b>Aura Solutions</b>')+'<div class="co"><b>'+esc2(String(co.company_name||'Aura Solutions Group Limited').toUpperCase())+'</b><br>'+esc2(join(co.business_address,co.postcode))+'<br>'+esc2(join(co.waste_carrier_type,co.waste_carrier_registration))+'</div></header>'
   +'<div class="titlebar"><div><h1>Job Completion Report</h1><div class="muted">'+esc2(join(j.job_types?.name,completed?'Completed '+dOnly(completed):''))+'</div></div><span class="jobno">'+esc2(j.job_number)+'</span></div>'
-  +'<div class="summary">'+[['Customer',cu.company_name],['Site',siteName||j.postcode||j.site_address],['Operative',operative],['Your reference',j.reference],['Arrived',dt(v.arrived_at)],['Completed',dt(completed)]].map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1]||'—')+'</b></div>').join('')+'</div>';
+  +'<div class="summary">'+[['Customer',cu.company_name],['Site',siteName||j.postcode||j.site_address],['Operative',operative],['Your reference',j.reference],['Arrived',dt(v.arrived_at)],['Completed',dt(completed)],['Waste Transfer Note',v.waste_removed?v.waste_transfer_note_number:'Not required'],['Time on site',(()=>{if(!v.arrived_at||!completed)return '';const m=Math.round((new Date(completed)-new Date(v.arrived_at))/60000);if(m<0||m>60*24*14)return '';const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return (d?d+'d ':'')+(h?h+'h ':'')+mm+'m';})()]].map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1]||'—')+'</b></div>').join('')+'</div>';
 
  let n=0;const body=head
   +sec(++n,'The job as issued',s1)
-  +sec(++n,'Arrival on site',s2,'keep')
+  +sec(++n,'Arrival on site',s2)
   +sec(++n,'Work carried out',s3)
   +sec(++n,'Issues / revisit',s4,(noIssues&&!otherIssue?'':'warnsec ')+'keep')
-  +(s5?sec(++n,'Waste & disposal',s5):'')
+  +(s5?sec(++n,'Waste overview',s5):'')
   +sec(++n,'Sign-off',s6,'keep')
-  +'<footer class="foot">'+esc2(co.company_name||'Aura Solutions Group Limited')+' · Job '+esc2(j.job_number)+' · Generated '+esc2(dt(new Date()))+'</footer>';
+  +'<footer class="foot">'+esc2(co.company_name||'Aura Solutions Group Limited')+' · Job '+esc2(j.job_number)+(co.waste_carrier_registration?' · Registered waste carrier '+esc2(co.waste_carrier_registration):'')+' · Generated '+esc2(dt(new Date()))+'</footer>';
 
  const css='@page{size:A4;margin:11mm 11mm 12mm}*{box-sizing:border-box}html,body{margin:0;background:#e9ece9;font:10.5px/1.45 "Helvetica Neue",Arial,sans-serif;color:#17221b;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
  +'.toolbar{position:sticky;top:0;z-index:5;background:#17221b;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center;font-size:13px}.toolbar button{background:#5fa86b;color:#fff;border:0;border-radius:6px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer}'
  +'.doc{width:210mm;margin:12px auto;background:#fff;padding:11mm;box-shadow:0 2px 10px rgba(0,0,0,.12)}'
  +'.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2f6b3a;padding-bottom:7px}.top img{height:50px}.co{text-align:right;font-size:9px;color:#4a5a4f;line-height:1.4}.co b{color:#17221b;font-size:10.5px}'
  +'.titlebar{display:flex;justify-content:space-between;align-items:center;margin:9px 0 7px}h1{font-size:19px;margin:0;color:#2f6b3a}.jobno{background:#2f6b3a;color:#fff;border-radius:4px;padding:4px 10px;font-weight:700;font-size:12px}.muted{color:#5b6b60}'
- +'.summary{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #cdd6cf;border-radius:6px;overflow:hidden;margin-bottom:10px}.summary div{padding:5px 8px;border-right:1px solid #e3e9e4;border-bottom:1px solid #e3e9e4;background:#f6f9f6}.summary span{display:block;font-size:8.5px;color:#5b6b60;text-transform:uppercase;letter-spacing:.4px}.summary b{font-size:10.5px}'
+ +'.summary{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #cdd6cf;border-radius:6px;overflow:hidden;margin-bottom:10px}.summary div{padding:5px 8px;border-right:1px solid #e3e9e4;border-bottom:1px solid #e3e9e4;background:#f6f9f6}.summary span{display:block;font-size:8.5px;color:#5b6b60;text-transform:uppercase;letter-spacing:.4px}.summary b{font-size:10.5px}'
  +'.sec{margin-top:10px}.sec h2{font-size:12.5px;color:#0c3e17;margin:0 0 6px;padding-bottom:4px;border-bottom:2px solid #79cf36;display:flex;align-items:center;gap:7px;break-after:avoid}.sec h2 .n{background:#2f6b3a;color:#fff;border-radius:50%;width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px}'
  +'.warnsec h2{border-bottom-color:#d9a13b}.keep{break-inside:avoid}'
  +'.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}.grid2 .box{margin:0}.box{border:1px solid #cdd6cf;border-radius:5px;padding:6px 8px;margin-bottom:7px;break-inside:avoid}.box h3{margin:-6px -8px 5px;background:#eef4ef;color:#2f6b3a;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;border-bottom:1px solid #cdd6cf}'
  +'table.kv{width:100%;border-collapse:collapse}table.kv td{padding:1.5px 0;vertical-align:top}td.k{color:#5b6b60;width:34%;padding-right:6px}td.v{font-weight:600}'
- +'.scopelist{margin-top:5px;border-top:1px dashed #d5ddd7;padding-top:5px}.scopelist div{margin-bottom:3px}'
+ +'.brief .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:2px 0 6px}.brief .chips div{background:#f6f9f6;border:1px solid #e3e9e4;border-radius:4px;padding:4px 6px}.brief .chips span{display:block;font-size:8.5px;color:#5b6b60;text-transform:uppercase;letter-spacing:.4px}.brief .chips b{font-size:10px}'+'.line{padding:5px 0;border-top:1px solid #edf1ee}.line .lbl{margin-bottom:1px}ol.scopes{margin:2px 0 0;padding-left:18px}ol.scopes li{margin-bottom:2px}'+'.map{position:relative;width:710px;max-width:100%;height:210px;overflow:hidden;border:1px solid #cdd6cf;border-radius:6px;margin-bottom:7px;background:#e8ece8}.map img{position:absolute;width:256px;height:256px}.map .pin{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-18px 0 0 -9px;background:#c62828;border:2px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 1px 4px rgba(0,0,0,.4)}.map .attr{position:absolute;right:4px;bottom:3px;font-size:7.5px;background:rgba(255,255,255,.8);padding:1px 4px;border-radius:3px}'+'.note{background:#eef4fb;border:1px solid #c9dbef;color:#1d4a73;border-radius:5px;padding:6px 8px;margin-bottom:7px}'+'.keepblock{break-inside:avoid}'
  +'.stage{break-inside:avoid}.scope{border:1px solid #cdd6cf;border-left:4px solid #2f6b3a;border-radius:5px;padding:7px 9px;margin-bottom:8px}.scopehead{font-weight:700;font-size:11.5px;color:#0c3e17;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}'
  +'.badge{font-size:8.5px;border-radius:999px;padding:2px 8px;font-weight:700}.badge.ok{background:#e3f2e6;color:#1f5a2a}.badge.warn{background:#fff1d6;color:#7a4d0b}'
  +'.asked{background:#f6f9f6;border-radius:4px;padding:5px 7px;margin-bottom:6px}.stage{margin-top:6px}.lbl{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;color:#5b6b60;font-weight:700;margin-bottom:2px}'
