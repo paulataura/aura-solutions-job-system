@@ -2282,7 +2282,7 @@ function renderDisposalSiteInfo(){const box=el('disposalSiteInfo');if(!box)retur
 
 async function holdDisposal(){if(!activeJob||activeJob.status!=='completed')return;const msg=el('disposalHoldMsg');msg.innerHTML='<div class="muted">Saving…</div>';
  try{const visitId=await getLatestVisitId();const u=await db.from('job_visits').update({disposal_hold_note:el('disposal_hold_note').value.trim()||null,disposal_held_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',visitId);if(u.error)throw u.error;
-  msg.innerHTML='<div class="ok">Saved. The waste is recorded as awaiting disposal — this job stays in your list and the office can see it. Open it again when you tip.</div>';}
+  msg.innerHTML='';jobDonePopup('Thank you — waste noted','Your work is saved and the waste is recorded as awaiting disposal. This job stays in your list — open it again when you tip the waste.');}
  catch(e){msg.innerHTML='<div class="err">Could not save: '+esc(e.message||String(e))+'</div>';}}
 
 async function renderOutstandingWaste(){const box=el('outstandingWasteAlert');if(!box)return;const jobs=(jobCentreJobs||[]).filter(j=>j.status==='completed');if(!jobs.length){box.classList.add('hidden');box.innerHTML='';return;}
@@ -2292,4 +2292,14 @@ async function renderOutstandingWaste(){const box=el('outstandingWasteAlert');if
  const days=t=>t?Math.floor((Date.now()-new Date(t).getTime())/864e5):null;
  box.classList.remove('hidden');box.innerHTML='<h2>♻ Waste awaiting disposal ('+rows.length+')</h2><div class="revisit-alert-list">'+rows.map(({j,v,site})=>{const n=days(v.completed_at);const q=[v.waste_quantity_value,v.waste_quantity_unit].filter(x=>x!==null&&x!==undefined&&x!=='').join(' ')+(v.waste_estimated_weight_kg?' (~'+v.waste_estimated_weight_kg+' kg)':'');
   return '<button type="button" onclick="openJob(\''+j.id+'\')"><b>'+esc(j.job_number)+'</b> · '+esc(j.customers?.company_name||j.site_address||'')+' — '+esc([v.waste_description,q].filter(Boolean).join(', ')||'waste')+(site?' → '+esc(site):'')+(n!==null?' · collected '+(n===0?'today':n+' day'+(n===1?'':'s')+' ago'):'')+(v.disposal_hold_note?' · held: '+esc(v.disposal_hold_note):'')+'</button>';}).join('')+'</div>';}
+
+/* Thank-you pop-up when a job is finished on site, then close the job (26 Oct 2026) */
+function jobDonePopup(title,text){let m=el('jobDoneModal');if(!m){m=document.createElement('div');m.id='jobDoneModal';m.className='modal hidden';m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.innerHTML='<div class="card" style="max-width:460px;width:calc(100% - 28px);margin:18vh auto;text-align:center"><div style="font-size:46px;line-height:1">✅</div><h2 id="jobDoneTitle" style="margin:10px 0 6px"></h2><p id="jobDoneText" class="muted" style="font-size:16px"></p><button id="jobDoneOk" class="btn primary" type="button" style="width:100%;padding:14px;font-size:17px;margin-top:8px">Close job</button></div>';document.body.appendChild(m);const st=document.createElement('style');st.textContent='#jobDoneModal:not(.hidden){position:fixed;inset:0;z-index:10001;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;background:rgba(18,28,20,.72)}#jobDoneModal:not(.hidden)>.card{box-shadow:0 18px 60px rgba(0,0,0,.28)}';document.head.appendChild(st);}
+ el('jobDoneTitle').textContent=title;el('jobDoneText').textContent=text;m.classList.remove('hidden');
+ el('jobDoneOk').onclick=()=>{m.classList.add('hidden');if(typeof showDashboard==='function')showDashboard();window.scrollTo(0,0);};}
+(function(){
+ const done=()=>jobDonePopup('Thank you — job complete','The job has been completed and sent to the office for review.');
+ const wrap=name=>{const orig=window[name];if(typeof orig!=='function')return;window[name]=async function(){const before=activeJob?.status;const r=await orig.apply(this,arguments);if(activeJob&&activeJob.status==='returned'&&before!=='returned')done();return r;};};
+ wrap('leaveCustomerSite');wrap('completeDisposal');
+})();
 </script></body></html>
