@@ -1,0 +1,2 @@
+-- Contractors see only the access requirements of the job's site (27 Oct 2026)
+-- function public.contractor_get_site_access(p_token text) returns access_codes, key_info, access_hours, vehicle_access, site_hazards, what3words; validated by contractor_validate_job_token; granted to anon.
