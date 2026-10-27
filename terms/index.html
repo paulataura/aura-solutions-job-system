@@ -15,17 +15,17 @@ header{position:relative;display:flex;justify-content:space-between;align-items:
 header img{height:74px;margin-top:-14px}
 .dochead{text-align:right}.dochead h1{margin:0;font-size:22px;letter-spacing:.3px;color:#0c3e17}.dochead .sub{font-size:13px;color:#5b6b60}
 .pill{display:inline-block;margin-top:6px;background:#72c936;color:#fff;padding:2px 10px;font-size:11px;font-weight:700;letter-spacing:.3px}
-main{position:relative;padding:8px 32px 30px}
-.key{border:1px solid #cfe5d3;background:#eef7ef;border-radius:8px;padding:12px 16px;margin:16px 0}
+main{position:relative;padding:4px 32px 24px;font-size:13px;line-height:1.5}
+.key{border:1px solid #cfe5d3;background:#eef7ef;border-radius:8px;padding:10px 14px;margin:10px 0 6px}.key li{margin-bottom:2px}
 .key h2{border:0;margin:0 0 6px;padding:0}
 .key ul{margin:0;padding-left:20px}
-h2{font-size:16px;color:#0c3e17;margin:22px 0 8px;padding-bottom:5px;border-bottom:1px solid #b9e29a}
-ol.clauses{margin:0;padding-left:22px}ol.clauses li{margin-bottom:6px}
+h2{font-size:14px;color:#0c3e17;margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid #b9e29a;break-after:avoid}
+ol.clauses{margin:0;padding-left:20px}ol.clauses li{margin-bottom:4px}.cols{column-gap:26px}@media(min-width:900px){.cols{column-count:2}}.cols h2:first-child{margin-top:8px}
 .note{font-size:12.5px;color:#5b6b60;margin-top:24px}
 footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-size:12px;line-height:1.6;padding:12px 16px}
 .toolbar{text-align:right;margin-top:10px}.toolbar button{background:#2f6b3a;color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:700;cursor:pointer}
 @media(max-width:640px){header{flex-direction:column;padding:44px 18px 10px}.dochead{text-align:left}header img{margin-top:0}main{padding:8px 18px 24px}}
-@media print{body{background:#fff}.page{box-shadow:none;max-width:none}.toolbar{display:none}h2{break-after:avoid}li{break-inside:avoid}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@page{size:A4;margin:10mm 11mm 12mm}@media print{html,body{background:#fff!important}.page{min-height:0}.cols{column-fill:balance}main{font-size:8.6px;line-height:1.38;padding:0 2mm}.cols{column-count:2}.key{font-size:9px;padding:6px 10px;margin:6px 0 2px}h2{font-size:10px;margin:9px 0 4px;padding-bottom:2px}ol.clauses{padding-left:15px}ol.clauses li{margin-bottom:2px}header{padding:30px 2mm 8px}header img{height:58px;margin-top:-6px}.dochead h1{font-size:18px}.chev{height:26px}.note{font-size:8px;margin-top:8px}footer{font-size:8.5px;padding:7px 10px}body{background:#fff}.page{box-shadow:none;max-width:none}.toolbar{display:none}h2{break-after:avoid}li{break-inside:avoid}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style>
 </head>
 <body>
@@ -33,7 +33,7 @@ footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-si
 <div class="wm"></div><div class="chev"></div>
 <header>
  <img src="../aura-logo.png" alt="Aura Solutions">
- <div class="dochead"><h1>TERMS AND CONDITIONS</h1><div class="sub">Aura Solutions Group Limited</div><span class="pill">VERSION 1.1 · 27 OCTOBER 2026</span></div>
+ <div class="dochead"><h1>TERMS AND CONDITIONS</h1><div class="sub">Aura Solutions Group Limited</div><span class="pill">VERSION 1.2 · 27 OCTOBER 2026</span></div>
 </header>
 <main>
 <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
@@ -46,10 +46,12 @@ footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-si
   <li>You must describe your waste accurately and tell us about any hazardous waste before we attend.</li>
   <li>Cancellations with less than 24 hours' notice are charged at 50% of the booked price. Visits where we cannot get access or start work are charged in full.</li>
   <li>We are not responsible for damage caused by the age, wear or existing condition of your drains, tanks, pumps or other equipment while we carry out work with reasonable care.</li>
+  <li>For assets we manage, you remain the owner and responsible for permits and insurance. We are not responsible for flooding, overflows or pollution unless caused by our negligence.</li>
   <li>Prices exclude VAT. Disposal is charged on the actual weight or volume recorded by the receiving site.</li>
  </ul>
 </div>
 
+<div class="cols">
 <h2>1. About these terms</h2>
 <ol class="clauses">
  <li>These terms apply to every quotation, order and job between Aura Solutions Group Limited (company number 15761350, "we", "us") and the customer named on the account or order ("you"). They apply instead of any terms you send us, unless we agree otherwise in writing.</li>
@@ -86,7 +88,7 @@ footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-si
  <li>You must not give us waste that differs from the description agreed, or any prohibited or undeclared waste (for example asbestos, clinical, radioactive or explosive material). If you do, you will pay all extra costs of handling, testing, transport and disposal, and you will be responsible for any resulting losses, fines or claims.</li>
  <li>We may refuse to collect waste that is not as described, is unsafe, or that we are not permitted to carry. Hazardous liquid waste is assessed stream by stream, and we are not obliged to accept every hazardous waste.</li>
  <li>Waste transfer notes, and consignment notes for hazardous waste, will be completed for each transfer. Both parties must keep them for at least two years (three years for consignment notes).</li>
- <li>Responsibility for waste that matches its description passes to us when it is loaded onto our vehicle or into our equipment.</li>
+ <li>Responsibility for waste that matches its description passes to us when it is loaded onto our vehicle or into our equipment. Waste that remains in a tank, chamber, drain or other asset, before collection or after we leave, remains your responsibility.</li>
 </ol>
 
 <h2>5. Site access and safety</h2>
@@ -125,7 +127,17 @@ footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-si
  <li>Maintenance and asset management contracts continue for the term agreed. After that, either party may end them by giving 30 days' written notice, unless the contract says otherwise.</li>
 </ol>
 
-<h2>9. Liability</h2>
+<h2>9. Asset management and environmental risk</h2>
+<ol class="clauses">
+ <li>Where we manage, monitor or maintain an asset for you (for example a septic tank, treatment plant, pump station, wet well, interceptor or drainage network), you remain the owner and operator of that asset. You remain responsible for its compliance, including any discharge permit, exemption or General Binding Rules, and for its repair, replacement and insurance, unless our contract says otherwise.</li>
+ <li><b>We are not responsible for flooding, overflows, spills, pollution, odour or other environmental damage</b>, or for any resulting clean-up costs, fines, enforcement action or third-party claims, unless it is caused by our negligence or our failure to carry out the agreed work.</li>
+ <li>In particular, we are not responsible where the cause is: the age, design, capacity or condition of the asset; storms, heavy rainfall, high groundwater or surface water entering the system; power, telemetry or communications failure; equipment failure that was not caused by us; misuse, including fats, oils, grease, wipes, chemicals or other unsuitable material entering the system; work by others; or a delay in access, approval or payment that prevents us acting.</li>
+ <li>Service visits, emptying frequencies and response times are planned in good faith and based on normal conditions and the information you give us. They are targets, not guarantees, unless a fixed response time is agreed in writing. Emergency attendance depends on safe access, available vehicles and disposal capacity.</li>
+ <li>You must tell us promptly about alarms, high levels, blockages, odours, leaks, overflows or changes in use, and take reasonable steps to limit any damage or pollution, including notifying the Environment Agency or Natural Resources Wales where the law requires it.</li>
+ <li>We recommend you keep suitable insurance for the asset, including flood, pollution and third-party cover.</li>
+</ol>
+
+<h2>10. Liability</h2>
 <ol class="clauses">
  <li>Nothing in these terms limits liability for death or personal injury caused by negligence, for fraud, or for anything else that cannot be limited by law.</li>
  <li>We are not liable for loss of profit, loss of business, loss of use, or any indirect or consequential loss.</li>
@@ -133,7 +145,7 @@ footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-si
  <li>You must tell us in writing about any claim within 14 days of becoming aware of it, and give us a reasonable opportunity to inspect and put right any problem before others are instructed.</li>
 </ol>
 
-<h2>10. General</h2>
+<h2>11. General</h2>
 <ol class="clauses">
  <li>We may use carefully selected subcontractors and other licensed carriers or disposal sites to carry out the work. We remain responsible for work we subcontract.</li>
  <li>We are not liable for delays or failures caused by events outside our reasonable control, such as severe weather, closure of disposal sites, vehicle breakdown, strikes or supplier failure.</li>
@@ -141,7 +153,8 @@ footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-si
  <li>These terms are governed by the law of England and Wales, and the courts of England and Wales have exclusive jurisdiction.</li>
 </ol>
 
-<p class="note">Aura Solutions Group Limited · Registered office: 129 Main Street, Sedgeberrow, Evesham, England, WR11 7UH · Company no. 15761350 · VAT no. GB 471 3179 91 · Registered waste carrier CBDU631384</p>
+</div>
+
 </main>
 <footer><b>AURA SOLUTIONS GROUP LIMITED</b> · Registered office: 129 Main Street, Sedgeberrow, Evesham, England, WR11 7UH<br>Company no. 15761350 · VAT no. GB 471 3179 91 · Registered waste carrier CBDU631384</footer>
 </div>
