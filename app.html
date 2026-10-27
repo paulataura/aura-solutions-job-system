@@ -345,7 +345,7 @@ function renderJobTypesDirectory(){const box=el('jobTypeDirectoryList');if(!box)
 function resetJobTypeDirectoryForm(){el('directoryJobTypeId').value='';el('directoryJobTypeName').value='';el('directoryJobTypeCode').value='';el('directoryJobTypeDescription').value='';el('directoryJobTypeWaste').checked=false;el('jobTypeDirectoryFormTitle').textContent='Add Job Type';el('cancelJobTypeEdit').classList.add('hidden');el('jobTypeDirectoryMsg').innerHTML='';}
 function editJobTypeDirectory(id){const x=jobTypesDirectoryRows.find(a=>a.id===id);if(!x)return;el('directoryJobTypeId').value=x.id;el('directoryJobTypeName').value=x.name||'';el('directoryJobTypeCode').value=x.code||'';el('directoryJobTypeDescription').value=x.description||'';el('directoryJobTypeWaste').checked=!!x.requires_waste_workflow;el('jobTypeDirectoryFormTitle').textContent='Edit Job Type';el('cancelJobTypeEdit').classList.remove('hidden');el('jobTypeDirectoryMsg').innerHTML='';el('directoryJobTypeName').focus();}
 async function saveJobTypeDirectory(e){e.preventDefault();if(activeProfile?.role!=='admin')return;const msg=el('jobTypeDirectoryMsg'),id=el('directoryJobTypeId').value||null,name=el('directoryJobTypeName').value.trim(),code=el('directoryJobTypeCode').value.trim().toLowerCase(),description=el('directoryJobTypeDescription').value.trim()||null,waste=el('directoryJobTypeWaste').checked;if(!name||!/^[a-z0-9_]+$/.test(code)){msg.innerHTML='<div class="err">Enter a name and a code using lowercase letters, numbers and underscores only.</div>';return;}msg.innerHTML='<div class="muted">Saving job type…</div>';const payload={name,code,description,requires_waste_workflow:waste,active:true};let result;if(id)result=await db.from('job_types').update(payload).eq('id',id);else{const max=Math.max(0,...jobTypesDirectoryRows.map(x=>Number(x.sort_order)||0));result=await db.from('job_types').insert({...payload,sort_order:max+1});}if(result.error){msg.innerHTML='<div class="err">Could not save job type: '+esc(result.error.message)+'</div>';return;}resetJobTypeDirectoryForm();await loadJobTypesDirectory();msg.innerHTML='<div class="ok">Job type saved.</div>';}
-async function toggleJobTypeDirectory(id,active){if(activeProfile?.role!=='admin')return;const x=jobTypesDirectoryRows.find(a=>a.id===id);if(!x)return;if(!active&&!confirm('Remove '+(x.name||'this job type')+' from new jobs? Existing jobs will remain unchanged.'))return;const {error}=await db.from('job_types').update({active}).eq('id',id);if(error){alert('Could not update job type: '+error.message);return;}await loadJobTypesDirectory();}
+async function toggleJobTypeDirectory(id,active){if(activeProfile?.role!=='admin')return;const x=jobTypesDirectoryRows.find(a=>a.id===id);if(!x)return;if(!active&&!await auraConfirm('Remove '+(x.name||'this job type')+' from new jobs? Existing jobs will remain unchanged.'))return;const {error}=await db.from('job_types').update({active}).eq('id',id);if(error){alert('Could not update job type: '+error.message);return;}await loadJobTypesDirectory();}
 function setCentreMode(mode){
  centreMode=mode;
  const isJobs=mode==='jobs',isCal=mode==='calendar',isPeople=mode==='people',isCustomers=mode==='customers',isDisposal=mode==='disposal',isJobTypes=mode==='jobtypes',isRate=mode==='ratecard';
@@ -491,7 +491,7 @@ async function siteVisitSaveSection(){
  }catch(error){msg.innerHTML='<div class="err">Section text may have saved, but a photo or save step failed: '+esc(error.message||String(error))+'. Check the section before retrying.</div>';await loadSiteVisit(false);}
 }
 async function siteVisitDeleteSection(id){
- if(!confirm('Remove this proposed scope section and its pictures?'))return;
+ if(!await auraConfirm('Remove this proposed scope section and its pictures?'))return;
  const paths=siteVisitPhotos.filter(x=>x.section_id===id).map(x=>x.storage_path);
  const {error}=await db.from('site_visit_sections').delete().eq('id',id).eq('job_id',activeJob.id);
  if(error){el('siteVisitSectionMsg').innerHTML='<div class="err">Could not remove section: '+esc(error.message)+'</div>';return;}
@@ -541,7 +541,7 @@ async function loadSiteVisit(refreshForm=true){
  el('siteVisitWasteSummary').innerHTML='<h3>Saved waste findings</h3>'+(w?.waste_present===null||w?.waste_present===undefined?'<div class="muted">No waste assessment saved yet.</div>':'<div class="scope-section"><b>Waste to remove: '+(w.waste_present?'Yes':'No')+'</b>'+(w.waste_present?'<div style="white-space:pre-wrap;margin-top:7px">'+esc(w.waste_description||'')+'</div><div>Estimated amount: '+esc(w.estimated_volume??'To be measured')+' '+esc(w.volume_unit||'')+'</div><div class="muted" style="white-space:pre-wrap">'+esc(w.waste_notes||'')+'</div>':'')+'</div>')+(w?.general_notes?'<div class="scope-section"><b>Overall notes</b><div style="white-space:pre-wrap">'+esc(w.general_notes)+'</div></div>':'')+wastePhotos.join('');
 }
 async function siteVisitDeletePhoto(id){
- const row=siteVisitPhotos.find(p=>p.id===id);if(!row||!confirm('Remove this photo?'))return;
+ const row=siteVisitPhotos.find(p=>p.id===id);if(!row||!await auraConfirm('Remove this photo?'))return;
  const {error}=await db.from('site_visit_photos').delete().eq('id',id).eq('job_id',activeJob.id);
  if(error){el('siteVisitWasteMsg').innerHTML='<div class="err">Could not remove photo: '+esc(error.message)+'</div>';return;}
  await db.storage.from('job-files').remove([row.storage_path]);await loadSiteVisit(false);
@@ -688,7 +688,7 @@ async function abortActiveJob(){
  if(!canAbortActiveJob())return;
  const reason=el('abort_reason').value.trim(),notes=el('abort_notes').value.trim();
  if(!reason||!notes){el('abortMsg').innerHTML='<div class="err">Please select an abort reason and explain what happened.</div>';return;}
- if(!confirm('Abort '+activeJob.job_number+'? This will stop the normal job workflow.'))return;
+ if(!await auraConfirm('Abort '+activeJob.job_number+'? This will stop the normal job workflow.'))return;
  el('abortMsg').innerHTML='<div class="muted">Aborting job…</div>';
  const from=activeJob.status;
  const {data,error}=await db.rpc('abort_job',{p_job_id:activeJob.id,p_reason:reason,p_notes:notes});
@@ -996,7 +996,7 @@ async function managementFinishJobCard(){
  const notes=el('completion_notes').value.trim(),issues=el('completion_issues').value.trim(),sections=readCompletionSections();
  if(sections.some(x=>!x.title||!x.work)){el('completionMsg').innerHTML='<div class="err">Complete the title and work description for every completed-work section.</div>';return;}
  if(!notes&&!sections.length){el('completionMsg').innerHTML='<div class="err">Add an overall work summary or at least one completed-work section.</div>';return;}
- if(!confirm('Complete this Aura job card using the information supplied by the third party?'))return;
+ if(!await auraConfirm('Complete this Aura job card using the information supplied by the third party?'))return;
  el('completionMsg').innerHTML='<div class="muted">Completing the Aura job card…</div>';
  try{
   const visitId=await getLatestVisitId();
@@ -1299,11 +1299,11 @@ async function saveCustomerSiteDirectory(event,customerId){
  await refreshCustomerSiteDirectory(customerId);
 }
 async function toggleCustomerSiteActive(id,active){
- const customerId=expandedCustomerSiteId,site=(customerSiteDirectoryCache[customerId]||[]).find(x=>x.id===id);if(!site||!confirm((active?'Reactivate ':'Remove from new job choices: ')+site.site_name+'?'))return;
+ const customerId=expandedCustomerSiteId,site=(customerSiteDirectoryCache[customerId]||[]).find(x=>x.id===id);if(!site||!await auraConfirm((active?'Reactivate ':'Remove from new job choices: ')+site.site_name+'?'))return;
  const {error}=await db.rpc('aura_save_customer_site',customerSitePayload(site,customerId,active));if(error){alert('Could not update site: '+error.message);return;}await refreshCustomerSiteDirectory(customerId);
 }
 async function deleteCustomerSite(id){
- const customerId=expandedCustomerSiteId,site=(customerSiteDirectoryCache[customerId]||[]).find(x=>x.id===id);if(!site||!confirm('Permanently delete '+site.site_name+'? Sites linked to jobs or contract plans cannot be deleted.'))return;
+ const customerId=expandedCustomerSiteId,site=(customerSiteDirectoryCache[customerId]||[]).find(x=>x.id===id);if(!site||!await auraConfirm('Permanently delete '+site.site_name+'? Sites linked to jobs or contract plans cannot be deleted.'))return;
  const {error}=await db.rpc('aura_delete_customer_site',{p_id:id,p_customer_id:customerId});if(error){alert('Could not delete site: '+error.message);return;}await refreshCustomerSiteDirectory(customerId);
 }
 async function toggleCustomerSites(id){
@@ -1369,7 +1369,7 @@ async function saveCustomerMaintenance(event,customerId){
  await loadMaintenancePlans();renderCalendar();el('customerDirectoryList')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function toggleCustomerMaintenanceActive(id,active){
- const p=maintenancePlans.find(x=>x.id===id);if(!p||!confirm((active?'Reactivate ':'Set inactive ')+p.title+'?'))return;
+ const p=maintenancePlans.find(x=>x.id===id);if(!p||!await auraConfirm((active?'Reactivate ':'Set inactive ')+p.title+'?'))return;
  const {error}=await db.from('customer_maintenance_plans').update({active}).eq('id',id);if(error){alert('Could not update plan: '+error.message);return;}await loadMaintenancePlans();renderCalendar();
 }
 function editDirectoryCustomer(id){
@@ -1387,7 +1387,7 @@ async function saveDirectoryCustomer(e){
  resetCustomerDirectoryForm();await loadCustomersDirectory();el('customerDirectoryMsg').innerHTML='<div class="ok">Customer saved.</div>';
 }
 async function toggleDirectoryCustomer(id,active){
- const x=directoryCustomers.find(v=>v.id===id);if(!x||!confirm((active?'Reactivate ':'Set inactive ')+x.company_name+'?'))return;
+ const x=directoryCustomers.find(v=>v.id===id);if(!x||!await auraConfirm((active?'Reactivate ':'Set inactive ')+x.company_name+'?'))return;
  const {error}=await db.rpc('aura_save_customer',directoryCustomerPayload(x,active));if(error){alert('Could not update customer: '+error.message);return;}await loadCustomersDirectory();
 }
 async function loadDisposalDirectory(){
@@ -1417,7 +1417,7 @@ async function saveDirectoryDisposalSite(e){
  resetDisposalDirectoryForm();await loadDisposalDirectory();el('disposalDirectoryMsg').innerHTML='<div class="ok">Disposal site saved.</div>';
 }
 async function toggleDirectoryDisposalSite(id,active){
- const x=directoryDisposals.find(v=>v.id===id);if(!x||!confirm((active?'Reactivate ':'Set inactive ')+x.site_name+'?'))return;
+ const x=directoryDisposals.find(v=>v.id===id);if(!x||!await auraConfirm((active?'Reactivate ':'Set inactive ')+x.site_name+'?'))return;
  const {error}=await db.rpc('aura_save_disposal_site',directoryDisposalPayload(x,active));if(error){alert('Could not update disposal site: '+error.message);return;}await loadDisposalDirectory();
 }
 async function loadPeople(){
@@ -1442,7 +1442,7 @@ async function editOperative(id){
  const {error}=await db.from('profiles').update({full_name:name.trim()||x.full_name,phone:phone.trim()||null}).eq('id',id);if(error){alert('Could not update operative: '+error.message);return;}await loadPeople();
 }
 async function toggleOperative(id,active){
- const x=peopleOperatives.find(v=>v.id===id);if(!x)return;if(!confirm((active?'Reactivate ':'Set inactive ')+(x.full_name||'this operative')+'?'))return;
+ const x=peopleOperatives.find(v=>v.id===id);if(!x)return;if(!await auraConfirm((active?'Reactivate ':'Set inactive ')+(x.full_name||'this operative')+'?'))return;
  const {error}=await db.from('profiles').update({active}).eq('id',id);if(error){alert('Could not update operative: '+error.message);return;}await loadPeople();
 }
 function editContractor(id){
@@ -1453,7 +1453,7 @@ async function saveContractor(e){
  e.preventDefault();const id=el('edit_contractor_id').value;const payload={company_name:el('contractor_company_name').value.trim(),contact_name:el('contractor_contact_name').value.trim(),email:el('contractor_email').value.trim()||null,phone:el('contractor_phone').value.trim()||null};if(!payload.company_name||!payload.contact_name){el('contractorMsg').innerHTML='<div class="err">Company name and contact name are required.</div>';return;}el('contractorMsg').innerHTML='<div class="muted">Saving…</div>';const q=id?db.from('contractors').update(payload).eq('id',id):db.from('contractors').insert({...payload,active:true});const {error}=await q;if(error){el('contractorMsg').innerHTML='<div class="err">Could not save contractor: '+esc(error.message)+'</div>';return;}resetContractorForm();await loadPeople();
 }
 async function toggleContractor(id,active){
- const x=peopleContractors.find(v=>v.id===id);if(!x)return;if(!confirm((active?'Reactivate ':'Set inactive ')+(x.company_name||'this contractor')+'?'))return;const {error}=await db.from('contractors').update({active}).eq('id',id);if(error){alert('Could not update contractor: '+error.message);return;}await loadPeople();
+ const x=peopleContractors.find(v=>v.id===id);if(!x)return;if(!await auraConfirm((active?'Reactivate ':'Set inactive ')+(x.company_name||'this contractor')+'?'))return;const {error}=await db.from('contractors').update({active}).eq('id',id);if(error){alert('Could not update contractor: '+error.message);return;}await loadPeople();
 }
 
 function contractorBaseUrl(){return new URL('./job.html',location.href).href;}
@@ -1462,7 +1462,7 @@ function contractorLinkControls(){
 }
 async function takeOverContractorJob(){
  if(!activeJob||!['admin','manager'].includes(activeProfile?.role)||!activeJob.contractor_id)return;
- if(!confirm('Convert '+activeJob.job_number+' into an Aura job card? The contractor assignment will be removed, while their notes and photos remain attached to this job.'))return;
+ if(!await auraConfirm('Convert '+activeJob.job_number+' into an Aura job card? The contractor assignment will be removed, while their notes and photos remain attached to this job.'))return;
  el('detailMsg').innerHTML='<div class="muted">Converting to an Aura job card…</div>';
  const {data,error}=await db.from('jobs').update({converted_from_contractor_id:activeJob.contractor_id,contractor_id:null,assigned_to:null,status:'draft',updated_at:new Date().toISOString()}).eq('id',activeJob.id).select('id,job_number,status,contractor_id,assigned_to').single();
  if(error){el('detailMsg').innerHTML='<div class="err">Could not convert this job: '+esc(error.message)+'</div>';return;}
@@ -1506,7 +1506,7 @@ async function copyContractorWelcomeMessage(){
  const x=el('contractorWelcomeText');if(!x)return;try{await navigator.clipboard.writeText(x.value);}catch(e){x.select();document.execCommand('copy');}el('detailMsg').innerHTML='<div class="ok">Welcome message copied. Paste it into your message to the contractor.</div>';
 }
 async function revokeContractorLink(){
- if(!activeJob?.contractor_id)return;if(!confirm('Revoke all active contractor links for this job?'))return;
+ if(!activeJob?.contractor_id)return;if(!await auraConfirm('Revoke all active contractor links for this job?'))return;
  const {error}=await db.rpc('revoke_contractor_job_link',{p_job_id:activeJob.id});if(error){el('detailMsg').innerHTML='<div class="err">Could not revoke link: '+esc(error.message)+'</div>';return;}contractorShareLink='';renderWorkflow();el('detailMsg').innerHTML='<div class="ok">Contractor link revoked.</div>';
 }
 function contractorStatusLabel(s){return statusLabel(s);}
@@ -2450,7 +2450,7 @@ async function saveRateCardItem(e){e.preventDefault();const msg=el('rcFormMsg');
  const r=rcEditingId?await db.from('rate_card_items').update(row).eq('id',rcEditingId):await db.from('rate_card_items').insert(row);
  if(r.error){msg.innerHTML='<div class="err">Could not save: '+esc(/unique/i.test(r.error.message)?'that code is already used by another item':r.error.message)+'</div>';return;}
  closeRateCardForm();await ensureRateCard(true);renderRateCard();}
-async function deleteRateCardItem(id){const x=rateCardItems.find(v=>v.id===id);if(!x||!confirm('Delete "'+x.name+'" from the rate card? Customer prices linked to it will lose their standard-price comparison. (Untick Active instead to just hide it.)'))return;
+async function deleteRateCardItem(id){const x=rateCardItems.find(v=>v.id===id);if(!x||!await auraConfirm('Delete "'+x.name+'" from the rate card? Customer prices linked to it will lose their standard-price comparison. (Untick Active instead to just hide it.)'))return;
  const r=await db.from('rate_card_items').delete().eq('id',id);if(r.error){el('rcFormMsg').innerHTML='<div class="err">Could not delete: '+esc(r.error.message)+'</div>';return;}closeRateCardForm();await ensureRateCard(true);renderRateCard();}
 
 /* ---- customer price lists ---- */
@@ -2493,7 +2493,7 @@ async function saveCustomerPrice(e,customerId){e.preventDefault();const msg=el('
  const r=id?await db.from('customer_prices').update(row).eq('id',id):await db.from('customer_prices').insert(row);
  if(r.error){msg.innerHTML='<div class="err">Could not save: '+esc(r.error.message)+'</div>';return;}
  cpEditing=null;await loadCustomerPrices(customerId);}
-async function deleteCustomerPrice(customerId,id){if(!confirm('Remove this price from the customer\'s price list?'))return;const r=await db.from('customer_prices').delete().eq('id',id);if(r.error){el('cpMsg').innerHTML='<div class="err">'+esc(r.error.message)+'</div>';return;}cpEditing=null;await loadCustomerPrices(customerId);}
+async function deleteCustomerPrice(customerId,id){if(!await auraConfirm('Remove this price from the customer\'s price list?'))return;const r=await db.from('customer_prices').delete().eq('id',id);if(r.error){el('cpMsg').innerHTML='<div class="err">'+esc(r.error.message)+'</div>';return;}cpEditing=null;await loadCustomerPrices(customerId);}
 
 /* ---- customer rate check (all customers) ---- */
 async function renderCustomerRateCheck(){const box=el('rcBody');box.innerHTML='<div class="muted">Checking customer prices…</div>';
@@ -2635,13 +2635,13 @@ async function sendCustomerForm(e){e.preventDefault();const out=el('cfSendResult
  out.innerHTML='<div class="muted">Creating secure link…</div>';const r=await db.rpc('aura_create_customer_application',{p_company_name:company,p_contact_name:contact,p_email:email});
  if(r.error||!r.data?.[0]){out.innerHTML='<div class="err">Could not create the form: '+esc(r.error?.message||'no link returned')+'</div>';return;}
  const link=CF_BASE()+'#t='+r.data[0].token;out.innerHTML=cfShareHtml(link,{company_name:company,contact_name:contact,email});el('cfCompany').value='';el('cfContact').value='';el('cfEmail').value='';loadCustomerApplications();}
-async function resendCustomerApplication(id){const a=customerApplications.find(x=>x.id===id);if(!a)return;if(!confirm('Create a new link for '+(a.company_name||'this form')+'? The old link will stop working.'))return;
+async function resendCustomerApplication(id){const a=customerApplications.find(x=>x.id===id);if(!a)return;if(!await auraConfirm('Create a new link for '+(a.company_name||'this form')+'? The old link will stop working.'))return;
  const r=await db.rpc('aura_create_customer_application',{p_company_name:a.company_name||'',p_contact_name:a.contact_name||'',p_email:a.email||''});if(r.error||!r.data?.[0]){alert('Could not create a new link: '+(r.error?.message||''));return;}
  await db.from('customer_applications').update({status:'declined'}).eq('id',id);toggleSendCustomerForm(true);el('cfSendResult').innerHTML=cfShareHtml(CF_BASE()+'#t='+r.data[0].token,a);loadCustomerApplications();}
-async function declineCustomerApplication(id,cancel){const a=customerApplications.find(x=>x.id===id);if(!a||!confirm((cancel?'Cancel the form sent to ':'Decline the form from ')+(a.data?.company_name||a.company_name||'this customer')+'?'+(cancel?' The link will stop working.':'')))return;
+async function declineCustomerApplication(id,cancel){const a=customerApplications.find(x=>x.id===id);if(!a||!await auraConfirm((cancel?'Cancel the form sent to ':'Decline the form from ')+(a.data?.company_name||a.company_name||'this customer')+'?'+(cancel?' The link will stop working.':'')))return;
  const u=await db.from('customer_applications').update({status:'declined',reviewed_at:new Date().toISOString(),reviewed_by_name:activeProfile?.full_name||null}).eq('id',id);if(u.error){alert(u.error.message);return;}loadCustomerApplications();}
 async function openAccountFromApplication(id){const a=customerApplications.find(x=>x.id===id);if(!a)return;const d=a.data||{};
- if(!confirm('Open a customer account for '+(d.company_name||a.company_name)+'?\n\nThis creates the customer'+((d.sites||[]).length?' and '+d.sites.length+' site'+(d.sites.length===1?'':'s'):'')+' from the form. You can edit anything afterwards.'))return;
+ if(!await auraConfirm('Open a customer account for '+(d.company_name||a.company_name)+'?\n\nThis creates the customer'+((d.sites||[]).length?' and '+d.sites.length+' site'+(d.sites.length===1?'':'s'):'')+' from the form. You can edit anything afterwards.'))return;
  const r=await db.rpc('aura_open_customer_account',{p_application_id:id});if(r.error){alert('Could not open the account: '+r.error.message);return;}
  await loadCustomerApplications();await loadCustomersDirectory();el('customerDirectorySearch').value=d.company_name||'';renderCustomersDirectory();el('customerDirectoryList')?.scrollIntoView({behavior:'smooth',block:'start'});}
 function viewCustomerApplication(id){const a=customerApplications.find(x=>x.id===id);if(!a)return;const d=a.data||{},E=auraDocEsc;
@@ -2657,13 +2657,27 @@ function viewCustomerApplication(id){const a=customerApplications.find(x=>x.id==
  w.document.open();w.document.write(auraDocHtml({tabTitle:'New customer form – '+(d.company_name||a.company_name||''),title:'New Customer Account Form',ref:d.company_name||a.company_name||'',sub:'Returned '+auraDocWhen(a.submitted_at),pill:a.status==='approved'?'ACCOUNT OPENED':'TO REVIEW',body}));w.document.close();}
 (function(){const orig=window.loadCustomersDirectory;if(typeof orig!=='function')return;window.loadCustomersDirectory=async function(){loadCustomerApplications();return orig.apply(this,arguments);};})();
 (function(){const orig=window.loadJobs;if(typeof orig!=='function')return;window.loadJobs=async function(){const r=await orig.apply(this,arguments);if(['admin','manager'].includes(activeProfile?.role))loadCustomerApplications();return r;};})();
+
+/* ===== 27 Oct 2026: in-app confirm and message boxes (replace the browser pop-ups) ===== */
+(function(){const st=document.createElement('style');st.textContent='.aura-dlg-back{position:fixed;inset:0;background:rgba(10,30,16,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;animation:auraFade .12s ease-out}.aura-dlg{background:#fff;border-radius:16px;max-width:460px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.25);overflow:hidden;position:relative}.aura-dlg:before{content:"";position:absolute;top:0;right:0;width:150px;height:14px;background:#0c3e17;clip-path:polygon(30% 0,100% 0,100% 100%,42% 100%)}.aura-dlg .bd{padding:24px 22px 8px}.aura-dlg h3{margin:0 0 8px;font-size:18px;color:#0c3e17;display:flex;gap:10px;align-items:center}.aura-dlg .ic{flex:none;width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:16px;background:#e3f2e6;color:#2f6b3a}.aura-dlg.danger .ic{background:#fde7e5;color:#b42318}.aura-dlg p{margin:0;color:#33423a;white-space:pre-wrap;line-height:1.5}.aura-dlg .ft{display:flex;gap:10px;justify-content:flex-end;padding:16px 22px 20px}.aura-dlg .ft button{border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:800;cursor:pointer}.aura-dlg .ok{background:#2f6b3a;color:#fff}.aura-dlg.danger .ok{background:#b42318}.aura-dlg .no{background:#eef4ef;color:#0c3e17}@keyframes auraFade{from{opacity:0}to{opacity:1}}';document.head.appendChild(st);})();
+function auraDialog(message,opt){opt=opt||{};return new Promise(res=>{const text=String(message||''),first=text.split(/[\s?:]/)[0];
+ const danger=opt.danger??(/^(Delete|Remove|Abort|Revoke|Decline|Cancel|Set inactive|Permanently)/i.test(text)&&!/Reactivate/i.test(text.slice(0,12)));
+ const verbs={Delete:'Delete',Remove:'Remove',Abort:'Abort job',Revoke:'Revoke',Decline:'Decline',Cancel:'Cancel form',Archive:'Archive',Open:'Open account',Create:'Create link',Convert:'Convert',Complete:'Complete',Reactivate:'Reactivate',Permanently:'Delete'};
+ const okText=opt.okText||(opt.alert?'OK':(verbs[first]||(/^Set inactive/.test(text)?'Set inactive':'Confirm')));
+ const parts=text.split(/\n\n/),single=!opt.alert&&!opt.title&&parts.length===1&&/\?\s*$/.test(text)&&text.length<120,title=opt.title||(parts.length>1?parts[0]:(single?text:(opt.alert?'Message':'Please confirm'))),body=single?'':(parts.length>1&&!opt.title?parts.slice(1).join('\n\n'):text);
+ const back=document.createElement('div');back.className='aura-dlg-back';back.innerHTML='<div class="aura-dlg'+(danger?' danger':'')+'" role="dialog" aria-modal="true"><div class="bd"><h3><span class="ic">'+(opt.alert?'i':(danger?'!':'?'))+'</span><span class="tt"></span></h3><p></p></div><div class="ft">'+(opt.alert?'':'<button type="button" class="no">Go back</button>')+'<button type="button" class="ok"></button></div></div>';
+ back.querySelector('.tt').textContent=title;back.querySelector('p').textContent=body;if(!body)back.querySelector('p').remove();back.querySelector('.ok').textContent=okText;
+ const done=v=>{back.remove();document.removeEventListener('keydown',key);res(v);};const key=e=>{if(e.key==='Escape')done(false);if(e.key==='Enter')done(true);};
+ back.querySelector('.ok').onclick=()=>done(true);back.querySelector('.no')?.addEventListener('click',()=>done(false));back.addEventListener('click',e=>{if(e.target===back)done(false);});document.addEventListener('keydown',key);document.body.appendChild(back);back.querySelector('.ok').focus();});}
+function auraConfirm(message,opt){return auraDialog(message,opt);}
+window.alert=function(message){auraDialog(message,{alert:true});};
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
 function jobIsArchived(id){return (jobArchivedJobs||[]).some(j=>j.id===id);}
 (function(){const orig=window.openJob;if(typeof orig!=='function')return;window.openJob=async function(id){const r=await orig.apply(this,arguments);const b=el('archiveJobBtn');if(b&&activeJob){const m=['admin','manager'].includes(activeProfile?.role);b.classList.toggle('hidden',!m);b.textContent=jobIsArchived(activeJob.id)?'↩ Unarchive':'🗄 Archive';}return r;};})();
 async function toggleArchiveActiveJob(){if(!activeJob)return;const archived=jobIsArchived(activeJob.id);
- if(!archived&&!confirm('Archive job '+(activeJob.job_number||'')+'?\n\nIt will be hidden from the job lists, calendar and operators. Nothing is deleted — you can find it under "Archived / test" and unarchive it.'))return;
+ if(!archived&&!await auraConfirm('Archive job '+(activeJob.job_number||'')+'?\n\nIt will be hidden from the job lists, calendar and operators. Nothing is deleted — you can find it under "Archived / test" and unarchive it.'))return;
  const patch=archived?{archived_at:null,archived_by_name:null}:{archived_at:new Date().toISOString(),archived_by_name:activeProfile?.full_name||null};
  const u=await db.from('jobs').update(patch).eq('id',activeJob.id);if(u.error){alert('Could not update: '+u.error.message);return;}
  await loadJobs();if(archived){openJob(activeJob.id);}else{showDashboard();}}
