@@ -1130,7 +1130,7 @@ async function viewWtnPdf(){
  +box('Section D – The transfer',kv([['Place of transfer','Collection site above'],['Date and time of transfer',fmt(new Date())]]))
  +'<div class="decl"><b>Waste hierarchy declaration.</b> By signing, the transferor confirms the waste details above are correct and that they have applied the waste hierarchy as required by Regulation 12 of the Waste (England and Wales) Regulations 2011.</div>'
  +'<div class="sigs">'+sig("Transferor's signature",custSig,custName?custName+' · '+(cu.company_name||''):(cu.company_name||''))+sig("Transferee's signature",opSig,join(activeProfile?.full_name,broker?j.carrier_name:auraName))+'</div>'
- +box('Receiving site (where the waste is going)',ds?kv([['Site',ds.site_name],['Type',ds.site_type],['Address',join(ds.address,ds.postcode)],['Permit no.',ds.permit_number]]):'<span class="none">To be confirmed by the office</span>')
+ +box('Receiving site (where the waste is going)',(()=>{const t=(el('disposal_site')?.value||'').trim(),dz=dsOverride(ds,t);return dz?kv([['Site',dz.site_name],['Type',dz.site_type],['Address',join(dz.address,dz.postcode)],['Permit no.',dz.permit_number]]):(t?kv([['Site',t]]):null);})()||(ds?kv([['Site',ds.site_name],['Type',ds.site_type],['Address',join(ds.address,ds.postcode)],['Permit no.',ds.permit_number]]):'<span class="none">To be confirmed by the office</span>'))
  +'<div class="foot"><span>Both parties must keep this note for at least two years. · '+esc(txt('wtnNumber'))+'</span><span>Page 1 of 1</span></div></section></body></html>';
  w.document.open();w.document.write(html);w.document.close();
 }
@@ -2402,7 +2402,7 @@ async function printJobCardV2(){
   const tipped=!!(v.tipping_site_signature||v.tipping_signed_at||v.disposal_date&&v.transfer_note);
   s5='<div class="keepblock"><div class="note">This is a summary only. The full Waste Transfer Note'+(v.waste_transfer_note_number?' <b>'+esc2(v.waste_transfer_note_number)+'</b>':'')+' is issued as a separate document.</div>'
    +'<div class="grid2"><div class="box"><h3>Waste collected</h3>'+kv([['Waste',v.waste_description||v.waste_type],['EWC code',(v.waste_ewc_code||v.ewc_code||'')+(v.waste_hazardous?' (hazardous)':' (non-hazardous)')],['Quantity',wasteQty],['Container',v.waste_container_type],['Collected',dt(v.waste_transfer_at||v.customer_signed_at)]])+'</div>'
-   +'<div class="box"><h3>Disposal</h3>'+(tipped?kv([['Receiving site',ds?ds.site_name:(v.waste_transferee_company||v.disposal_site)],['Type',ds?.site_type],['Address',ds?addr(ds.address,ds.postcode):v.waste_transferee_address],['Permit no.',ds?.permit_number],['Date tipped',dOnly(v.disposal_date)||dt(v.tipping_signed_at)],['Received by',v.waste_transferee_name],['Weighbridge / transfer ref.',v.transfer_note]]):'<div class="flag">Awaiting disposal'+(v.disposal_hold_note?' — held: '+esc2(v.disposal_hold_note):'')+'</div>'+kv([['Going to',ds?join(ds.site_name,ds.postcode):'To be confirmed']]))
+   +'<div class="box"><h3>Disposal</h3>'+(tipped?(()=>{const dz=dsOverride(ds,v.disposal_site);return kv([['Receiving site',dz?dz.site_name:(v.disposal_site||v.waste_transferee_company)],['Type',dz?.site_type],['Address',dz?addr(dz.address,dz.postcode):(v.disposal_site?'':v.waste_transferee_address)],['Permit no.',dz?.permit_number],['Date tipped',dOnly(v.disposal_date)||dt(v.tipping_signed_at)],['Received by',v.waste_transferee_name],['Weighbridge / transfer ref.',v.transfer_note]]);})():'<div class="flag">Awaiting disposal'+(v.disposal_hold_note?' — held: '+esc2(v.disposal_hold_note):'')+'</div>'+kv([['Going to',ds?join(ds.site_name,ds.postcode):'To be confirmed']]))
    +(v.tipping_site_signature?'<div class="minisig"><span class="lbl">Receiving site signature</span><img src="'+v.tipping_site_signature+'"></div>':'')+'</div></div></div>'
    +(ofType('waste_evidence').length?'<div class="box"><h3>Tipping ticket / disposal evidence</h3>'+photos(ofType('waste_evidence'))+'</div>':'');
  }
@@ -2591,6 +2591,8 @@ function disposalRateChips(siteId){const rates=rateCardItems.filter(x=>x.categor
 
 (function(){const s=document.getElementById('rcCatFilter');if(s)s.innerHTML+=RC_CATS.map(([k,l])=>'<option value="'+k+'">'+l+'</option>').join('');})();
 
+/* the disposal site typed on the visit overrides the job's planned site when it names a different place */
+function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
 function jobIsArchived(id){return (jobArchivedJobs||[]).some(j=>j.id===id);}
 (function(){const orig=window.openJob;if(typeof orig!=='function')return;window.openJob=async function(id){const r=await orig.apply(this,arguments);const b=el('archiveJobBtn');if(b&&activeJob){const m=['admin','manager'].includes(activeProfile?.role);b.classList.toggle('hidden',!m);b.textContent=jobIsArchived(activeJob.id)?'↩ Unarchive':'🗄 Archive';}return r;};})();
