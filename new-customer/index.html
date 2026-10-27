@@ -156,7 +156,7 @@ function collect(){const v=id=>el(id).value.trim();
   accounts_name:v('accounts_name'),accounts_phone:v('accounts_phone'),accounts_email:v('accounts_email'),invoice_email:v('invoice_email'),po_required:radio('po_required'),
   sites:[...document.querySelectorAll('.site')].map(b=>{const o={};b.querySelectorAll('[data-k]').forEach(x=>o[x.dataset.k]=x.value.trim());if(o.postcode)o.postcode=o.postcode.toUpperCase();return o;}).filter(o=>Object.values(o).some(Boolean)),
   services:[...document.querySelectorAll('#services input:checked')].map(x=>x.value),waste_description:v('waste_description'),waste_producer:radio('waste_producer'),hazardous:radio('hazardous'),frequency:v('frequency'),notes:v('notes'),
-  signed_name:v('signed_name'),signed_position:v('signed_position'),confirmed:el('confirm').checked,terms_accepted:el('accept_terms').checked,terms_version:'1.2 (27 Oct 2026)',payment_terms:'30 days EOM',signed_at:new Date().toISOString()};}
+  signed_name:v('signed_name'),signed_position:v('signed_position'),confirmed:el('confirm').checked,terms_accepted:el('accept_terms').checked,terms_version:'1.2 (reviewed January 2026)',payment_terms:'30 days EOM',signed_at:new Date().toISOString()};}
 function stop(html,pill){el('loading').classList.add('hidden');el('form').classList.add('hidden');el('stop').innerHTML=html;el('stop').classList.remove('hidden');if(pill)el('statusPill').textContent=pill;window.scrollTo(0,0);}
 async function load(){
  if(!token)return stop('<div class="err">This link is incomplete. Please use the full link from the email Aura Solutions sent you.</div>','LINK NOT VALID');
