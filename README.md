@@ -11,4 +11,4 @@ For GitHub Pages, upload these files to the repository and publish the repositor
 
 ## Archive
 
-Earlier copies of the app are kept in `archive/old-builds/` for reference. The live app is `index.html`, `job.html` and `Aura_Solutions_Supabase_Test_v32_40_Completed_Work_Sections_operator_brief_v3.html`.
+Earlier copies of the app are kept in `archive/old-builds/` for reference. The live app is `index.html`, `job.html` and `app.html` (opened at `/app`; the old long filename redirects there).
