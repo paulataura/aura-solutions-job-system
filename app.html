@@ -2806,6 +2806,14 @@ function openJobDocsMail(){const s=window.__sendDocs;if(!s)return;if(!(navigator
    +f('editWtnWeight','Estimated weight (kg)',v.waste_estimated_weight_kg,'number','e.g. 250')+f('editWtnSic',"Producer's SIC code",v.waste_sic_code,'text','e.g. 25110'));};
  window.saveWtnEdit=async function(visitId){try{const w=el('editWtnWeight')?.value;const {error}=await db.from('job_visits').update({customer_signed_name:el('editWtnSignedName')?.value.trim()||null,waste_estimated_weight_kg:w?Number(w):null,waste_sic_code:el('editWtnSic')?.value.trim()||null}).eq('id',visitId);if(error)throw error;}catch(e){const m=el('wtnEditMsg');if(m)m.innerHTML='<div class="err">Could not save: '+esc(e.message||String(e))+'</div>';return;}
   return origS.apply(this,arguments);};})();
+/* 27 Oct 2026: editing the operator report or the WTN only replaces that section – the rest of the review stays visible for reference */
+(function(){const keep=(name,h2text)=>{const orig=window[name];if(typeof orig!=='function')return;window[name]=async function(){const body=el('managementReviewBody');const before=body?[...body.children]:[];
+  await orig.apply(this,arguments);if(!body||!before.length)return;const form=body.firstElementChild;if(!form||before.includes(form))return;
+  const ids=new Set([...form.querySelectorAll('[id]')].map(x=>x.id));body.innerHTML='';let placed=false;
+  before.forEach(n=>{const h=n.querySelector&&n.querySelector('h2');if(!placed&&h&&h.textContent.trim()===h2text){body.appendChild(form);placed=true;return;}
+   n.querySelectorAll('[id]').forEach(x=>{if(ids.has(x.id)){x.removeAttribute('id');if(x.matches('input,textarea,select,button'))x.disabled=true;}});body.appendChild(n);});
+  if(!placed)body.prepend(form);form.style.outline='2px solid #72c936';form.style.outlineOffset='4px';form.scrollIntoView({block:'start',behavior:'smooth'});};};
+ keep('toggleOperatorReportEdit','Operator job card');keep('toggleWtnEdit','Waste / WTN');})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
