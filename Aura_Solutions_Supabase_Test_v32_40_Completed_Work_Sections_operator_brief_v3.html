@@ -2197,7 +2197,7 @@ function cleanIssueSetState(ok,text){const st=el('cleanIssueState');if(!st)retur
 function cleanIssueAnswered(){const c=el('cleanIssueChoice')?.value;return c==='no'||(c==='yes'&&(!!el('cleanIssueNotes')?.value.trim()||window.cleanIssuePhotoCount>0)&&window.cleanIssueSaved);}
 async function cleanIssueLoad(){if(!activeJob||!el('cleanIssueChoice'))return;window.cleanIssueSaved=false;const q=await db.from('job_visits').select('issues').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);const t=String(q.data?.[0]?.issues||'').trim();
  if(/^No issues/i.test(t)){el('cleanIssueChoice').value='no';el('cleanIssueNotes').value='';window.cleanIssueSaved=true;}
- else if(/^Issue\/revisit:/i.test(t)){el('cleanIssueChoice').value='yes';el('cleanIssueNotes').value=t.replace(/^Issue\/revisit:\s*/i,'').split(/\n\n/)[0].replace(/^See pictures$/,'');window.cleanIssueSaved=true;}
+ else if(/^Issue\/revisit:/i.test(t)){el('cleanIssueChoice').value='yes';el('cleanIssueNotes').value=t.replace(/^Issue\/revisit:\s*/i,'').replace(/\n\s*\n+Customer (signed|absent|refused)[\s\S]*$/i,'').trim().replace(/^See pictures$/,'');window.cleanIssueSaved=true;}
  else{el('cleanIssueChoice').value='';el('cleanIssueNotes').value='';}
  cleanIssueToggle();await cleanIssueRenderPhotos();cleanIssueRefreshState();}
 function cleanIssueRefreshState(){const c=el('cleanIssueChoice')?.value;if(!c)return cleanIssueSetState(false,'🔴 Answer required');if(c==='yes'&&!el('cleanIssueNotes').value.trim()&&!(window.cleanIssuePhotoCount>0))return cleanIssueSetState(false,'🔴 Add a note or a picture of the issue');if(!window.cleanIssueSaved)return cleanIssueSetState(false,'🔴 Not saved yet');cleanIssueSetState(true,c==='yes'?'🟢 Saved: issue / revisit flagged':'🟢 Saved: no issues');}
@@ -2373,18 +2373,19 @@ async function printJobCardV2(){
 
  /* 2. arrival (with site map) */
  const lat=Number(j.site_latitude),lng=Number(j.site_longitude);let mapHtml='';
- if(Number.isFinite(lat)&&Number.isFinite(lng)&&(lat||lng)){const z=16,n=2**z,W=710,H=210,px=(lng+180)/360*n*256,rad=lat*Math.PI/180,py=(1-Math.log(Math.tan(rad)+1/Math.cos(rad))/Math.PI)/2*n*256;let tiles='';
+ if(Number.isFinite(lat)&&Number.isFinite(lng)&&(lat||lng)){const z=16,n=2**z,W=345,H=235,px=(lng+180)/360*n*256,rad=lat*Math.PI/180,py=(1-Math.log(Math.tan(rad)+1/Math.cos(rad))/Math.PI)/2*n*256;let tiles='';
   for(let tx=Math.floor((px-W/2)/256);tx<=Math.floor((px+W/2)/256);tx++)for(let ty=Math.floor((py-H/2)/256);ty<=Math.floor((py+H/2)/256);ty++)tiles+='<img src="https://tile.openstreetmap.org/'+z+'/'+tx+'/'+ty+'.png" style="left:'+Math.round(tx*256-(px-W/2))+'px;top:'+Math.round(ty*256-(py-H/2))+'px" alt="">';
   mapHtml='<div class="map">'+tiles+'<div class="pin"></div><div class="attr">© OpenStreetMap contributors</div></div>';}
- const s2='<div class="keepblock">'+mapHtml+kv([['Arrived on site',dt(v.arrived_at)],['Arrival notes',v.arrival_notes]])+'</div>'+photos(ofType('arrival_photo'),'No arrival picture recorded.');
+ const arrP=ofType('arrival_photo'),arrHtml=photos(arrP,'No arrival picture recorded.').replace('<div class="photos">','<div class="photos'+(arrP.filter(f=>url[f.storage_path]).length===1?' one':'')+'">');
+ const s2='<div class="keepblock">'+(mapHtml?'<div class="arrgrid">'+mapHtml+'<div>'+arrHtml+'</div></div>':arrHtml)+kv([['Arrived on site',dt(v.arrived_at)],['Arrival notes',v.arrival_notes]])+'</div>';
 
  /* 3. work, one block per scope */
  let s3;
  if(sections.length){
   s3=scopes.map((x,i)=>{const e=done(x.id)||{};const prog=ids(e,'progress_photo_file_ids','progress_photo_file_id').map(id=>fileById[id]).filter(Boolean),fin=ids(e,'photo_file_ids','photo_file_id').map(id=>fileById[id]).filter(Boolean);
-   return '<div class="scope"><div class="scopehead">Scope '+(i+1)+'<span class="badge '+(e.work&&fin.length?'ok':'warn')+'">'+(e.work&&fin.length?'Completed':'Not recorded')+'</span></div>'
-    +'<div class="asked"><span class="lbl">Work required</span>'+nl(x.details)+'</div>'
-    +((e.progress_notes||prog.length)?'<div class="stage"><span class="lbl">In progress</span>'+(e.progress_notes?'<div>'+nl(e.progress_notes)+'</div>':'')+photos(prog)+'</div>':'')
+   const t1=String(x.title||x.details||'').split(/\n/)[0].trim(),okS=!!(e.work||fin.length);
+   return '<div class="scope"><div class="scopehead">Scope '+(i+1)+(t1?' · '+esc2(t1.length>70?t1.slice(0,67)+'…':t1):'')+'<span class="badge '+(okS?'ok':'warn')+'">'+(okS?'Completed':'Not recorded')+'</span></div>'
+    +((e.progress_notes||prog.length)?'<div class="stage"><span class="lbl">Operator\'s on-site feedback</span>'+(e.progress_notes?'<div>'+nl(e.progress_notes)+'</div>':'')+photos(prog)+'</div>':'')
     +'<div class="stage"><span class="lbl">Completed</span>'+(e.work?'<div>'+nl(e.work)+'</div>':'<div class="none">No completion notes recorded.</div>')+photos(fin)+'</div></div>';}).join('');
  }else{
   s3=(v.completion_notes?'<div class="stage"><span class="lbl">Work completed</span><div>'+nl(v.completion_notes)+'</div></div>':'<div class="none">No work record.</div>')+photos(ofType('completion_photo'))+photos(ofType('job_attachment'));
@@ -2392,7 +2393,7 @@ async function printJobCardV2(){
 
  /* 4. issues */
  const s4=noIssues&&!otherIssue?'<div class="okline">No issues reported and no revisit needed.</div>'
-  :'<div class="flag">'+nl((issuePara||'').replace(/^Issue\/revisit:\s*/i,'')||otherIssue)+'</div>'+photos(ofType('issue_photo'));
+  :'<div class="flag">'+nl((issuePara?issuesRaw.replace(/^Issue\/revisit:\s*/i,'').replace(/\n\s*\n+Customer (signed|absent|refused)[\s\S]*$/i,'').trim().replace(/^See pictures$/,''):'')||otherIssue)+'</div>'+photos(ofType('issue_photo'));
 
  /* 5. waste & disposal */
  let s5='';
@@ -2440,7 +2441,7 @@ async function printJobCardV2(){
  +'.stage{break-inside:avoid}.scope{border:1px solid #cdd6cf;border-left:4px solid #2f6b3a;border-radius:5px;padding:7px 9px;margin-bottom:8px}.scopehead{font-weight:700;font-size:11.5px;color:#0c3e17;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}'
  +'.badge{font-size:8.5px;border-radius:999px;padding:2px 8px;font-weight:700}.badge.ok{background:#e3f2e6;color:#1f5a2a}.badge.warn{background:#fff1d6;color:#7a4d0b}'
  +'.asked{background:#f6f9f6;border-radius:4px;padding:5px 7px;margin-bottom:6px}.stage{margin-top:6px}.lbl{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;color:#5b6b60;font-weight:700;margin-bottom:2px}'
- +'.photos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:5px}figure{margin:0;border:1px solid #d8e0da;border-radius:4px;overflow:hidden;break-inside:avoid;background:#fff}figure img{display:block;width:100%;height:38mm;object-fit:cover;background:#eef2ee}figcaption{padding:3px 5px;font-size:9px}figcaption span{color:#7a877e}'
+ +'.photos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:5px}.arrgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start;margin-bottom:7px}.arrgrid .map{width:100%;height:62mm;margin:0}.arrgrid .photos{grid-template-columns:1fr 1fr;margin:0}.arrgrid .photos.one{grid-template-columns:1fr}.arrgrid .photos.one figure img{height:54mm}figure{margin:0;border:1px solid #d8e0da;border-radius:4px;overflow:hidden;break-inside:avoid;background:#fff}figure img{display:block;width:100%;height:38mm;object-fit:cover;background:#eef2ee}figcaption{padding:3px 5px;font-size:9px}figcaption span{color:#7a877e}'
  +'.none{color:#8a978e;font-style:italic}.okline{background:#eef7ef;border:1px solid #cfe5d3;color:#1f5a2a;border-radius:5px;padding:6px 8px;font-weight:600}.flag{background:#fff6e5;border:1px solid #edd3a1;color:#5c3a06;border-radius:5px;padding:6px 8px;font-weight:600;margin-bottom:5px}'
  +'.minisig{margin-top:6px}.minisig img{max-height:38px;max-width:100%;display:block}'
  +'.decl{font-size:9.5px;background:#f6f8f6;border:1px solid #dfe5e0;border-radius:5px;padding:6px 8px;margin-bottom:7px}.sigs{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sig{border:1px solid #cdd6cf;border-radius:5px;padding:6px 8px}.sig .lbl{margin:0}.sig .img{height:56px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #9aa79e;margin:4px 0}.sig .img img{max-height:54px;max-width:100%}'
