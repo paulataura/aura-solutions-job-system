@@ -2790,6 +2790,15 @@ function downloadJobDocs(){sendDocsFiles.forEach((f,i)=>setTimeout(()=>{const a=
 function openJobDocsMail(){const s=window.__sendDocs;if(!s)return;if(!(navigator.canShare&&navigator.canShare({files:sendDocsFiles})))downloadJobDocs();
  location.href='mailto:'+encodeURIComponent(s.to)+'?'+[s.cc?'cc='+encodeURIComponent(s.cc):'','subject='+encodeURIComponent(s.subject),'body='+encodeURIComponent(s.body)].filter(Boolean).join('&');}
 (function(){const orig=window.renderInvoicePanel;if(typeof orig!=='function')return;window.renderInvoicePanel=function(){const r=orig.apply(this,arguments);renderSendDocsPanel();return r;};})();
+/* 27 Oct 2026: Edit WTN also covers who signed, estimated weight and the producer's SIC code */
+(function(){const origT=window.toggleWtnEdit,origS=window.saveWtnEdit;if(typeof origT!=='function'||typeof origS!=='function')return;
+ window.toggleWtnEdit=async function(){await origT.apply(this,arguments);const grid=document.querySelector('.wtn-edit-form .two');if(!grid||!activeJob)return;
+  const {data}=await db.from('job_visits').select('customer_signed_name,customer_signature,waste_estimated_weight_kg,waste_sic_code').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);const v=data?.[0]||{};
+  const f=(id,label,val,type,ph)=>'<div class="field"><label>'+label+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+esc(val??'')+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+'></div>';
+  grid.insertAdjacentHTML('afterbegin',f('editWtnSignedName','Signed by (customer / transferor)',v.customer_signed_name,'text',v.customer_signature?(activeJob.site_contact_name||'Name of the person who signed'):'Name of the person who signed')
+   +f('editWtnWeight','Estimated weight (kg)',v.waste_estimated_weight_kg,'number','e.g. 250')+f('editWtnSic',"Producer's SIC code",v.waste_sic_code,'text','e.g. 25110'));};
+ window.saveWtnEdit=async function(visitId){try{const w=el('editWtnWeight')?.value;const {error}=await db.from('job_visits').update({customer_signed_name:el('editWtnSignedName')?.value.trim()||null,waste_estimated_weight_kg:w?Number(w):null,waste_sic_code:el('editWtnSic')?.value.trim()||null}).eq('id',visitId);if(error)throw error;}catch(e){const m=el('wtnEditMsg');if(m)m.innerHTML='<div class="err">Could not save: '+esc(e.message||String(e))+'</div>';return;}
+  return origS.apply(this,arguments);};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
