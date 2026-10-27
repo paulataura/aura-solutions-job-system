@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>Your job documents – Aura Solutions</title>
+<meta property="og:title" content="Aura Solutions – Your job documents">
+<meta property="og:description" content="View and download your job card and waste transfer note.">
+<meta property="og:image" content="https://app.aurasolutions.co.uk/aura-logo.png">
+<link rel="icon" href="../aura-logo.png">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#e9ece9;color:#17221b;font:15px/1.5 "Helvetica Neue",Arial,sans-serif}
+.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;position:relative;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column}.page>main{flex:1}
+.wm{position:absolute;inset:0;background:linear-gradient(135deg,transparent 0 38%,rgba(12,62,23,.018) 38% 49%,transparent 49% 56%,rgba(121,207,54,.024) 56% 68%,transparent 68%);pointer-events:none}
+.chev{position:absolute;top:0;right:0;width:min(380px,48%);height:34px;background:#0c3e17;clip-path:polygon(38% 0,100% 0,100% 100%,50% 100%)}
+.chev:after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:#79cf36;transform:scaleY(.5);transform-origin:bottom}
+header{position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:44px 28px 12px;border-bottom:1px solid #2f6b3a;margin:0 0 6px}
+header img{height:74px;margin-top:-14px}
+.dochead{text-align:right}
+.dochead h1{margin:0;font-size:22px;letter-spacing:.3px;color:#0c3e17}
+.dochead .sub{font-size:13px;color:#5b6b60}
+.pill{display:inline-block;margin-top:6px;background:#72c936;color:#fff;padding:2px 10px;font-size:11px;font-weight:700;letter-spacing:.3px}
+main{position:relative;padding:4px 28px 28px}
+.intro{color:#33423a;margin:10px 0 4px}
+section{margin-top:22px}
+h2{display:flex;align-items:center;gap:9px;font-size:17px;color:#0c3e17;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #b9e29a}
+h2 .n{flex:none;background:#2f6b3a;color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.field{margin-bottom:12px}
+label{display:block;font-size:13px;color:#33423a;margin-bottom:4px}
+.req{color:#b42318}
+input,select,textarea{width:100%;font:inherit;padding:11px 12px;border:1px solid #c5d2c7;border-radius:8px;background:#fff;color:#17221b}
+textarea{min-height:76px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid #79cf36;border-color:#2f6b3a}
+.hint{font-size:12px;color:#6b7a70;margin-top:3px}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice label{display:flex;align-items:center;gap:7px;border:1px solid #c5d2c7;border-radius:999px;padding:7px 13px;margin:0;font-size:14px;color:#17221b;cursor:pointer;background:#fff}
+.choice input{width:auto;margin:0}
+.site{border:1px solid #d7e1d8;border-left:4px solid #2f6b3a;border-radius:8px;padding:12px 14px 4px;margin-bottom:12px;background:rgba(255,255,255,.85)}
+.site .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.site b{color:#0c3e17}
+.tick{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#17221b}
+.tick input{width:auto;margin-top:4px}
+.btn{border:0;border-radius:8px;padding:13px 20px;font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:#2f6b3a;color:#fff}.btn.light{background:#eef4ef;color:#0c3e17}.btn.link{background:none;color:#9a3029;padding:4px 6px;font-weight:600}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.err{background:#fdecea;border:1px solid #f3c1bb;color:#8a1c12;border-radius:8px;padding:10px 12px;margin-top:12px}
+.ok{background:#eef7ef;border:1px solid #cfe5d3;color:#1f5a2a;border-radius:8px;padding:14px 16px}
+.svcgroup{border:1px solid #dfe5e0;border-radius:10px;padding:10px 12px;margin-bottom:10px;background:rgba(255,255,255,.9)}.svchead{font-weight:800;color:#0c3e17;font-size:15px}.svcopts{display:grid;grid-template-columns:1fr 1fr;gap:6px}.svc{display:flex!important;gap:9px;align-items:flex-start;border:1px solid #d7e1d8;border-radius:8px;padding:8px 10px;margin:0!important;cursor:pointer;background:#fff;color:#17221b!important}.svc input{width:auto;margin-top:3px}.svc b{display:block;font-size:14px}.svc small{display:block;font-size:12px;color:#6b7a70;line-height:1.35}.svc:has(input:checked){border-color:#2f6b3a;background:#eef7ef}@media(max-width:640px){.svcopts{grid-template-columns:1fr}}#services{grid-template-columns:1fr}.opt{font-weight:400;color:#8a978e;font-size:12px;margin-left:3px}/* required fields: clearly marked until answered */.req{color:#b42318;font-weight:800}.field.is-req>label:after{content:'Required';display:inline-block;margin-left:7px;background:#fdecea;color:#b42318;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;vertical-align:1px}.field.is-req.done>label:after{content:'✓';background:#e3f2e6;color:#1f5a2a}.field.is-req:not(.done) input:not([type=radio]):not([type=checkbox]),.field.is-req:not(.done) select,.field.is-req:not(.done) textarea{border-color:#e7b4ae;background:#fffaf9}.field.is-req:not(.done) .choice label{border-color:#e7b4ae;background:#fffaf9}.field.invalid input:not([type=radio]):not([type=checkbox]),.field.invalid select,.field.invalid textarea{border:2px solid #b42318;background:#fff3f2}.field.invalid .choice label{border:2px solid #b42318}.field.invalid>label{color:#b42318;font-weight:700}.fieldmsg{color:#b42318;font-size:12.5px;font-weight:700;margin-top:4px}.tick.invalid{outline:2px solid #b42318;outline-offset:4px;border-radius:6px;background:#fff3f2}.progress{position:sticky;top:0;z-index:5;background:#0c3e17;color:#fff;font-size:13px;padding:8px 14px;border-radius:0 0 10px 10px;margin:0 0 6px;display:flex;justify-content:space-between;gap:10px}.progress b{color:#b9e29a}.done-card{text-align:center;padding:26px 18px 8px}.done-tick{width:74px;height:74px;border-radius:50%;background:#e3f2e6;color:#2f6b3a;font-size:40px;line-height:74px;margin:6px auto 12px;font-weight:800}.done-card h2{border:0;justify-content:center;font-size:24px;margin:0 0 6px}.done-card .lead{font-size:16px;color:#33423a;margin:0 auto 18px;max-width:520px}.next{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:left;margin:8px 0 18px}.next div{border:1px solid #dfe5e0;border-radius:10px;padding:12px;background:#fff}.next b{display:block;color:#0c3e17;margin-bottom:3px}.next span.n{display:inline-flex;width:22px;height:22px;border-radius:50%;background:#2f6b3a;color:#fff;font-size:12px;font-weight:800;align-items:center;justify-content:center;margin-bottom:6px}.contactbox{border:1px solid #cfe5d3;background:#eef7ef;border-radius:10px;padding:12px 14px;margin:0 auto 10px;max-width:560px}.contactbox a{color:#0c3e17;font-weight:800;text-decoration:none}@media(max-width:640px){.next{grid-template-columns:1fr}}.subhead{font-size:13px;font-weight:700;color:#0c3e17;margin:4px 0 8px}.terms{font-size:14px;background:#f6f8f6;border:1px solid #dfe5e0;border-left:4px solid #2f6b3a;border-radius:8px;padding:12px 14px}.termslinks{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px}.preview-banner{background:#fff6e5;border:1px solid #edd3a1;color:#5c3a06;border-radius:8px;padding:10px 12px;margin:10px 0;font-weight:600}.terms ul{margin:8px 0;padding-left:20px}.terms a{color:#2f6b3a;font-weight:700}.privacy{font-size:12.5px;color:#5b6b60;background:#f6f8f6;border:1px solid #dfe5e0;border-radius:8px;padding:10px 12px;margin-top:12px}
+footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-size:12px;line-height:1.6;padding:12px 16px}
+footer:before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:#79cf36;transform:scaleY(.5);transform-origin:top}
+footer .gen{color:#b9d3bd}
+.hidden{display:none!important}
+@media(max-width:640px){.grid{grid-template-columns:1fr}header{flex-direction:column;align-items:flex-start;padding:44px 18px 10px}.dochead{text-align:left}main{padding:4px 18px 24px}header img{margin-top:0}}
+
+.docs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}.doccard{border:1px solid #dfe5e0;border-radius:14px;padding:16px;background:#fff;display:flex;flex-direction:column;gap:8px}.doccard .ic{width:46px;height:46px;border-radius:12px;background:#eef7ef;color:#2f6b3a;display:flex;align-items:center;justify-content:center;font-size:24px}.doccard h3{margin:0;color:#0c3e17;font-size:17px}.doccard .muted{color:#6b7a70;font-size:13px}.doccard .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.doccard a{display:inline-block;border-radius:8px;padding:10px 14px;font-weight:800;text-decoration:none}.doccard a.p{background:#2f6b3a;color:#fff}.doccard a.l{background:#eef4ef;color:#0c3e17}
+.jobsum{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 18px;background:#f6f9f6;border:1px solid #e3e9e4;border-radius:12px;padding:12px 14px;margin-top:12px}.jobsum span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#6b7a70}.jobsum b{font-size:15px}
+@media(max-width:640px){.docs,.jobsum{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+ <div class="wm"></div><div class="chev"></div>
+ <header>
+  <img src="../aura-logo.png" alt="Aura Solutions">
+  <div class="dochead"><h1>YOUR JOB DOCUMENTS</h1><div class="sub">Aura Solutions Group Limited</div><span class="pill" id="statusPill">SECURE LINK</span></div>
+ </header>
+ <main>
+  <div id="out"><p class="intro">Loading your documents…</p></div>
+ </main>
+ <footer><b>AURA SOLUTIONS GROUP LIMITED</b> · Registered office: 129 Main Street, Sedgeberrow, Evesham, England, WR11 7UH<br>Company no. 15761350 · VAT no. GB 471 3179 91 · Registered waste carrier CBDU631384<br><span class="gen">01386 571556 · info@aurasolutions.co.uk</span></footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL='https://tatuejkauahqsgzwalid.supabase.co',SUPABASE_PUBLISHABLE_KEY='sb_publishable_J1__8GTEG2cDHKtPYQir9w_lgQALvxt';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const token=(new URLSearchParams(location.hash.slice(1)).get('t')||'').trim(),out=document.getElementById('out');
+const url=p=>SUPABASE_URL+'/storage/v1/object/public/shared-documents/'+p.split('/').map(encodeURIComponent).join('/');
+function card(icon,title,desc,p){return '<div class="doccard"><div class="ic">'+icon+'</div><h3>'+esc(title)+'</h3><div class="muted">'+esc(desc)+'</div><div class="acts"><a class="p" href="'+url(p)+'" target="_blank" rel="noopener">View</a><a class="l" href="'+url(p)+'?download='+encodeURIComponent(p.split('/').pop())+'">⬇ Download</a></div></div>';}
+(async()=>{
+ if(!token){out.innerHTML='<div class="err">This link is incomplete. Please use the full link from your email.</div>';return;}
+ const {data,error}=await db.rpc('customer_documents_get',{p_token:token});
+ if(error){out.innerHTML='<div class="err">'+esc(error.message)+'</div>';document.getElementById('statusPill').textContent='LINK NOT VALID';return;}
+ const r=data&&data[0];if(!r){out.innerHTML='<div class="err">This link is not valid.</div>';return;}
+ const date=r.job_date?new Date(r.job_date+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'';
+ out.innerHTML='<p class="intro">Here are the documents for your job with Aura Solutions. You can view them online or download a copy to keep.</p>'
+  +'<div class="jobsum">'+[['Customer',r.customer_name],['Site',r.site_name],['Job number',r.job_number],['Date',date],['Your reference',r.reference],['Your PO',r.customer_po]].filter(x=>x[1]).map(x=>'<div><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')+'</div>'
+  +'<div class="docs">'+(r.job_card_path?card('📋','Job card','A full record of the work carried out, with photos and sign-off.',r.job_card_path):'')+(r.wtn_path?card('♻','Waste transfer note','Your duty of care record for the waste removed. Please keep it for at least two years.',r.wtn_path):'')+'</div>'
+  +'<div class="contactbox" style="border:1px solid #cfe5d3;background:#eef7ef;border-radius:10px;padding:12px 14px;text-align:center">Questions about this job? Call <a href="tel:+441386571556" style="color:#0c3e17;font-weight:800">01386 571556</a> or email <a href="mailto:info@aurasolutions.co.uk" style="color:#0c3e17;font-weight:800">info@aurasolutions.co.uk</a></div>';
+})();
+</script>
+</body>
+</html>
