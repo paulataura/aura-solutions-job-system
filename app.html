@@ -2710,20 +2710,43 @@ function auraLoadScript(src){return new Promise((res,rej)=>{if([...document.scri
 async function auraCaptureDoc(fn){const orig=window.open;let fake;window.open=function(){fake={closed:false,document:{_h:'',open(){this._h='';},write(x){this._h+=x;},close(){},body:{set innerHTML(v){fake.err=v;},get innerHTML(){return '';}}},focus(){},close(){}};return fake;};
  try{await fn();}finally{window.open=orig;}if(!fake)throw new Error('The document could not be created.');if(fake.err)throw new Error(String(fake.err).replace(/<[^>]+>/g,''));return fake.document._h;}
 async function auraHtmlToPdf(html,meta){
- /* the PDF maker runs inside the document's own frame so the document's styles are used */
+ /* Builds an A4 PDF that matches the printed document: the page is laid out inside its own frame, page breaks are
+    moved so photos, boxes and signatures are never split, then each page is drawn with the chevron, shading and footer. */
  const fr=document.createElement('iframe');fr.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0';document.body.appendChild(fr);
- try{const d=fr.contentDocument;d.open();d.write(html.replace('</head>','<style>.toolbar,.chev,.wm,.foot,.psp1,.psp2{display:none!important}html,body{background:#fff!important;margin:0!important}.doc{margin:0!important;box-shadow:none!important;width:794px!important;max-width:none!important;padding:0 11mm!important}</style></head>'));d.close();
-  await new Promise((res,rej)=>{const s=d.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';s.onload=res;s.onerror=()=>rej(new Error('Could not load the PDF maker – check the internet connection.'));d.head.appendChild(s);});
+ const load=(d,src)=>new Promise((res,rej)=>{const s=d.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Could not load the PDF maker – check the internet connection.'));d.head.appendChild(s);});
+ try{const d=fr.contentDocument,W=fr.contentWindow;d.open();d.write(html.replace('</head>','<style>.toolbar,.chev,.wm,.foot,.psp1,.psp2{display:none!important}html,body{background:#fff!important;margin:0!important}.doc{margin:0!important;box-shadow:none!important;width:794px!important;max-width:none!important;padding:6mm 11mm 0!important;position:relative}</style></head>'));d.close();
+  await load(d,'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');await load(d,'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
   if(d.fonts&&d.fonts.ready)await d.fonts.ready;await Promise.all([...d.images].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r;setTimeout(r,8000);})));
-  const co=companySettings||{};
-  const opts=fr.contentWindow.JSON.parse(JSON.stringify({margin:[13,0,19,0],image:{type:'jpeg',quality:0.92},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['.keep','.box','figure','.sig','.sigs','.scope','h2','tr','.decl','.summary','.arrgrid','.stage']}}));
-  const pdf=await fr.contentWindow.html2pdf().set(opts).from(d.querySelector('.doc')).toPdf().get('pdf');const n=pdf.internal.getNumberOfPages();
-  for(let i=1;i<=n;i++){pdf.setPage(i);
+  const doc=d.querySelector('.doc'),MM=794/210,TOP1=9,TOP=15,BOT=21,H1=(297-TOP1-BOT)*MM,HN=(297-TOP-BOT)*MM;
+  const y=e=>e.getBoundingClientRect().top-doc.getBoundingClientRect().top,yb=e=>e.getBoundingClientRect().bottom-doc.getBoundingClientRect().top;
+  const pageEnd=t=>{let e=H1;while(e<=t)e+=HN;return e;};
+  /* move page breaks so these never split */
+  const sel='h2,figure,.box,.keep,.keepblock,.stage,.sig,.sigs,.decl,.summary,.arrgrid,.scope,.okline,.flag,.note,.approved,tr,li,.line,p,.map';
+  for(let pass=0;pass<400;pass++){let moved=false;
+   for(const e of doc.querySelectorAll(sel)){if(!e.offsetParent&&e.tagName!=='TR')continue;let t=y(e),b=yb(e);
+    if(e.tagName==='H2'){const nx=e.nextElementSibling;b=nx?Math.min(yb(nx),b+120):b+60;}
+    const end=pageEnd(t);if(b<=end+1||b-t>=HN)continue;
+    let tgt=e;while(tgt.parentElement&&tgt.parentElement!==doc&&['grid','flex','inline-grid','inline-flex'].includes(W.getComputedStyle(tgt.parentElement).display))tgt=tgt.parentElement;
+    if(tgt.closest('h2')&&tgt!==e)continue;const gap=end-y(tgt)+2;if(gap<=0||yb(tgt)-y(tgt)>=HN)continue;
+    if(tgt.tagName==='TR'){const sp=d.createElement('tr');sp.innerHTML='<td colspan="9" style="height:'+gap+'px;padding:0;border:0"></td>';tgt.before(sp);}
+    else{const mt=parseFloat(W.getComputedStyle(tgt).marginTop)||0;tgt.style.marginTop=(mt+gap)+'px';}
+    moved=true;break;}
+   if(!moved)break;}
+  const total=doc.scrollHeight,slices=[];for(let s0=0,i=0;s0<total-2;i++){const h=i?HN:H1;slices.push([s0,Math.min(h,total-s0)]);s0+=h;}
+  const pdf=new W.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait'}),n=slices.length,co=companySettings||{};
+  const band=(a,b,rgb,op)=>{/* faint diagonal shading band between x+y=a and x+y=b (mm) */const pts=[];const P=[[0,0],[210,0],[210,297],[0,297]];
+   const clip=(poly,f)=>{const o=[];for(let i=0;i<poly.length;i++){const p=poly[i],q=poly[(i+1)%poly.length],fp=f(p),fq=f(q);if(fp>=0)o.push(p);if((fp>=0)!==(fq>=0)){const t=fp/(fp-fq);o.push([p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t]);}}return o;};
+   const poly=clip(clip(P,p=>p[0]+p[1]-a),p=>b-(p[0]+p[1]));if(poly.length<3)return;pdf.saveGraphicsState();pdf.setGState(new pdf.GState({opacity:op}));pdf.setFillColor(...rgb);
+   pdf.lines(poly.slice(1).map((p,i)=>[p[0]-poly[i][0],p[1]-poly[i][1]]),poly[0][0],poly[0][1],[1,1],'F',true);pdf.restoreGraphicsState();};
+  for(let i=0;i<n;i++){const [s0,h]=slices[i];
+   const cv=await W.html2canvas(doc,{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794,width:794,x:0,y:s0,height:Math.ceil(h),scrollX:0,scrollY:0,logging:false});
+   if(i)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,i?TOP:TOP1,210,h/MM);
+   band(507*0.38,507*0.49,[12,62,23],0.018);band(507*0.56,507*0.68,[121,207,54],0.024);
    pdf.setFillColor(12,62,23);pdf.lines([[62,0],[0,9],[-50,0]],148,0,[1,1],'F',true);pdf.setDrawColor(121,207,54);pdf.setLineWidth(0.15);pdf.line(160,9,210,9);
    pdf.setFillColor(12,62,23);pdf.rect(0,283,210,14,'F');pdf.line(0,283,210,283);pdf.setTextColor(255,255,255);pdf.setFontSize(6.6);
    pdf.text(String(co.company_name||'AURA SOLUTIONS GROUP LIMITED').toUpperCase()+'  ·  Registered office: '+(co.registered_office||[co.business_address,co.postcode].filter(Boolean).join(', ')),105,287.6,{align:'center'});
    pdf.text([co.company_number?'Company no. '+co.company_number:'',co.vat_number?'VAT no. '+co.vat_number:'',co.waste_carrier_registration?'Registered waste carrier '+co.waste_carrier_registration:''].filter(Boolean).join('  ·  '),105,290.9,{align:'center'});
-   pdf.setTextColor(185,211,189);pdf.text((meta.footer||'')+(meta.footer?'  ·  ':'')+'Page '+i+' of '+n,105,294.2,{align:'center'});}
+   pdf.setTextColor(185,211,189);pdf.text((meta.footer||'')+(meta.footer?'  ·  ':'')+'Page '+(i+1)+' of '+n,105,294.2,{align:'center'});}
   return pdf.output('blob');}
  finally{fr.remove();}}
 function sendDocsDefaults(){const j=activeJob||{},cu=j.customers||{};const first=String(cu.contact_name||j.site_contact_name||'').split(' ')[0];
