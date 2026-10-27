@@ -6,3 +6,6 @@
 -- RPCs: aura_create_customer_application (management), customer_application_get / customer_application_submit (public link),
 --       aura_open_customer_account (management; creates customer + sites from the submitted form in one step)
 -- Full SQL is in the Supabase migration history for project tatuejkauahqsgzwalid.
+-- 27 Oct 2026 later: link codes shortened to 16 URL-safe characters (customer_application_short_token);
+-- payment terms (customer_payment_terms): customers.payment_terms default '30 days EOM', terms_version, terms_accepted_at, terms_accepted_by;
+-- company_settings.payment_terms / terms_version; submit requires terms_accepted; trigger records acceptance on the customer when the account is opened.
