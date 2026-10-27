@@ -1,0 +1,8 @@
+-- New customer forms (applied 27 Oct 2026 via Supabase migrations "customer_application_forms" and "customer_application_open_account").
+-- customers: trading_name, company_type, company_number, vat_number, sic_code, accounts_contact_name, accounts_email, accounts_phone,
+--            invoice_email, po_required, contact_position, account_opened_at
+-- company_settings: bank_name, bank_account_name, bank_sort_code, bank_account_number, remittance_email, registered_office
+-- customer_applications table (token stored as sha256 hash only; management-only RLS)
+-- RPCs: aura_create_customer_application (management), customer_application_get / customer_application_submit (public link),
+--       aura_open_customer_account (management; creates customer + sites from the submitted form in one step)
+-- Full SQL is in the Supabase migration history for project tatuejkauahqsgzwalid.
