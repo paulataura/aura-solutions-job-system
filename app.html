@@ -2709,13 +2709,15 @@ function siteFormHtml(customerId){return '<form id="customerSiteForm" class="peo
 function auraLoadScript(src){return new Promise((res,rej)=>{if([...document.scripts].some(s=>s.src===src))return res();const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Could not load '+src));document.head.appendChild(s);});}
 async function auraCaptureDoc(fn){const orig=window.open;let fake;window.open=function(){fake={closed:false,document:{_h:'',open(){this._h='';},write(x){this._h+=x;},close(){},body:{set innerHTML(v){fake.err=v;},get innerHTML(){return '';}}},focus(){},close(){}};return fake;};
  try{await fn();}finally{window.open=orig;}if(!fake)throw new Error('The document could not be created.');if(fake.err)throw new Error(String(fake.err).replace(/<[^>]+>/g,''));return fake.document._h;}
-async function auraHtmlToPdf(html,meta){await auraLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
- const fr=document.createElement('iframe');fr.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;visibility:hidden';document.body.appendChild(fr);
- try{const d=fr.contentDocument;d.open();d.write(html.replace('</head>','<style>.toolbar,.chev,.wm,.foot,.psp1,.psp2{display:none!important}html,body{background:#fff!important}.doc{margin:0!important;box-shadow:none!important;width:794px!important;padding:0 11mm!important}.top{margin-top:2mm}</style></head>'));d.close();
-  await new Promise(r=>setTimeout(r,300));await Promise.all([...d.images].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r;})));
+async function auraHtmlToPdf(html,meta){
+ /* the PDF maker runs inside the document's own frame so the document's styles are used */
+ const fr=document.createElement('iframe');fr.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0';document.body.appendChild(fr);
+ try{const d=fr.contentDocument;d.open();d.write(html.replace('</head>','<style>.toolbar,.chev,.wm,.foot,.psp1,.psp2{display:none!important}html,body{background:#fff!important;margin:0!important}.doc{margin:0!important;box-shadow:none!important;width:794px!important;max-width:none!important;padding:0 11mm!important}</style></head>'));d.close();
+  await new Promise((res,rej)=>{const s=d.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';s.onload=res;s.onerror=()=>rej(new Error('Could not load the PDF maker – check the internet connection.'));d.head.appendChild(s);});
+  if(d.fonts&&d.fonts.ready)await d.fonts.ready;await Promise.all([...d.images].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r;setTimeout(r,8000);})));
   const co=companySettings||{};
-  const worker=window.html2pdf().set({margin:[13,0,19,0],image:{type:'jpeg',quality:0.92},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['.keep','.box','figure','.sig','.sigs','.scope','h2','tr','.decl','.summary','.arrgrid','.stage']}}).from(d.querySelector('.doc'));
-  const pdf=await worker.toPdf().get('pdf');const n=pdf.internal.getNumberOfPages();
+  const opts=fr.contentWindow.JSON.parse(JSON.stringify({margin:[13,0,19,0],image:{type:'jpeg',quality:0.92},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['.keep','.box','figure','.sig','.sigs','.scope','h2','tr','.decl','.summary','.arrgrid','.stage']}}));
+  const pdf=await fr.contentWindow.html2pdf().set(opts).from(d.querySelector('.doc')).toPdf().get('pdf');const n=pdf.internal.getNumberOfPages();
   for(let i=1;i<=n;i++){pdf.setPage(i);
    pdf.setFillColor(12,62,23);pdf.lines([[62,0],[0,9],[-50,0]],148,0,[1,1],'F',true);pdf.setDrawColor(121,207,54);pdf.setLineWidth(0.15);pdf.line(160,9,210,9);
    pdf.setFillColor(12,62,23);pdf.rect(0,283,210,14,'F');pdf.line(0,283,210,283);pdf.setTextColor(255,255,255);pdf.setFontSize(6.6);
