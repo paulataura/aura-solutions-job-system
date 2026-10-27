@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>New Customer Account Form – Aura Solutions</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#e9ece9;color:#17221b;font:15px/1.5 "Helvetica Neue",Arial,sans-serif}
+.page{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;position:relative;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.08)}
+.wm{position:absolute;inset:0;background:linear-gradient(135deg,transparent 0 38%,rgba(12,62,23,.018) 38% 49%,transparent 49% 56%,rgba(121,207,54,.024) 56% 68%,transparent 68%);pointer-events:none}
+.chev{position:absolute;top:0;right:0;width:min(380px,48%);height:34px;background:#0c3e17;clip-path:polygon(38% 0,100% 0,100% 100%,50% 100%)}
+.chev:after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:#79cf36;transform:scaleY(.5);transform-origin:bottom}
+header{position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:44px 28px 12px;border-bottom:1px solid #2f6b3a;margin:0 0 6px}
+header img{height:74px;margin-top:-14px}
+.dochead{text-align:right}
+.dochead h1{margin:0;font-size:22px;letter-spacing:.3px;color:#0c3e17}
+.dochead .sub{font-size:13px;color:#5b6b60}
+.pill{display:inline-block;margin-top:6px;background:#72c936;color:#fff;padding:2px 10px;font-size:11px;font-weight:700;letter-spacing:.3px}
+main{position:relative;padding:4px 28px 28px}
+.intro{color:#33423a;margin:10px 0 4px}
+section{margin-top:22px}
+h2{display:flex;align-items:center;gap:9px;font-size:17px;color:#0c3e17;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #b9e29a}
+h2 .n{flex:none;background:#2f6b3a;color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.field{margin-bottom:12px}
+label{display:block;font-size:13px;color:#33423a;margin-bottom:4px}
+.req{color:#b42318}
+input,select,textarea{width:100%;font:inherit;padding:11px 12px;border:1px solid #c5d2c7;border-radius:8px;background:#fff;color:#17221b}
+textarea{min-height:76px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid #79cf36;border-color:#2f6b3a}
+.hint{font-size:12px;color:#6b7a70;margin-top:3px}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice label{display:flex;align-items:center;gap:7px;border:1px solid #c5d2c7;border-radius:999px;padding:7px 13px;margin:0;font-size:14px;color:#17221b;cursor:pointer;background:#fff}
+.choice input{width:auto;margin:0}
+.site{border:1px solid #d7e1d8;border-left:4px solid #2f6b3a;border-radius:8px;padding:12px 14px 4px;margin-bottom:12px;background:rgba(255,255,255,.85)}
+.site .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.site b{color:#0c3e17}
+.tick{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#17221b}
+.tick input{width:auto;margin-top:4px}
+.btn{border:0;border-radius:8px;padding:13px 20px;font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:#2f6b3a;color:#fff}.btn.light{background:#eef4ef;color:#0c3e17}.btn.link{background:none;color:#9a3029;padding:4px 6px;font-weight:600}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.err{background:#fdecea;border:1px solid #f3c1bb;color:#8a1c12;border-radius:8px;padding:10px 12px;margin-top:12px}
+.ok{background:#eef7ef;border:1px solid #cfe5d3;color:#1f5a2a;border-radius:8px;padding:14px 16px}
+.privacy{font-size:12.5px;color:#5b6b60;background:#f6f8f6;border:1px solid #dfe5e0;border-radius:8px;padding:10px 12px;margin-top:12px}
+footer{position:relative;background:#0c3e17;color:#fff;text-align:center;font-size:12px;line-height:1.6;padding:12px 16px}
+footer:before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:#79cf36;transform:scaleY(.5);transform-origin:top}
+footer .gen{color:#b9d3bd}
+.hidden{display:none!important}
+@media(max-width:640px){.grid{grid-template-columns:1fr}header{flex-direction:column;align-items:flex-start;padding:44px 18px 10px}.dochead{text-align:left}main{padding:4px 18px 24px}header img{margin-top:0}}
+</style>
+</head>
+<body>
+<div class="page">
+ <div class="wm"></div><div class="chev"></div>
+ <header>
+  <img src="../aura-logo.png" alt="Aura Solutions">
+  <div class="dochead"><h1>NEW CUSTOMER ACCOUNT FORM</h1><div class="sub">Aura Solutions Group Limited</div><span class="pill" id="statusPill">PLEASE COMPLETE</span></div>
+ </header>
+ <main>
+  <div id="loading" class="intro">Loading your form…</div>
+  <div id="stop" class="hidden"></div>
+  <form id="form" class="hidden" novalidate>
+   <p class="intro">Thank you for choosing Aura Solutions. Please fill in the details below so we can open your account. It takes about 5 minutes. Fields marked <span class="req">*</span> are required.</p>
+
+   <section><h2><span class="n">1</span>Company details</h2>
+    <div class="grid">
+     <div class="field"><label for="company_name">Company / organisation name <span class="req">*</span></label><input id="company_name" required autocomplete="organization"></div>
+     <div class="field"><label for="trading_name">Trading name (if different)</label><input id="trading_name"></div>
+     <div class="field"><label for="company_type">Type of business <span class="req">*</span></label><select id="company_type" required><option value="">Choose…</option><option>Limited company</option><option>LLP</option><option>Sole trader</option><option>Partnership</option><option>Public sector / council</option><option>Charity</option><option>Other</option></select></div>
+     <div class="field"><label for="company_number">Company registration number</label><input id="company_number" inputmode="text"><div class="hint">For limited companies and LLPs.</div></div>
+     <div class="field"><label for="vat_number">VAT number</label><input id="vat_number"></div>
+     <div class="field"><label for="sic_code">SIC code</label><input id="sic_code" inputmode="numeric"><div class="hint">Shown on your Companies House record. We need it for waste transfer notes.</div></div>
+    </div>
+    <div class="field"><label for="address">Registered / head office address <span class="req">*</span></label><textarea id="address" required autocomplete="street-address"></textarea></div>
+    <div class="grid"><div class="field"><label for="postcode">Postcode <span class="req">*</span></label><input id="postcode" required autocomplete="postal-code"></div><div class="field"><label for="website">Website</label><input id="website" inputmode="url"></div></div>
+   </section>
+
+   <section><h2><span class="n">2</span>Main contact</h2>
+    <div class="grid">
+     <div class="field"><label for="contact_name">Name <span class="req">*</span></label><input id="contact_name" required autocomplete="name"></div>
+     <div class="field"><label for="contact_position">Position</label><input id="contact_position" autocomplete="organization-title"></div>
+     <div class="field"><label for="contact_phone">Phone <span class="req">*</span></label><input id="contact_phone" type="tel" required autocomplete="tel"></div>
+     <div class="field"><label for="contact_email">Email <span class="req">*</span></label><input id="contact_email" type="email" required autocomplete="email"></div>
+    </div>
+   </section>
+
+   <section><h2><span class="n">3</span>Accounts and invoicing</h2>
+    <div class="grid">
+     <div class="field"><label for="accounts_name">Accounts contact name</label><input id="accounts_name"></div>
+     <div class="field"><label for="accounts_phone">Accounts phone</label><input id="accounts_phone" type="tel"></div>
+     <div class="field"><label for="accounts_email">Accounts email</label><input id="accounts_email" type="email"></div>
+     <div class="field"><label for="invoice_email">Email for invoices <span class="req">*</span></label><input id="invoice_email" type="email" required></div>
+    </div>
+    <div class="field"><label>Do you need a purchase order (PO) number on our invoices? <span class="req">*</span></label><div class="choice"><label><input type="radio" name="po_required" value="yes"> Yes</label><label><input type="radio" name="po_required" value="no"> No</label></div></div>
+   </section>
+
+   <section><h2><span class="n">4</span>Sites we will be working at</h2>
+    <p class="hint" style="margin-top:-4px">Add each site where we will carry out work. You can add more later.</p>
+    <div id="sites"></div>
+    <button class="btn light" type="button" id="addSite">+ Add another site</button>
+   </section>
+
+   <section><h2><span class="n">5</span>Your waste and our services</h2>
+    <div class="field"><label>Services you are interested in</label><div class="choice" id="services">
+     <label><input type="checkbox" value="Drain jetting"> Drain jetting</label><label><input type="checkbox" value="CCTV drain survey"> CCTV drain survey</label><label><input type="checkbox" value="Tanker / liquid waste removal"> Tanker / liquid waste removal</label><label><input type="checkbox" value="Interceptor cleaning"> Interceptor cleaning</label><label><input type="checkbox" value="Pump station maintenance"> Pump station maintenance</label><label><input type="checkbox" value="Confined space / man entry"> Confined space / man entry</label><label><input type="checkbox" value="Other"> Other</label></div></div>
+    <div class="field"><label for="waste_description">What waste will we usually be removing?</label><textarea id="waste_description" placeholder="e.g. sewage sludge from a pump station, interceptor waste, silt"></textarea></div>
+    <div class="grid">
+     <div class="field"><label>Are you the producer of this waste?</label><div class="choice"><label><input type="radio" name="waste_producer" value="yes"> Yes</label><label><input type="radio" name="waste_producer" value="no"> No</label><label><input type="radio" name="waste_producer" value="not sure"> Not sure</label></div></div>
+     <div class="field"><label>Could any of it be hazardous?</label><div class="choice"><label><input type="radio" name="hazardous" value="yes"> Yes</label><label><input type="radio" name="hazardous" value="no"> No</label><label><input type="radio" name="hazardous" value="not sure"> Not sure</label></div></div>
+    </div>
+    <div class="field"><label for="frequency">How often will you need us?</label><select id="frequency"><option value="">Choose…</option><option>One-off job</option><option>As and when needed</option><option>Regular / contract work</option></select></div>
+    <div class="field"><label for="notes">Anything else we should know?</label><textarea id="notes"></textarea></div>
+   </section>
+
+   <section><h2><span class="n">6</span>Declaration</h2>
+    <div class="grid">
+     <div class="field"><label for="signed_name">Your full name <span class="req">*</span></label><input id="signed_name" required autocomplete="name"></div>
+     <div class="field"><label for="signed_position">Position <span class="req">*</span></label><input id="signed_position" required></div>
+    </div>
+    <label class="tick"><input type="checkbox" id="confirm" required> <span>I confirm the information on this form is correct and that I am authorised to open an account with Aura Solutions Group Limited on behalf of the organisation named above. <span class="req">*</span></span></label>
+    <div class="privacy">We use these details to set up and manage your account, carry out work at your sites and complete the waste paperwork required by law. We keep them securely and do not share them except where needed to provide our services or meet legal requirements.</div>
+   </section>
+
+   <div id="msg"></div>
+   <div class="actions"><button class="btn primary" type="submit" id="submitBtn">Submit form</button></div>
+  </form>
+ </main>
+ <footer id="foot"><b>AURA SOLUTIONS GROUP LIMITED</b> · Registered office: 129 Main Street, Sedgeberrow, Evesham, England, WR11 7UH<br>Company no. 15761350 · VAT no. GB 471 3179 91 · Registered waste carrier CBDU631384<br><span class="gen">info@aurasolutions.co.uk</span></footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL='https://tatuejkauahqsgzwalid.supabase.co',SUPABASE_PUBLISHABLE_KEY='sb_publishable_J1__8GTEG2cDHKtPYQir9w_lgQALvxt';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+const el=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const token=(new URLSearchParams(location.hash.slice(1)).get('t')||new URLSearchParams(location.search).get('t')||'').trim();
+let siteCount=0;
+function addSite(v){v=v||{};const i=++siteCount,box=document.createElement('div');box.className='site';box.dataset.site=i;
+ box.innerHTML='<div class="row"><b>Site '+i+'</b>'+(i>1?'<button type="button" class="btn link">Remove</button>':'<label class="tick" style="font-size:13px"><input type="checkbox" data-same> Same as company address</label>')+'</div>'
+ +'<div class="grid"><div class="field"><label>Site name</label><input data-k="site_name" placeholder="e.g. Main depot, Sonnet Park pump station" value="'+esc(v.site_name)+'"></div><div class="field"><label>Postcode</label><input data-k="postcode" value="'+esc(v.postcode)+'"></div></div>'
+ +'<div class="field"><label>Site address</label><textarea data-k="site_address" style="min-height:58px">'+esc(v.site_address)+'</textarea></div>'
+ +'<div class="grid"><div class="field"><label>Site contact name</label><input data-k="site_contact_name" value="'+esc(v.site_contact_name)+'"></div><div class="field"><label>Site contact phone</label><input data-k="site_contact_phone" type="tel" value="'+esc(v.site_contact_phone)+'"></div></div>'
+ +'<div class="field"><label>Access notes, opening hours, keys / codes</label><textarea data-k="access_notes" style="min-height:58px">'+esc(v.access_notes)+'</textarea></div>';
+ el('sites').appendChild(box);
+ box.querySelector('.btn.link')?.addEventListener('click',()=>box.remove());
+ box.querySelector('[data-same]')?.addEventListener('change',e=>{if(e.target.checked){box.querySelector('[data-k=site_address]').value=el('address').value;box.querySelector('[data-k=postcode]').value=el('postcode').value;if(!box.querySelector('[data-k=site_name]').value)box.querySelector('[data-k=site_name]').value='Head office';}});}
+el('addSite').addEventListener('click',()=>addSite());
+function radio(name){return document.querySelector('input[name="'+name+'"]:checked')?.value||'';}
+function collect(){const v=id=>el(id).value.trim();
+ return {company_name:v('company_name'),trading_name:v('trading_name'),company_type:v('company_type'),company_number:v('company_number'),vat_number:v('vat_number'),sic_code:v('sic_code'),address:v('address'),postcode:v('postcode').toUpperCase(),website:v('website'),
+  contact_name:v('contact_name'),contact_position:v('contact_position'),contact_phone:v('contact_phone'),contact_email:v('contact_email'),
+  accounts_name:v('accounts_name'),accounts_phone:v('accounts_phone'),accounts_email:v('accounts_email'),invoice_email:v('invoice_email'),po_required:radio('po_required'),
+  sites:[...document.querySelectorAll('.site')].map(b=>{const o={};b.querySelectorAll('[data-k]').forEach(x=>o[x.dataset.k]=x.value.trim());if(o.postcode)o.postcode=o.postcode.toUpperCase();return o;}).filter(o=>Object.values(o).some(Boolean)),
+  services:[...document.querySelectorAll('#services input:checked')].map(x=>x.value),waste_description:v('waste_description'),waste_producer:radio('waste_producer'),hazardous:radio('hazardous'),frequency:v('frequency'),notes:v('notes'),
+  signed_name:v('signed_name'),signed_position:v('signed_position'),confirmed:el('confirm').checked,signed_at:new Date().toISOString()};}
+function stop(html,pill){el('loading').classList.add('hidden');el('form').classList.add('hidden');el('stop').innerHTML=html;el('stop').classList.remove('hidden');if(pill)el('statusPill').textContent=pill;window.scrollTo(0,0);}
+async function load(){
+ if(!token)return stop('<div class="err">This link is incomplete. Please use the full link from the email Aura Solutions sent you.</div>','LINK NOT VALID');
+ const {data,error}=await db.rpc('customer_application_get',{p_token:token});
+ if(error)return stop('<div class="err">'+esc(error.message)+'</div>','LINK NOT VALID');
+ const r=data&&data[0];if(!r)return stop('<div class="err">This form link is not valid.</div>','LINK NOT VALID');
+ if(['submitted','approved','declined'].includes(r.status))return stop('<div class="ok"><b>This form has already been submitted.</b><br>Thank you. If anything needs changing, please email info@aurasolutions.co.uk.</div>','SUBMITTED');
+ if(r.company_name)el('company_name').value=r.company_name;if(r.contact_name){el('contact_name').value=r.contact_name;el('signed_name').value=r.contact_name;}if(r.email){el('contact_email').value=r.email;}
+ addSite();el('loading').classList.add('hidden');el('form').classList.remove('hidden');}
+el('accounts_email').addEventListener('change',()=>{if(!el('invoice_email').value)el('invoice_email').value=el('accounts_email').value;});
+el('form').addEventListener('submit',async e=>{e.preventDefault();const msg=el('msg');msg.innerHTML='';
+ const d=collect(),missing=[];
+ [['company_name','Company name'],['company_type','Type of business'],['address','Address'],['postcode','Postcode'],['contact_name','Contact name'],['contact_phone','Contact phone'],['contact_email','Contact email'],['invoice_email','Email for invoices'],['signed_name','Your full name'],['signed_position','Your position']].forEach(([k,l])=>{if(!d[k])missing.push(l);});
+ if(!d.po_required)missing.push('Purchase order question');if(!d.confirmed)missing.push('Declaration tick box');
+ const badEmail=[d.contact_email,d.invoice_email,d.accounts_email].filter(Boolean).find(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+ if(missing.length){msg.innerHTML='<div class="err">Please complete: '+esc(missing.join(', '))+'.</div>';return;}
+ if(badEmail){msg.innerHTML='<div class="err">Please check this email address: '+esc(badEmail)+'</div>';return;}
+ const b=el('submitBtn');b.disabled=true;b.textContent='Sending…';
+ const {error}=await db.rpc('customer_application_submit',{p_token:token,p_data:d});
+ if(error){b.disabled=false;b.textContent='Submit form';msg.innerHTML='<div class="err">'+esc(error.message)+'</div>';return;}
+ stop('<div class="ok"><b>Thank you – your form has been sent to Aura Solutions.</b><br>We will set up your account and be in touch shortly. You can close this page.</div>','SUBMITTED');});
+load();
+</script>
+</body>
+</html>

@@ -2614,7 +2614,7 @@ async function printWasteTransferNote(){
 }
 /* ===== 27 Oct 2026: New customer forms — send a secure link, customer fills it in, open the account from it ===== */
 let customerApplications=[],custFormsOpen=false;
-const CF_BASE=()=>new URL('./customer-form.html',location.href).href;
+const CF_BASE=()=>new URL('./new-customer/',location.href).href;
 (function(){const st=document.createElement('style');st.textContent='.cf-box{border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0;background:#f8faf8}.cf-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #e6ece7}.cf-row:first-of-type{border-top:0}.cf-st{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800}.cf-st.sent,.cf-st.opened{background:#eef0ee;color:#4b5a4f}.cf-st.submitted{background:#fff1d6;color:#7a4d0b}.cf-st.approved{background:#e3f2e6;color:#1f5a2a}.cf-st.declined{background:#fde7e5;color:#9b1c13}.cf-link{width:100%;font-size:13px;margin:6px 0}';document.head.appendChild(st);})();
 async function loadCustomerApplications(){if(!['admin','manager'].includes(activeProfile?.role))return;const r=await db.from('customer_applications').select('id,status,company_name,contact_name,email,data,sent_at,sent_by_name,opened_at,submitted_at,expires_at,customer_id,reviewed_at,reviewed_by_name').order('sent_at',{ascending:false});if(r.error){const b=el('custFormsList');if(b)b.innerHTML='<div class="err">Could not load customer forms: '+esc(r.error.message)+'</div>';return;}customerApplications=r.data||[];renderCustomerApplications();renderCustomerFormsAlert();}
 function cfDate(d){return d?new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'';}
