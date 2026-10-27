@@ -97,12 +97,13 @@ footer .gen{color:#b9d3bd}
    </section>
 
    <section><h2><span class="n">3</span>Accounts and invoicing</h2>
-    <div class="grid">
-     <div class="field"><label for="accounts_name">Accounts contact name</label><input id="accounts_name"></div>
-     <div class="field"><label for="accounts_phone">Accounts phone</label><input id="accounts_phone" type="tel"></div>
-     <div class="field"><label for="accounts_email">Accounts email</label><input id="accounts_email" type="email"></div>
-     <div class="field"><label for="invoice_email">Email for invoices <span class="req">*</span></label><input id="invoice_email" type="email" required></div>
+    <div class="field"><label>Who should we contact about accounts and invoices? <span class="req">*</span></label><div class="choice"><label><input type="radio" name="accounts_who" value="main"> The main contact above</label><label><input type="radio" name="accounts_who" value="other"> Someone else</label></div></div>
+    <div id="accountsOther" class="grid hidden">
+     <div class="field"><label for="accounts_name">Accounts contact name <span class="req">*</span></label><input id="accounts_name"></div>
+     <div class="field"><label for="accounts_phone">Accounts phone <span class="req">*</span></label><input id="accounts_phone" type="tel"></div>
+     <div class="field"><label for="accounts_email">Accounts email <span class="req">*</span></label><input id="accounts_email" type="email"></div>
     </div>
+    <div class="field"><label for="invoice_email">Email address to send invoices to <span class="req">*</span></label><input id="invoice_email" type="email" required><div class="hint">We fill this in for you from the contact you chose – change it if invoices should go to a different address, e.g. accounts@yourcompany.co.uk.</div></div>
     <div class="field"><label>Do you need a purchase order (PO) number on our invoices? <span class="req">*</span></label><div class="choice"><label><input type="radio" name="po_required" value="yes"> Yes</label><label><input type="radio" name="po_required" value="no"> No</label></div></div>
    </section>
 
@@ -116,8 +117,8 @@ footer .gen{color:#b9d3bd}
     <div class="field"><label>Which of our services are you interested in? <span class="opt">(optional – tick any that apply)</span></label><div id="services" class="svcopts"><label class="svc"><input type="checkbox" value="Asset management"><span><b>Asset management</b><small>Ongoing care of septic tanks, treatment plants, pump stations and drainage – servicing, telemetry and monitoring, planned maintenance and bringing assets up to adoption standard.</small></span></label><label class="svc"><input type="checkbox" value="Civils &amp; installations"><span><b>Civils &amp; installations</b><small>Groundworks, new drainage, pump stations and wet wells, septic tanks, sewage treatment plants, gullies and interceptors, and remedial works to existing drainage.</small></span></label><label class="svc"><input type="checkbox" value="Industrial services"><span><b>Industrial services</b><small>Tank cleansing, high-pressure jetting and washing, culvert cleaning and industrial site support.</small></span></label><label class="svc"><input type="checkbox" value="Waste management"><span><b>Waste management</b><small>Liquid waste and sewage, food waste, gully and interceptor waste, process liquids, hazardous liquid waste and scheduled collections.</small></span></label><label class="svc"><input type="checkbox" value="Something else"><span><b>Something else</b><small>Tell us in the notes below.</small></span></label></div></div>
     <div class="field"><label for="waste_description">What waste will we usually be removing?</label><textarea id="waste_description" placeholder="e.g. sewage sludge from a pump station, interceptor waste, silt"></textarea></div>
     <div class="grid">
-     <div class="field"><label>Are you the producer of this waste?</label><div class="choice"><label><input type="radio" name="waste_producer" value="yes"> Yes</label><label><input type="radio" name="waste_producer" value="no"> No</label><label><input type="radio" name="waste_producer" value="not sure"> Not sure</label></div></div>
-     <div class="field"><label>Could any of it be hazardous?</label><div class="choice"><label><input type="radio" name="hazardous" value="yes"> Yes</label><label><input type="radio" name="hazardous" value="no"> No</label><label><input type="radio" name="hazardous" value="not sure"> Not sure</label></div></div>
+     <div class="field"><label>Are you the producer of this waste? <span class="req">*</span></label><div class="choice"><label><input type="radio" name="waste_producer" value="yes"> Yes</label><label><input type="radio" name="waste_producer" value="no"> No</label><label><input type="radio" name="waste_producer" value="not sure"> Not sure</label></div></div>
+     <div class="field"><label>Could any of it be hazardous? <span class="req">*</span></label><div class="choice"><label><input type="radio" name="hazardous" value="yes"> Yes</label><label><input type="radio" name="hazardous" value="no"> No</label><label><input type="radio" name="hazardous" value="not sure"> Not sure</label></div></div>
     </div>
     <div class="field"><label for="frequency">How often will you need us?</label><select id="frequency"><option value="">Choose…</option><option>One-off job</option><option>As and when needed</option><option>Regular / contract work</option></select></div>
     <div class="field"><label for="notes">Anything else we should know?</label><textarea id="notes"></textarea></div>
@@ -163,7 +164,7 @@ function radio(name){return document.querySelector('input[name="'+name+'"]:check
 function collect(){const v=id=>el(id).value.trim();
  return {company_name:v('company_name'),trading_name:v('trading_name'),company_type:v('company_type'),company_number:v('company_number'),vat_number:v('vat_number'),sic_code:v('sic_code'),address:v('address'),postcode:v('postcode').toUpperCase(),website:v('website'),
   contact_name:v('contact_name'),contact_position:v('contact_position'),contact_phone:v('contact_phone'),contact_email:v('contact_email'),
-  accounts_name:v('accounts_name'),accounts_phone:v('accounts_phone'),accounts_email:v('accounts_email'),invoice_email:v('invoice_email'),po_required:radio('po_required'),
+  accounts_who:radio('accounts_who'),accounts_name:radio('accounts_who')==='main'?v('contact_name'):v('accounts_name'),accounts_phone:radio('accounts_who')==='main'?v('contact_phone'):v('accounts_phone'),accounts_email:radio('accounts_who')==='main'?v('contact_email'):v('accounts_email'),invoice_email:v('invoice_email'),po_required:radio('po_required'),
   sites:[...document.querySelectorAll('.site')].map(b=>{const o={};b.querySelectorAll('[data-k]').forEach(x=>o[x.dataset.k]=x.value.trim());if(o.postcode)o.postcode=o.postcode.toUpperCase();return o;}).filter(o=>Object.values(o).some(Boolean)),
   services:[...document.querySelectorAll('#services input:checked')].map(x=>x.value),waste_description:v('waste_description'),waste_producer:radio('waste_producer'),hazardous:radio('hazardous'),frequency:v('frequency'),notes:v('notes'),
   signed_name:v('signed_name'),signed_position:v('signed_position'),confirmed:el('confirm').checked,terms_accepted:el('accept_terms').checked,terms_version:'1.2 (reviewed January 2026)',payment_terms:'30 days EOM',signed_at:new Date().toISOString()};}
@@ -177,11 +178,14 @@ async function load(){markOptional(el('form'));
  if(['submitted','approved','declined'].includes(r.status))return stop('<div class="ok"><b>This form has already been submitted.</b><br>Thank you. If anything needs changing, please email info@aurasolutions.co.uk.</div>','SUBMITTED');
  if(r.company_name)el('company_name').value=r.company_name;if(r.contact_name){el('contact_name').value=r.contact_name;el('signed_name').value=r.contact_name;}if(r.email){el('contact_email').value=r.email;}
  addSite();el('loading').classList.add('hidden');el('form').classList.remove('hidden');}
-el('accounts_email').addEventListener('change',()=>{if(!el('invoice_email').value)el('invoice_email').value=el('accounts_email').value;});
+let invAuto=true;el('invoice_email').addEventListener('input',()=>{invAuto=!el('invoice_email').value;});
+function syncInvoiceEmail(){const who=radio('accounts_who');const src=who==='other'?el('accounts_email').value:el('contact_email').value;if(invAuto||!el('invoice_email').value){el('invoice_email').value=src;invAuto=true;}}
+document.querySelectorAll('input[name=accounts_who]').forEach(r=>r.addEventListener('change',()=>{el('accountsOther').classList.toggle('hidden',radio('accounts_who')!=='other');syncInvoiceEmail();}));
+['accounts_email','contact_email'].forEach(id=>el(id).addEventListener('input',syncInvoiceEmail));
 el('form').addEventListener('submit',async e=>{e.preventDefault();const msg=el('msg');msg.innerHTML='';
  const d=collect(),missing=[];
  [['company_name','Company name'],['company_type','Type of business'],['address','Address'],['postcode','Postcode'],['contact_name','Contact name'],['contact_phone','Contact phone'],['contact_email','Contact email'],['invoice_email','Email for invoices'],['signed_name','Your full name'],['signed_position','Your position']].forEach(([k,l])=>{if(!d[k])missing.push(l);});
- if(!d.po_required)missing.push('Purchase order question');if(!d.terms_accepted)missing.push('Accept the terms and conditions');if(!d.confirmed)missing.push('Declaration tick box');
+ if(!d.accounts_who)missing.push('Who to contact about accounts');if(d.accounts_who==='other'){if(!d.accounts_name)missing.push('Accounts contact name');if(!d.accounts_phone)missing.push('Accounts phone');if(!d.accounts_email)missing.push('Accounts email');}if(!d.po_required)missing.push('Purchase order question');if(!d.waste_producer)missing.push('Are you the producer of the waste');if(!d.hazardous)missing.push('Could any of it be hazardous');if(!d.terms_accepted)missing.push('Accept the terms and conditions');if(!d.confirmed)missing.push('Declaration tick box');
  const badEmail=[d.contact_email,d.invoice_email,d.accounts_email].filter(Boolean).find(x=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
  if(missing.length){msg.innerHTML='<div class="err">Please complete: '+esc(missing.join(', '))+'.</div>';return;}
  if(badEmail){msg.innerHTML='<div class="err">Please check this email address: '+esc(badEmail)+'</div>';return;}
