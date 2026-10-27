@@ -2726,7 +2726,9 @@ async function auraHtmlToPdf(html,meta){
    for(const e of doc.querySelectorAll(sel)){if(!e.offsetParent&&e.tagName!=='TR')continue;let t=y(e),b=yb(e);
     if(e.tagName==='H2'){const nx=e.nextElementSibling;b=nx?Math.min(yb(nx),b+120):b+60;}
     const end=pageEnd(t);if(b<=end+1||b-t>=HN)continue;
-    let tgt=e;while(tgt.parentElement&&tgt.parentElement!==doc&&['grid','flex','inline-grid','inline-flex'].includes(W.getComputedStyle(tgt.parentElement).display))tgt=tgt.parentElement;
+    let tgt=e;const pd=tgt.parentElement&&W.getComputedStyle(tgt.parentElement).display;
+    if(pd==='grid'&&tgt.parentElement.children.length>2){/* photo grids: move just this row of photos to the next page */const row=[...tgt.parentElement.children].filter(c=>Math.abs(y(c)-t)<3),g=end-t+2;if(row.length&&row[0]!==tgt.parentElement.firstElementChild){row.forEach(c=>{c.style.marginTop=((parseFloat(W.getComputedStyle(c).marginTop)||0)+g)+'px';});moved=true;break;}}
+    while(tgt.parentElement&&tgt.parentElement!==doc&&['grid','flex','inline-grid','inline-flex'].includes(W.getComputedStyle(tgt.parentElement).display))tgt=tgt.parentElement;
     if(tgt.closest('h2')&&tgt!==e)continue;const gap=end-y(tgt)+2;if(gap<=0||yb(tgt)-y(tgt)>=HN)continue;
     if(tgt.tagName==='TR'){const sp=d.createElement('tr');sp.innerHTML='<td colspan="9" style="height:'+gap+'px;padding:0;border:0"></td>';tgt.before(sp);}
     else{const mt=parseFloat(W.getComputedStyle(tgt).marginTop)||0;tgt.style.marginTop=(mt+gap)+'px';}
