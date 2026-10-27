@@ -2564,7 +2564,7 @@ function wtnDocHtml(d){const E=auraDocEsc,j=d.job||{},cu=j.customers||{},co=comp
  const kv=rows=>'<table class="kv">'+rows.filter(r=>r[1]&&String(r[1]).trim()).map(r=>'<tr><td class="k">'+E(r[0])+'</td><td class="v">'+E(r[1]).replace(/\n/g,'<br>')+'</td></tr>').join('')+'</table>';
  const box=(t,inner)=>'<div class="box"><h3>'+E(t)+'</h3>'+inner+'</div>';
  const sig=(label,img,name,at,none)=>'<div class="sig"><div class="lbl">'+E(label)+'</div><div class="img">'+(img?'<img src="'+img+'">':'<span class="none">'+E(none||'Not signed')+'</span>')+'</div>'+E(name||'')+(at?'<div class="muted">Signed '+E(auraDocWhen(at))+'</div>':'')+'</div>';
- const broker=j.aura_role==='broker',auraName=co.company_name||'Aura Solutions Group Limited',auraAddr=wtnAddr(co.business_address,co.postcode),auraReg=(co.waste_carrier_registration||'')+(co.waste_carrier_expires_at?' (expires '+new Date(co.waste_carrier_expires_at).toLocaleDateString('en-GB')+')':'');
+ const broker=j.aura_role==='broker',auraName=String(co.company_name||'Aura Solutions Group Limited').toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase()),auraAddr=wtnAddr(co.business_address,co.postcode),auraReg=(co.waste_carrier_registration||'')+(co.waste_carrier_expires_at?' (expires '+new Date(co.waste_carrier_expires_at).toLocaleDateString('en-GB')+')':'');
  const transferee=broker?kv([['Name',j.carrier_name],['Capacity','Registered waste carrier'],['Registration no.',j.carrier_registration]])
   :kv([['Name',auraName],['Address',auraAddr],['Capacity','Registered waste carrier ('+(co.waste_carrier_type||'upper tier')+')'],['Registration no.',auraReg]]);
  const ds=d.disposal||{},st=j.__site||{};let n=0;
