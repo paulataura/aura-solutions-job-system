@@ -1,0 +1,2 @@
+-- customer_sites: access_codes, key_info, access_hours, vehicle_access, site_hazards (27 Oct 2026); aura_open_customer_account copies access_codes from the form
+alter table public.customer_sites add column if not exists access_codes text, add column if not exists key_info text, add column if not exists access_hours text, add column if not exists vehicle_access text, add column if not exists site_hazards text;

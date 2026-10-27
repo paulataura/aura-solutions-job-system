@@ -163,7 +163,7 @@ function addSite(v){v=v||{};const i=++siteCount,box=document.createElement('div'
  +'<div class="grid"><div class="field"><label>Address line 1</label><input data-k="addr1" placeholder="Building and street"></div><div class="field"><label>Address line 2</label><input data-k="addr2"></div>'
  +'<div class="field"><label>Town / city</label><input data-k="town"></div><div class="field"><label>Postcode</label><input data-k="postcode" value="'+esc(v.postcode)+'"></div></div>'
  +'<div class="grid"><div class="field"><label>Site contact name</label><input data-k="site_contact_name" value="'+esc(v.site_contact_name)+'"></div><div class="field"><label>Site contact phone</label><input data-k="site_contact_phone" type="tel" value="'+esc(v.site_contact_phone)+'"></div></div>'
- +'<div class="field"><label>Access notes, opening hours, keys / codes</label><textarea data-k="access_notes" style="min-height:58px">'+esc(v.access_notes)+'</textarea></div>';
+ +'<div class="field"><label>Gate / door codes</label><textarea data-k="access_codes" style="min-height:50px" placeholder="One per line, e.g. Main gate: 1234"></textarea></div><div class="field"><label>Access notes – opening hours, keys, parking</label><textarea data-k="access_notes" style="min-height:58px">'+esc(v.access_notes)+'</textarea></div>';
  el('sites').appendChild(box);if(typeof markOptional==='function')markOptional(box);
  box.querySelector('.btn.link')?.addEventListener('click',()=>box.remove());
  box.querySelector('[data-same]')?.addEventListener('change',e=>{if(e.target.checked){['addr1','addr2','town','postcode'].forEach(k=>{box.querySelector('[data-k='+k+']').value=el(k).value;});if(!box.querySelector('[data-k=site_name]').value)box.querySelector('[data-k=site_name]').value='Head office';}});}
