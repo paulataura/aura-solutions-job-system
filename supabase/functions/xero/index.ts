@@ -5,7 +5,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CLIENT_ID = Deno.env.get("XERO_CLIENT_ID") || "";
+const CLIENT_ID = Deno.env.get("XERO_CLIENT_ID") || "CB78FE23415F4FE4A593617287A93E4E";
 const CLIENT_SECRET = Deno.env.get("XERO_CLIENT_SECRET") || "";
 const REDIRECT = `${SUPABASE_URL}/functions/v1/xero-callback`;
 const SCOPES = "openid profile email offline_access accounting.invoices accounting.payments accounting.contacts accounting.settings accounting.attachments";

@@ -3,7 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-const CLIENT_ID = Deno.env.get("XERO_CLIENT_ID") || "";
+const CLIENT_ID = Deno.env.get("XERO_CLIENT_ID") || "CB78FE23415F4FE4A593617287A93E4E";
 const CLIENT_SECRET = Deno.env.get("XERO_CLIENT_SECRET") || "";
 const REDIRECT = `${SUPABASE_URL}/functions/v1/xero-callback`;
 const APP = "https://app.aurasolutions.co.uk/app";
