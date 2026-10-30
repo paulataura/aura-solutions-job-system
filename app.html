@@ -2280,12 +2280,13 @@ async function printJobCardV2(){
  try{
  const j=activeJob,cu=j.customers||{},co=companySettings||{},ds=j.disposal_sites;
  const [vr,fr,sr,st]=await Promise.all([
-  db.from('job_visits').select('*').eq('job_id',j.id).order('created_at',{ascending:false}).limit(1),
+  window.__jcVisitId?db.from('job_visits').select('*').eq('id',window.__jcVisitId).limit(1):db.from('job_visits').select('*').eq('job_id',j.id).order('created_at',{ascending:false}).limit(1),
   db.from('job_files').select('id,file_type,file_name,storage_path,caption,created_at,taken_at').eq('job_id',j.id).order('created_at',{ascending:true}),
   db.from('job_scope_sections').select('id,position,title,details').eq('job_id',j.id).order('position'),
   j.customer_site_id?db.from('customer_sites').select('site_name').eq('id',j.customer_site_id).maybeSingle():Promise.resolve({data:null})
  ]);
  if(vr.error||fr.error||sr.error)throw (vr.error||fr.error||sr.error);
+ const jcWin=window.__jcWindow||null;if(jcWin&&fr.data)fr.data=fr.data.filter(f=>(!jcWin[0]||f.created_at>=jcWin[0])&&(!jcWin[1]||f.created_at<jcWin[1]));
  const v=(vr.data||[])[0]||{},files=(fr.data||[]).filter(f=>/\.(jpe?g|png|webp|gif|heic)$/i.test(f.storage_path||'')||/photo|evidence|attachment/.test(f.file_type));
  const signed=files.length?await db.storage.from('job-files').createSignedUrls(files.map(f=>f.storage_path),3600):{data:[]};
  const url={};(signed.data||[]).forEach(x=>{if(x.signedUrl)url[x.path]=x.signedUrl;});
@@ -2373,7 +2374,7 @@ async function printJobCardV2(){
  }
 
  /* earlier loads on this job (each with its own WTN) */
- try{const ldR=await db.from('job_waste_loads').select('*').eq('job_id',j.id).order('load_number');const lds=ldR.data||[];
+ try{const ldR=await db.from('job_waste_loads').select('*').eq('job_id',j.id).order('load_number');const lds=(ldR.data||[]).filter(l=>!(l.wtn_number&&l.wtn_number===v.waste_transfer_note_number)&&(!window.__jcVisitId||!l.visit_id||l.visit_id===v.id));
   if(lds.length&&v.waste_removed){const row=l=>'<tr><td class="k">Load '+l.load_number+'</td><td class="v">'+esc2(l.wtn_number||'')+'<br><span class="muted">'+esc2([l.description,l.ewc_code].filter(Boolean).join(' · '))+'</span></td><td class="v">'+esc2([l.quantity_value,l.quantity_unit].filter(x=>x!=null&&x!=='').join(' ')+(l.estimated_weight_kg?' (est. '+l.estimated_weight_kg+' kg)':''))+'<br><span class="muted">Collected '+esc2(dt(l.collected_at))+'</span></td><td class="v">'+(l.disposal_status==='confirmed'?esc2(join(l.disposal_site_text,l.disposed_at?dOnly(l.disposed_at):'',l.ticket_number?'ticket '+l.ticket_number:'')):'<span class="muted">Awaiting disposal</span>')+'</td></tr>';
    s5='<div class="keepblock"><div class="note">This job has '+(lds.length+1)+' loads, each with its own Waste Transfer Note. The customer\'s signature at completion covers all loads.</div><table class="kv" style="margin-bottom:8px">'+lds.map(row).join('')+'</table></div><div class="lbl" style="margin-top:6px">Load '+(lds.length+1)+' (final load)</div>'+s5;}}catch(_){}
  /* 6. sign-off */
@@ -2387,6 +2388,7 @@ async function printJobCardV2(){
   
   +(()=>{const sumRows=[['Customer',cu.company_name],['Site',siteName||j.postcode||j.site_address],['Operative',operative],['Your reference',j.reference],...(j.customer_po?[['Customer PO',j.customer_po]]:[]),['Arrived',dt(v.arrived_at)],['Completed',dt(completed)],['Waste Transfer Note',v.waste_removed?v.waste_transfer_note_number:'Not required'],['Time on site',(()=>{if(!v.arrived_at||!completed)return '';const m=Math.round((new Date(completed)-new Date(v.arrived_at))/60000);if(m<0||m>60*24*14)return '';const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return (d?d+'d ':'')+(h?h+'h ':'')+mm+'m';})()]].filter(r=>r[1]);const cols=sumRows.length%4===0?4:(sumRows.length%3===0?3:4);return '<div class="summary" style="grid-template-columns:repeat('+cols+',1fr)">'+sumRows.map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1]||'—')+'</b></div>').join('')+'</div>';})();
 
+ if(window.__jcCollect){window.__jcCollect.push({v,s1,s2,s3,s4,s5,s6,noIssues,otherIssue,completed,operative,head});w.document.open();w.document.write('<p></p>');w.document.close();return;}
  let n=0;const body=head
   +sec(++n,'The job as issued',s1)
   +sec(++n,'Arrival on site',s2)
@@ -3079,6 +3081,65 @@ function editLoadOffice(id){const box=el('ldEdit_'+id),l=jobLoads.find(x=>x.id==
  box.innerHTML='<div style="margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff"><div class="two">'+f('wtn_number','WTN number',l.wtn_number)+f('collected_at','Left site',reviewDateInput(l.collected_at),'datetime-local')+f('description','Waste description',l.description)+f('ewc_code','EWC code',l.ewc_code)+f('quantity_value','Quantity',l.quantity_value,'number')+f('quantity_unit','Unit',l.quantity_unit)+f('estimated_weight_kg','Estimated weight (kg)',l.estimated_weight_kg,'number')+f('container_type','Container',l.container_type)+f('disposal_site_text','Tipped at',l.disposal_site_text)+f('disposed_at','Date tipped',reviewDateInput(l.disposed_at),'datetime-local')+f('ticket_number','Ticket no.',l.ticket_number)+f('receiver_name','Received by',l.receiver_name)+'</div><div class="actions"><button class="btn primary" type="button" onclick="saveLoadOffice(\''+id+'\')">Save load</button></div><div id="ldEditMsg_'+id+'"></div></div>';}
 async function saveLoadOffice(id){const box=el('ldEdit_'+id),msg=el('ldEditMsg_'+id),p={};box.querySelectorAll('[data-ld]').forEach(i=>{const k=i.dataset.ld,v=i.value.trim();p[k]=i.type==='number'?(v===''?null:Number(v)):i.type==='datetime-local'?(v?new Date(v).toISOString():null):(v||null);});if(p.disposal_site_text&&p.disposed_at)p.disposal_status='confirmed';
  const u=await db.from('job_waste_loads').update(p).eq('id',id);if(u.error){msg.innerHTML='<div class="err">'+esc(u.error.message)+'</div>';return;}await loadManagementReview();}
+/* ===== 30 Oct 2026: scheduled repeat visits on one job (e.g. Mon / Wed / Fri tankering) =====
+   The office plans extra visits on the job. Each visit is issued to the operator as a normal job; when they submit,
+   the next planned visit is issued automatically. Everything stays on one job, one job card and one invoice. */
+let visitPlan=[],visitProfiles=null;
+async function loadVisitPlan(){if(!activeJob)return [];const r=await db.from('job_visit_plan').select('*').eq('job_id',activeJob.id).neq('status','cancelled').order('planned_date');visitPlan=r.error?[]:(r.data||[]);return visitPlan;}
+async function operatorProfiles(){if(visitProfiles)return visitProfiles;const r=await db.from('profiles').select('id,full_name,role,active').order('full_name');visitProfiles=(r.data||[]).filter(p=>p.active!==false);return visitProfiles;}
+const visitDate=d=>d?new Date(String(d).length===10?d+'T12:00:00Z':d).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}):'';
+async function renderVisitPanel(){const host=el('jobDocsPanel');if(!host||!activeJob)return;let box=el('visitPlanPanel');if(!box){box=document.createElement('div');box.id='visitPlanPanel';box.className='saved-site-card';box.style.marginTop='12px';host.parentNode.insertBefore(box,host);}
+ const mgmt=['admin','manager'].includes(activeProfile?.role);box.classList.toggle('hidden',!mgmt);if(!mgmt)return;const jobId=activeJob.id;
+ const [plan,vr,profs]=await Promise.all([loadVisitPlan(),db.from('job_visits').select('id,visit_number,planned_date,arrived_at,completed_at,visit_operator_id,created_at').eq('job_id',jobId).order('created_at'),operatorProfiles()]);if(activeJob?.id!==jobId)return;
+ const visits=vr.data||[],pn=id=>(profs.find(p=>p.id===id)||{}).full_name||'';
+ const done=visits.map((v,i)=>'<div class="cf-row" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #e6ece7"><div><b>Visit '+(i+1)+'</b> · '+esc(visitDate(v.arrived_at||v.planned_date||(i===0?activeJob.job_date:'')))+(pn(v.visit_operator_id||(i===visits.length-1?activeJob.assigned_to:null))?' · '+esc(pn(v.visit_operator_id||activeJob.assigned_to)):'')+'</div><span class="muted" style="font-size:13px">'+(v.completed_at?'✓ Done':(i===visits.length-1?'Current visit':''))+'</span></div>').join('');
+ const planned=plan.filter(p=>p.status==='planned').map((p,i)=>'<div class="cf-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #e6ece7"><div><b>Visit '+(Math.max(visits.length,1)+i+1)+'</b> · '+esc(visitDate(p.planned_date))+(p.operator_id?' · '+esc(pn(p.operator_id)):'')+(p.office_notes?'<div class="muted" style="font-size:12.5px">Note for the operator: '+esc(p.office_notes)+'</div>':'')+'</div><div style="display:flex;gap:6px"><span class="pill">Planned</span><button class="mini-btn danger" type="button" onclick="removePlannedVisit(\''+p.id+'\')">Remove</button></div></div>').join('');
+ const tmr=new Date(Date.now()+864e5).toISOString().slice(0,10);
+ box.innerHTML='<div class="row" style="align-items:center"><div><h3 style="margin:0">📅 Visits on this job</h3><div class="muted" style="font-size:13px">Each visit goes to the operator as a normal job. All visits stay on this job, one job card and one invoice.</div></div><button class="btn light" type="button" onclick="el(\'visitAddForm\').classList.toggle(\'hidden\')">+ Add visit</button></div>'
+  +'<div style="margin-top:8px">'+(done||'<div class="muted" style="font-size:13px">Visit 1 is this job'+(activeJob.job_date?' on '+esc(visitDate(activeJob.job_date)):'')+'.</div>')+planned+'</div>'
+  +'<div id="visitAddForm" class="hidden" style="margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff"><div class="two"><div class="field"><label for="visitAddDate">Visit date *</label><input id="visitAddDate" type="date" value="'+tmr+'"></div><div class="field"><label for="visitAddOp">Operator</label><select id="visitAddOp">'+profs.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===activeJob.assigned_to?' selected':'')+'>'+esc(p.full_name||'')+'</option>').join('')+'</select></div></div><div class="field"><label for="visitAddNote">Note for the operator <span class="muted" style="font-weight:400">(optional – only shown if you add one)</span></label><textarea id="visitAddNote" style="min-height:60px"></textarea></div>'
+  +'<label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-bottom:8px"><input id="visitAddRepeat" type="checkbox" style="width:auto"> Also add the same weekdays for the next <input id="visitAddWeeks" type="number" min="1" max="12" value="1" style="width:60px;display:inline-block"> week(s)</label>'
+  +'<div class="actions"><button class="btn primary" type="button" onclick="addPlannedVisit()">Add visit</button></div><div id="visitAddMsg"></div></div>';}
+async function addPlannedVisit(){const msg=el('visitAddMsg'),d=el('visitAddDate').value;if(!d){msg.innerHTML='<div class="err">Choose the visit date.</div>';return;}
+ const dates=[d];if(el('visitAddRepeat').checked){const wks=Math.min(12,Math.max(1,Number(el('visitAddWeeks').value)||1));for(let w=1;w<=wks;w++){const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+7*w);dates.push(x.toISOString().slice(0,10));}}
+ const rows=dates.map(x=>({job_id:activeJob.id,planned_date:x,operator_id:el('visitAddOp').value||null,office_notes:el('visitAddNote').value.trim()||null,created_by_name:activeProfile?.full_name||null}));
+ msg.innerHTML='<div class="muted">Saving…</div>';const r=await db.from('job_visit_plan').insert(rows);if(r.error){msg.innerHTML='<div class="err">'+esc(r.error.message)+'</div>';return;}
+ /* if this visit's work is already finished, issue the next visit straight away */
+ if(['returned','reviewed','closed','completed'].includes(activeJob.status)&&!(activeJob.status==='completed')){const a=await db.rpc('aura_advance_visit',{p_job_id:activeJob.id,p_force:true});if(a.error){msg.innerHTML='<div class="err">Visit saved, but it could not be issued: '+esc(a.error.message)+'</div>';return;}if(a.data){await openJob(activeJob.id);return;}}
+ await renderVisitPanel();}
+async function removePlannedVisit(id){if(!await auraConfirm('Remove this planned visit?'))return;const r=await db.from('job_visit_plan').update({status:'cancelled'}).eq('id',id);if(r.error){alert(r.error.message);return;}await renderVisitPanel();}
+async function moreVisitsPlanned(){try{if(!activeJob)return false;const r=await db.from('job_visit_plan').select('id').eq('job_id',activeJob.id).eq('status','planned').limit(1);return !!(r.data&&r.data.length);}catch(_){return false;}}
+/* when a visit is submitted, the next planned visit is issued automatically */
+(function(){const o=window.persistJobStatus;if(typeof o!=='function')return;window.persistJobStatus=async function(status){const r=await o.apply(this,arguments);if(status==='returned'&&activeJob){try{const a=await db.rpc('aura_advance_visit',{p_job_id:activeJob.id,p_force:false});if(a.data)activeJob.__nextVisit=a.data;}catch(_){}}return r;};})();
+/* non-final visits: the customer signs on the final visit, so their signature isn't needed today */
+(function(){const ls=window.loadSiteSignoff;if(typeof ls==='function')window.loadSiteSignoff=async function(){const r=await ls.apply(this,arguments);try{window.__moreVisits=await moreVisitsPlanned();const sel=el('customer_signoff_status');let note=el('visitSignNote');
+  if(window.__moreVisits&&sel){sel.value='absent';if(el('customer_signoff_reason')&&!el('customer_signoff_reason').value)el('customer_signoff_reason').value='Customer signs at the end of the job (further visits planned).';toggleCustomerSignoff();sel.closest('.field')?.classList.add('hidden');el('customerSignoffExceptionWrap')?.classList.add('hidden');
+   if(!note){note=document.createElement('div');note.id='visitSignNote';note.className='muted';note.style.margin='6px 0 10px';sel.closest('.field')?.before(note);}note.textContent='Customer signature not needed today – just add your own signature and submit.';if(el('loadsSignoffBox'))el('loadsSignoffBox').innerHTML='';}
+  else{sel?.closest('.field')?.classList.remove('hidden');if(note)note.remove();}}catch(_){}return r;};
+ const ol=window.leaveCustomerSite;if(typeof ol==='function')window.leaveCustomerSite=async function(){if(window.__moreVisits){const cb=el('allLoadsConfirm');const had=jobLoads;jobLoads=[];try{return await ol.apply(this,arguments);}finally{jobLoads=had;}}return ol.apply(this,arguments);};})();
+/* operator: show the office's note for this visit, if there is one */
+(function(){const o=window.openJob;if(typeof o!=='function')return;window.openJob=async function(){const r=await o.apply(this,arguments);try{if(!activeJob)return r;const jobId=activeJob.id;
+  const v=(await db.from('job_visits').select('office_notes,visit_number,completed_at').eq('job_id',jobId).order('created_at',{ascending:false}).limit(1)).data?.[0];let b=el('officeVisitNote');
+  if(v&&v.office_notes&&!v.completed_at){if(!b){b=document.createElement('div');b.id='officeVisitNote';const head=el('jobDetail')?.querySelector('.row');head?.after(b);}b.innerHTML='<div class="flag" style="margin:10px 0;font-size:15px">📝 <b>Note from the office:</b> '+esc(v.office_notes)+'</div>';}else if(b)b.remove();
+  if(['admin','manager'].includes(activeProfile?.role))renderVisitPanel();}catch(_){}return r;};})();
+/* one job card for all visits, with a section per visit */
+(function(){const o=window.printJobCardV2;if(typeof o!=='function')return;window.printJobCardV2=async function(){if(!activeJob)return o.apply(this,arguments);
+ let vs=[];try{vs=(await db.from('job_visits').select('id,created_at,arrived_at,completed_at,visit_operator_id,office_notes').eq('job_id',activeJob.id).order('created_at')).data||[];}catch(_){}
+ vs=vs.filter(v=>v.arrived_at||v.completed_at);if(vs.length<2)return o.apply(this,arguments);
+ const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to create the job card.');return;}w.document.write('<p style="font:16px Arial;padding:20px">Preparing job card…</p>');
+ try{const parts=[];for(let i=0;i<vs.length;i++){window.__jcVisitId=vs[i].id;window.__jcWindow=[i?vs[i].created_at:null,vs[i+1]?vs[i+1].created_at:null];window.__jcCollect=parts;await auraCaptureDoc(()=>o.call(this));}
+  window.__jcVisitId=null;window.__jcWindow=null;window.__jcCollect=null;
+  const j=activeJob,cu=j.customers||{},E=auraDocEsc,last=parts[parts.length-1]||{},ops=[...new Set(parts.map(p=>p.operative).filter(Boolean))];
+  const sec=(n,t,inner,cls)=>auraDocSection(n,t,inner,cls);const day=d=>d?new Date(d).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
+  const sumRows=[['Customer',cu.company_name],['Your reference',j.reference],...(j.customer_po?[['Customer PO',j.customer_po]]:[]),['Visits',String(parts.length)],['First visit',day(parts[0]?.v?.arrived_at)],['Last visit',day(last.v?.arrived_at)],['Operative'+(ops.length>1?'s':''),ops.join(', ')]].filter(r=>r[1]);
+  const head='<div class="summary" style="grid-template-columns:repeat(4,1fr)">'+sumRows.map(r=>'<div><span>'+E(r[0])+'</span><b>'+E(r[1])+'</b></div>').join('')+'</div>';
+  let n=0,body=head+sec(++n,'The job as issued',last.s1||parts[0].s1);
+  parts.forEach((p,i)=>{body+='<div class="dayhead">Visit '+(i+1)+' · '+E(day(p.v.arrived_at))+(p.operative?' · '+E(p.operative):'')+'</div>'+(vs[i].office_notes?'<div class="note">Office note for this visit: '+E(vs[i].office_notes)+'</div>':'')
+   +sec(++n,'Arrival on site',p.s2)+sec(++n,'Work carried out',p.s3)+sec(++n,'Issues / revisit',p.s4,(p.noIssues&&!p.otherIssue?'':'warnsec ')+'keep')+(p.s5?sec(++n,'Waste',p.s5):'');});
+  body+=sec(++n,'Sign-off',last.s6||'','keep');
+  const html=auraDocHtml({tabTitle:'Job Completion Report '+(j.job_number||''),title:'Job Completion Report',ref:j.job_number,sub:[j.job_types?.name,parts.length+' visits'].filter(Boolean).join(', '),pill:j.reviewed_at?'APPROVED':'COMPLETED',footRef:'Job '+(j.job_number||''),body,css:'.dayhead{margin:16px 0 2px;padding:6px 10px;background:#0c3e17;color:#fff;border-radius:5px;font-size:12px;letter-spacing:.3px;break-after:avoid}'});
+  w.document.open();w.document.write(html);w.document.close();}
+ catch(e){window.__jcVisitId=null;window.__jcWindow=null;window.__jcCollect=null;w.document.body.innerHTML='<p style="font:16px Arial;padding:20px;color:#b42318">Could not build the job card: '+esc(e.message||String(e))+'</p>';}};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */

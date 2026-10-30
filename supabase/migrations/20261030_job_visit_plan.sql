@@ -1,0 +1,3 @@
+-- Scheduled repeat visits on one job: planned visits, and an RPC that issues the next one when a visit is submitted.
+-- (Full SQL as applied: table job_visit_plan with management RLS + operator read; function aura_advance_visit(p_job_id uuid, p_force boolean).)
+create table if not exists public.job_visit_plan (id uuid primary key default gen_random_uuid(), job_id uuid not null references public.jobs(id) on delete cascade, planned_date date not null, operator_id uuid references public.profiles(id), office_notes text, status text not null default 'planned' check (status in ('planned','issued','cancelled')), visit_id uuid references public.job_visits(id) on delete set null, created_by_name text, created_at timestamptz not null default now());
