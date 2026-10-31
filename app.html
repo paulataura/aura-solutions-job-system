@@ -3632,7 +3632,7 @@ document.documentElement.lang='en-GB';
 function auraSpell(n){const skip=/ewc|postcode|post_code|email|phone|tel|code|ref|_po\b|po_|^po|number|wtn|sic|reg|permit|search|password|url|w3w|what3words|lat|lng|account|sort/i;
  const list=n.matches&&n.matches('textarea,input')?[n]:(n.querySelectorAll?[...n.querySelectorAll('textarea,input')]:[]);
  list.forEach(e=>{if(e.dataset.spellSet)return;e.dataset.spellSet='1';const t=(e.getAttribute('type')||'text').toLowerCase();if(e.tagName==='INPUT'&&t!=='text')return;
-  if(skip.test((e.id||'')+' '+(e.name||'')+' '+(e.className||''))||e.inputMode==='decimal'||e.inputMode==='numeric')return;e.spellcheck=true;e.setAttribute('lang','en-GB');});}
+  if(skip.test((e.id||'')+' '+(e.name||'')+' '+(e.className||''))||e.inputMode==='decimal'||e.inputMode==='numeric'){e.spellcheck=false;return;}e.spellcheck=true;e.setAttribute('lang','en-GB');});}
 new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(x=>{if(x.nodeType===1)auraSpell(x);}))).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>auraSpell(document));auraSpell(document);
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
