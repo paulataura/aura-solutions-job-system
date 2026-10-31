@@ -217,5 +217,9 @@ el('form').addEventListener('submit',async e=>{e.preventDefault();const msg=el('
   +'<p class="hint" style="text-align:center"><a href="../terms/Aura-Solutions-Terms-and-Conditions-v1.2.pdf" download style="color:#2f6b3a;font-weight:700">⬇ Download a copy of our Terms and Conditions</a> · You can now close this page.</p></div>','SUBMITTED');});
 load();
 </script>
+<script>/* spell check (UK English) on text boxes – not on codes, numbers, emails, postcodes or references */
+(function(){document.documentElement.lang='en-GB';const skip=/ewc|postcode|post_code|email|phone|tel|code|ref|number|sic|reg|vat|company_no|account|sort|url/i;
+ const go=n=>[...(n.querySelectorAll?n.querySelectorAll('textarea,input'):[])].forEach(e=>{if(e.dataset.spellSet)return;e.dataset.spellSet='1';const t=(e.getAttribute('type')||'text').toLowerCase();if(e.tagName==='INPUT'&&t!=='text')return;if(skip.test((e.id||'')+' '+(e.name||'')))return;e.spellcheck=true;e.setAttribute('lang','en-GB');});
+ go(document);new MutationObserver(()=>go(document)).observe(document.documentElement,{childList:true,subtree:true});})();</script>
 </body>
 </html>
