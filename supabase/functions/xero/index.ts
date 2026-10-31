@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
           Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, today),
-          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: String(job.customer_po || job.reference || job.job_number || "").slice(0, 255) || undefined,
+          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: [job.customer_po || job.reference, job.job_number ? "Job " + job.job_number : ""].filter(Boolean).join(" · ").slice(0, 255) || undefined,
           BrandingThemeID: s.branding_theme_id || undefined,
           LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)),
         }] }),
