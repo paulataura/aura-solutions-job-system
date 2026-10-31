@@ -7,7 +7,7 @@ const FONT='Arial';
 // merge field tokens: the text "⟦n⟧" is turned into a real Word MERGEFIELD afterwards
 const fields=[];const SAMPLE={InvoiceTitle:'TAX INVOICE',InvoiceNumber:'INV-10225',InvoiceDate:'26 Oct 2026',InvoiceDueDate:'30 Nov 2026',Reference:'PO 0961 - Wastesavers',InvoiceAmountDue:'731.81',ContactName:'Zwanny LTD',ContactPostalAddress:'Unit 308, Woodside Way\nSpringvale Industrial Estate\nCwmbran, Torfaen  NP44 5BR',ContactTaxNumber:'',Description:'24 Oct 2026 – Haulage – bulk tanker',Quantity:'1.00',UnitAmount:'400.00',TaxPercentageOrName:'20%',LineAmount:'400.00',InvoiceSubTotal:'609.84',TaxCode:'VAT 20%',TaxTotal:'121.97',InvoiceTotal:'731.81',InvoiceTotalNetPayments:'0.00',PaymentMessageAndUrl:'View and pay online: https://in.xero.com/…',PaymentImage:'',TaxUnitName:'VAT'};
 function F(name,sw){if(PREVIEW){if(/^Table(Start|End)/.test(name))return '';return SAMPLE[name]??'';}fields.push({name,sw:sw||''});return '⟦'+(fields.length-1)+'⟧';}
-const run=(t,o={})=>new TextRun({text:t,font:FONT,size:o.size||18,bold:!!o.bold,color:o.color||'17221B',allCaps:!!o.caps,characterSpacing:o.spacing});
+const run=(t,o={})=>new TextRun({text:t,font:FONT,size:o.size||18,bold:!!o.bold,color:o.color||'17221B',allCaps:!!o.caps,characterSpacing:o.spacing,shading:o.shade?{type:ShadingType.CLEAR,color:'auto',fill:o.shade}:undefined});
 // a run list that may contain field tokens and newlines (preview text may have \n)
 function runs(parts,o){if(!Array.isArray(parts))parts=[parts];const out=[];parts.forEach(p=>{if(typeof p!=='string'){out.push(p);return;}String(p).split('\n').forEach((s,i)=>{if(i)out.push(new TextRun({break:1}));if(s!=='')out.push(run(s,o));});});return out;}
 const P=(parts,o={})=>new Paragraph({alignment:o.align,spacing:{before:o.before||0,after:o.after??40,line:o.line||260},keepNext:o.keepNext,shading:o.shade?{type:ShadingType.CLEAR,color:'auto',fill:o.shade}:undefined,border:o.border,indent:o.indent,children:runs(Array.isArray(parts)?parts:[parts],o)});
@@ -29,7 +29,7 @@ const chevImg=new ImageRun({type:'png',data:chev,transformation:{width:378,heigh
 const half=CW/2|0;
 const header=tbl([half,CW-half],[new TableRow({children:[
  cell([new Paragraph({children:[chevImg,new ImageRun({type:'png',data:logo,transformation:{width:190,height:Math.round(190*Number(process.env.LOGO_RATIO))}})]})],half,{m:{top:0,bottom:0,left:0,right:0},v:VerticalAlign.BOTTOM}),
- cell([P(F('InvoiceTitle','\\* Upper'),{size:38,bold:true,color:GREEN,align:AlignmentType.RIGHT,after:20,before:520}),P(F('InvoiceNumber'),{size:23,bold:true,align:AlignmentType.RIGHT,after:0})],CW-half,{m:{top:0,bottom:0,left:0,right:0},v:VerticalAlign.BOTTOM})]})]);
+ cell([P(F('InvoiceTitle','\\* Upper'),{size:38,bold:true,color:GREEN,align:AlignmentType.RIGHT,after:20,before:520}),new Table({alignment:AlignmentType.RIGHT,width:{size:2000,type:WidthType.DXA},columnWidths:[2000],layout:TableLayoutType.FIXED,borders:{top:NB,bottom:NB,left:NB,right:NB,insideHorizontal:NB,insideVertical:NB},rows:[new TableRow({children:[cell([P(F('InvoiceNumber'),{size:22,bold:true,color:'FFFFFF',align:AlignmentType.CENTER,after:0})],2000,{fill:'72C936',m:{top:30,bottom:30,left:80,right:80}})]})]})],CW-half,{m:{top:0,bottom:0,left:0,right:0},v:VerticalAlign.BOTTOM})]})]);
 const rule=new Paragraph({spacing:{before:80,after:140},border:{bottom:{style:BorderStyle.SINGLE,size:6,color:MID,space:1}},children:[]});
 // ---- key details strip ----
 const sw=[1900,1800,1800,2866,2100];
@@ -59,7 +59,7 @@ const pw=[5200,160,CW-5200-160],kvw=5000;
 const payTop=tbl(pw,[new TableRow({children:[
  cell([P('Bank transfer (BACS)',{size:16,bold:true,color:MID,caps:true,spacing:10,after:60}),kv('Bank','HSBC',kvw),kv('Account name','Aura Solutions Group Limited',kvw),kv('Sort code','40-18-00',kvw),kv('Account no.','31377817',kvw),kv('Payment reference',F('InvoiceNumber'),kvw)],pw[0],{m:{top:0,bottom:0,left:0,right:0}}),
  cell([P('')],pw[1],{borders:{left:NB,top:NB,bottom:NB,right:B(LINE)},m:{top:0,bottom:0,left:0,right:0}}),
- cell([P('Pay online',{size:16,bold:true,color:MID,caps:true,spacing:10,after:60,indent:{left:200}}),new Paragraph({indent:{left:200},spacing:{after:40},children:PREVIEW?[qr]:runs([F('PaymentImage')],{})}),P(F('PaymentMessageAndUrl'),{size:16,color:MID,bold:true,after:0,indent:{left:200}})],pw[2],{m:{top:0,bottom:0,left:0,right:0}})]})]);
+ cell([P('Pay online',{size:16,bold:true,color:MID,caps:true,spacing:10,after:60,align:AlignmentType.CENTER}),new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:40},children:PREVIEW?[qr]:runs([F('PaymentImage')],{})}),P(F('PaymentMessageAndUrl'),{size:16,color:MID,bold:true,after:0,align:AlignmentType.CENTER})],pw[2],{m:{top:0,bottom:0,left:120,right:120},v:VerticalAlign.CENTER})]})]);
 const termsBand=tbl([CW],[new TableRow({children:[cell([
  P(['Payment is due by ',F('InvoiceDueDate','\\@ "d MMMM yyyy"'),' – 30 days end of month. Please quote the invoice number as your payment reference and send remittance advice to info@aurasolutions.co.uk.'],{size:16,after:50}),
  P('No CIS deductions are to be made from this invoice.',{size:16,bold:true,after:50}),
