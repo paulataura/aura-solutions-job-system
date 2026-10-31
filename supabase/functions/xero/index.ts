@@ -61,7 +61,13 @@ async function xero(path: string, init: RequestInit = {}) {
 }
 
 const q = (s: string) => String(s || "").replace(/"/g, '\\"');
-function dueDate30EOM(d: Date) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 2, 0)).toISOString().slice(0, 10); }
+function dueDate(terms: string | null, d: Date) {
+  const t = String(terms || "30 days EOM");
+  if (/eom|end of month/i.test(t)) return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 2, 0)).toISOString().slice(0, 10);
+  if (/receipt/i.test(t)) return d.toISOString().slice(0, 10);
+  const n = parseInt((t.match(/(\d+)/) || [])[1], 10);
+  return new Date(d.getTime() + (isNaN(n) ? 30 : n) * 864e5).toISOString().slice(0, 10);
+}
 
 async function ensureContact(table: "customers" | "suppliers", id: string) {
   const { data: c } = await admin.from(table).select("*").eq("id", id).maybeSingle();
@@ -131,11 +137,12 @@ Deno.serve(async (req) => {
       const lines = (body.lines || []).filter((l: any) => l.description && Number(l.unit_amount) !== 0);
       if (!lines.length) return json({ error: "Add at least one invoice line with a price." }, 400);
       const contactId = await ensureContact("customers", job.customer_id);
+      const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", job.customer_id).maybeSingle();
       const today = new Date();
       const inv = await xero("Invoices", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
-          Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate30EOM(today),
+          Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, today),
           LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: [job.job_number, job.customer_po ? "PO " + job.customer_po : ""].filter(Boolean).join(" / ").slice(0, 255),
           BrandingThemeID: s.branding_theme_id || undefined,
           LineItems: lines.map((l: any) => ({ Description: String(l.description).slice(0, 4000), Quantity: Number(l.quantity) || 1, UnitAmount: Number(l.unit_amount), AccountCode: l.account_code || s.sales_account_code, TaxType: s.sales_tax_type })),
