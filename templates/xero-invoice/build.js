@@ -37,8 +37,12 @@ const strip=(lbl,val,w,hl)=>cell([P(lbl,{size:14,color:hl?MID:GREY,caps:true,spa
 const keyStrip=tbl(sw,[new TableRow({children:[strip('Invoice number',F('InvoiceNumber'),sw[0]),strip('Issue date',F('InvoiceDate','\\@ "dd MMM yyyy"'),sw[1]),strip('Due date',F('InvoiceDueDate','\\@ "dd MMM yyyy"'),sw[2]),strip('Your reference',F('Reference'),sw[3]),strip('Amount due',['£',money('InvoiceAmountDue')],sw[4],true)]})]);
 // ---- 1. invoice to ----
 const gap=160,bw=(CW-gap)/2|0;
-const billTo=box('Bill to',[P(F('ContactName'),{bold:true,size:19,after:30}),P(F('ContactPostalAddress'),{size:17,after:30}),P([F('ContactTaxDisplayName'),' ',F('ContactTaxNumber')],{size:15,color:GREY,after:0})],bw);
-const from=box('From',[P('Aura Solutions Group Limited',{bold:true,size:19,after:30}),P('Main Street, Sedgeberrow\nEvesham, Worcestershire\nWR11 7UH',{size:17,after:50}),kv('Company no.','15761350 (England and Wales)',bw-240,false),kv('VAT no.','GB 471 3179 91',bw-240,false),kv('Queries','info@aurasolutions.co.uk · 01386 571556',bw-240,false)],bw);
+// Bill to and From in one table so both boxes are always the same depth
+const fromBody=[P('Aura Solutions Group Limited',{bold:true,size:19,after:30}),P('Main Street, Sedgeberrow\nEvesham, Worcestershire\nWR11 7UH',{size:17,after:40}),P('VAT no. GB 471 3179 91',{size:15,color:GREY,after:0})];
+const billBody=[P(F('ContactName'),{bold:true,size:19,after:30}),P(F('ContactPostalAddress'),{size:17,after:40}),P([F('ContactTaxDisplayName'),' ',F('ContactTaxNumber')],{size:15,color:GREY,after:0})];
+const bwR=CW-bw-gap,hd=(t,w)=>cell([P(t,{size:16,bold:true,color:MID,caps:true,spacing:10,after:0})],w,{fill:HEAD,borders:{top:B(),left:B(),right:B(),bottom:B()},m:{top:50,bottom:50,left:120,right:120}}),bd=(c,w)=>cell(c,w,{borders:{top:NB,left:B(),right:B(),bottom:B()},m:{top:80,bottom:90,left:120,right:120}}),sp=()=>cell([P('',{after:0})],gap,{m:{top:0,bottom:0,left:0,right:0}});
+const invoiceTo=tbl([bw,gap,bwR],[new TableRow({children:[hd('Bill to',bw),sp(),hd('From',bwR)]}),new TableRow({children:[bd(billBody,bw),sp(),bd(fromBody,bwR)]})]);
+
 const two=(a,b)=>tbl([bw,gap,CW-bw-gap],[new TableRow({children:[cell([a],bw,{m:{top:0,bottom:0,left:0,right:0}}),cell([P('')],gap,{m:{top:0,bottom:0,left:0,right:0}}),cell([b],CW-bw-gap,{m:{top:0,bottom:0,left:0,right:0}})]})]);
 // ---- 2. charges ----
 const lw=[5266,1100,1400,1100,1600];
@@ -71,5 +75,5 @@ const fp=(parts,o={})=>new Paragraph({alignment:AlignmentType.CENTER,spacing:{af
 const footer=new Footer({children:[fp('AURA SOLUTIONS GROUP LIMITED  ·  Registered office: Main Street, Sedgeberrow, Evesham, England, WR11 7UH',{img:bandImg,bold:true}),fp('Registered in England and Wales no. 15761350  ·  VAT no. GB 471 3179 91  ·  Registered waste carrier CBDU631384'),fp(['Invoice ',F('InvoiceNumber'),'  ·  Queries: info@aurasolutions.co.uk · 01386 571556'],{c:'B9D3BD'})]});
 const doc=new Document({creator:'Aura Solutions Group Limited',title:'Aura invoice template',styles:{default:{document:{run:{font:FONT,size:18}}}},
  sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:567,bottom:1080,left:720,right:720,header:300,footer:300}}},footers:{default:footer},
- children:[header,rule,keyStrip,H(1,'Invoice to'),two(billTo,from),H(2,'Charges'),lines,new Paragraph({spacing:{after:60},children:[]}),totals,H(3,'How to pay'),...howToPay]}]});
+ children:[header,rule,keyStrip,H(1,'Invoice to'),invoiceTo,H(2,'Charges'),lines,new Paragraph({spacing:{after:60},children:[]}),totals,H(3,'How to pay'),...howToPay]}]});
 Packer.toBuffer(doc).then(buf=>{fs.writeFileSync(PREVIEW?'preview.docx':'raw.docx',buf);fs.writeFileSync('fields.json',JSON.stringify(PREVIEW?[]:fields));console.log('written',PREVIEW?'preview':'raw',fields.length,'fields');});
