@@ -1,0 +1,2 @@
+-- Visits always get a number (trigger), visits made before numbering were numbered in date order,
+-- and aura_advance_visit numbers the next visit as (visits so far + 1). See the applied function body for details.
