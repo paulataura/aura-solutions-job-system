@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
       const [acc, tax, themes, trk] = await Promise.all([xero("Accounts"), xero("TaxRates"), xero("BrandingThemes"), xero("TrackingCategories?includeArchived=false")]);
       return json({
         accounts: (acc?.Accounts || []).filter((a: any) => a.Status === "ACTIVE" && ["REVENUE", "SALES", "OTHERINCOME"].includes(a.Type)).map((a: any) => ({ code: a.Code, name: a.Name })),
-        expenseAccounts: (acc?.Accounts || []).filter((a: any) => a.Status === "ACTIVE" && ["DIRECTCOSTS", "EXPENSE", "OVERHEADS"].includes(a.Type)).map((a: any) => ({ code: a.Code, name: a.Name })),
+        expenseAccounts: (acc?.Accounts || []).filter((a: any) => a.Status === "ACTIVE" && ["DIRECTCOSTS", "EXPENSE", "OVERHEADS"].includes(a.Type)).map((a: any) => ({ code: a.Code, name: a.Name, type: a.Type })),
         taxRates: (tax?.TaxRates || []).filter((t: any) => t.Status === "ACTIVE").map((t: any) => ({ type: t.TaxType, name: t.Name, rate: t.EffectiveRate, sales: t.CanApplyToRevenue, purchases: t.CanApplyToExpenses })),
         themes: (themes?.BrandingThemes || []).map((t: any) => ({ id: t.BrandingThemeID, name: t.Name })),
         tracking: (trk?.TrackingCategories || []).filter((c: any) => c.Status === "ACTIVE").map((c: any) => ({ id: c.TrackingCategoryID, name: c.Name, options: (c.Options || []).filter((o: any) => o.Status === "ACTIVE").map((o: any) => ({ id: o.TrackingOptionID, name: o.Name })) })),
@@ -225,6 +225,49 @@ Deno.serve(async (req) => {
         await admin.from("purchase_orders").update({ supplier_invoice_amount: amt, supplier_invoice_number: bills.map((b: any) => b.InvoiceNumber).filter(Boolean).join(", ") || null, supplier_invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null, status: "invoiced" }).eq("id", po.id);
       }
       return json({ ok: true, po_status: poStatus, bills: bills.map((b: any) => ({ number: b.InvoiceNumber, subtotal: b.SubTotal, total: b.Total, status: b.Status, due: b.AmountDue })) });
+    }
+
+    if (action === "sync_tracking") {
+      // Keep a Xero tracking category (default "Resource") in step with the app's resource list
+      const catName = String(body.name || "Resource").slice(0, 100);
+      const { data: res } = await admin.from("finance_categories").select("id,name,active,xero_tracking_option_id").eq("kind", "resource").order("sort");
+      const all = await xero("TrackingCategories?includeArchived=true");
+      let cat = (all?.TrackingCategories || []).find((c: any) => c.Name === catName);
+      if (!cat) {
+        const made = await xero("TrackingCategories", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Name: catName }) });
+        cat = made?.TrackingCategories?.[0];
+        if (!cat?.TrackingCategoryID) throw new Error("Xero didn't create the tracking category.");
+        cat.Options = [];
+      } else if (cat.Status === "ARCHIVED") {
+        await xero(`TrackingCategories/${cat.TrackingCategoryID}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Name: catName, Status: "ACTIVE" }) });
+      }
+      const opts: any[] = cat.Options || [];
+      const report: string[] = [];
+      for (const r of res || []) {
+        const name = String(r.name).slice(0, 100);
+        let o = opts.find((x: any) => x.TrackingOptionID === r.xero_tracking_option_id) || opts.find((x: any) => x.Name === name);
+        if (r.active === false) {
+          if (o && o.Status !== "ARCHIVED") {
+            try { await xero(`TrackingCategories/${cat.TrackingCategoryID}/Options/${o.TrackingOptionID}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Name: o.Name, Status: "ARCHIVED" }) }); report.push("archived " + o.Name); }
+            catch (e) { report.push("could not archive " + o.Name + ": " + (e as Error).message); }
+          }
+          continue;
+        }
+        if (!o) {
+          const made = await xero(`TrackingCategories/${cat.TrackingCategoryID}/Options`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Name: name }) });
+          o = made?.Options?.[0];
+          report.push("added " + name);
+        } else if (o.Name !== name || o.Status === "ARCHIVED") {
+          const upd = await xero(`TrackingCategories/${cat.TrackingCategoryID}/Options/${o.TrackingOptionID}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Name: name, Status: "ACTIVE" }) });
+          report.push((o.Name !== name ? "renamed " + o.Name + " to " : "re-activated ") + name);
+          o = upd?.Options?.[0] || o;
+        }
+        if (o?.TrackingOptionID && o.TrackingOptionID !== r.xero_tracking_option_id) await admin.from("finance_categories").update({ xero_tracking_option_id: o.TrackingOptionID, xero_tracking_option: name }).eq("id", r.id);
+        else await admin.from("finance_categories").update({ xero_tracking_option: name }).eq("id", r.id);
+      }
+      const { data: c } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
+      await admin.from("xero_connection").update({ settings: { ...(c?.settings || {}), tracking_category_name: catName, tracking_category_id: cat.TrackingCategoryID } }).eq("id", 1);
+      return json({ ok: true, category: catName, changes: report });
     }
 
     return json({ error: "Unknown action." }, 400);
