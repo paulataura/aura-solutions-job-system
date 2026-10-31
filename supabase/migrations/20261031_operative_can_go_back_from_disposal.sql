@@ -1,0 +1,2 @@
+-- Operatives may move their own job from 'completed' (waiting for disposal) back to 'on_site' to correct the waste answer.
+-- (Full function body as applied: operative_update_job_status with the extra completed -> on_site transition.)

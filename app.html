@@ -3587,6 +3587,32 @@ async function xeroSyncInvoice(btn){const j=activeJob;if(!j)return;if(btn)btn.di
  window.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault();});
  window.addEventListener('drop',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault();});
 })();
+/* ===== 31 Oct 2026: disposal step fixes – pick a disposal site when the office hasn't set one; go back if "waste removed" was answered by mistake ===== */
+let disposalChoiceSites=null;
+(function(){const o=window.renderDisposalSiteInfo;if(typeof o!=='function')return;window.renderDisposalSiteInfo=function(){const r=o.apply(this,arguments);try{renderDisposalChooser();renderDisposalGoBack();}catch(e){console.warn(e);}return r;};})();
+async function renderDisposalChooser(){const box=el('disposalSiteInfo');if(!box||!activeJob||activeJob.disposal_sites)return;
+ if(!disposalChoiceSites){const r=await db.from('disposal_sites').select('id,site_name,address,postcode,permit_number,site_type').eq('active',true).order('site_name');disposalChoiceSites=r.data||[];}
+ const cur=String(el('disposal_site')?.value||'').trim();const match=disposalChoiceSites.find(s=>cur&&cur.startsWith(s.site_name));
+ box.innerHTML='<div class="saved-site-card" style="margin-bottom:12px;border-color:#edd3a1;background:#fffaf0"><b>No disposal site was set by the office.</b><div class="muted" style="margin:2px 0 8px">Choose where the waste was tipped:</div>'
+  +'<select id="disposalChoice" onchange="disposalChoiceChanged()"><option value="">Choose the disposal site…</option>'+disposalChoiceSites.map(s=>'<option value="'+esc(s.id)+'"'+(match&&match.id===s.id?' selected':'')+'>'+esc(s.site_name+(s.postcode?' – '+s.postcode:''))+'</option>').join('')+'<option value="__other"'+(cur&&!match?' selected':'')+'>Another site – type the details</option></select>'
+  +'<div class="muted" style="font-size:12.5px;margin-top:6px">'+(['admin','manager'].includes(activeProfile?.role)?'Choosing a site here also saves it on the job.':'The office will see the site you chose.')+'</div></div>';
+ if(cur&&!match)disposalChoiceChanged(true);}
+async function disposalChoiceChanged(keep){const v=el('disposalChoice')?.value;const ids=['disposal_site','waste_transferee_company','waste_transferee_address'];
+ const unlock=on=>ids.forEach(id=>{const f=el(id);if(!f)return;f.readOnly=!on;f.removeAttribute('aria-readonly');if(on)f.removeAttribute('readonly');f.style.background=on?'#fff':'';f.title=on?'Type the disposal site details':'';});
+ if(v==='__other'){unlock(true);if(!keep){ids.forEach(id=>{if(el(id))el(id).value='';});el('disposal_site')?.focus();}
+  const lab=el('disposal_site')?.closest('.field')?.querySelector('label');if(lab)lab.textContent='Disposal site *';return;}
+ unlock(false);const s=(disposalChoiceSites||[]).find(x=>x.id===v);if(!s)return;const addr=[s.address,s.postcode].filter(Boolean).join(', ');
+ el('disposal_site').value=[s.site_name,addr].filter(Boolean).join(', ');if(el('waste_transferee_company'))el('waste_transferee_company').value=s.site_name;if(el('waste_transferee_address'))el('waste_transferee_address').value=addr;
+ if(['admin','manager'].includes(activeProfile?.role)){const u=await db.from('jobs').update({disposal_site_id:s.id}).eq('id',activeJob.id);if(!u.error){activeJob.disposal_site_id=s.id;}}}
+/* go back: the job returns to the site sign-off so the waste answer can be changed */
+function renderDisposalGoBack(){const sec=el('disposalSection');if(!sec||el('disposalGoBack'))return;const d=document.createElement('div');d.id='disposalGoBack';d.className='saved-site-card';d.style.marginTop='12px';
+ d.innerHTML='<h3>Answered “waste removed” by mistake?</h3><div class="muted" style="margin-bottom:8px">Go back to the site sign-off to change the waste answer. Nothing you have entered is lost.</div><button class="btn light" type="button" onclick="disposalGoBack(this)">↩ Go back to site sign-off</button><div id="disposalGoBackMsg" style="margin-top:8px"></div>';
+ sec.appendChild(d);}
+async function disposalGoBack(btn){if(!activeJob||activeJob.status!=='completed')return;if(!await auraConfirm('Go back to the site sign-off? The job returns to “On site” so you can change whether waste was removed, then sign off again.'))return;
+ if(btn)btn.disabled=true;const msg=el('disposalGoBackMsg');
+ try{await persistJobStatus('on_site');window.asgWasteConfirmedForJob=null;const id=activeJob.id;await openJob(id);
+  setTimeout(()=>{try{setSectionCollapsed('siteSignoffSection',false);setSectionCollapsed('cleanOperatorPanel',false);}catch(_){}const w=el('waste_removed');if(w){w.disabled=false;w.closest('.field')?.scrollIntoView({behavior:'smooth',block:'center'});}},400);}
+ catch(e){if(msg)msg.innerHTML='<div class="err">Could not go back: '+esc(e.message||String(e))+'</div>';if(btn)btn.disabled=false;}}
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
