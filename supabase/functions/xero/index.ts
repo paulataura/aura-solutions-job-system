@@ -24,7 +24,7 @@ async function officeUser(req: Request) {
   const uid = data?.user?.id;
   if (!uid) return null;
   const { data: p } = await admin.from("profiles").select("id,full_name,role,active").eq("id", uid).maybeSingle();
-  if (!p || p.active === false || !["admin", "manager"].includes(p.role)) return null;
+  if (!p || p.active === false || p.role !== "admin") return null;
   return p;
 }
 
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const user = await officeUser(req);
-    if (!user) return json({ error: "Only office users can use the Xero link." }, 403);
+    if (!user) return json({ error: "Only admin accounts can use finance and the Xero link." }, 403);
     const body = await req.json().catch(() => ({}));
     const action = body.action;
 
@@ -135,9 +135,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create_invoice") {
-      const { data: job } = await admin.from("jobs").select("id,job_number,reference,customer_po,customer_id,xero_invoice_id").eq("id", body.job_id).maybeSingle();
+      const { data: job } = await admin.from("jobs").select("id,job_number,reference,customer_po,customer_id").eq("id", body.job_id).maybeSingle();
       if (!job) return json({ error: "Job not found." }, 404);
-      if (job.xero_invoice_id) return json({ error: "This job already has a Xero invoice." }, 400);
+      const { data: fin0 } = await admin.from("job_finance").select("xero_invoice_id").eq("job_id", job.id).maybeSingle();
+      if (fin0?.xero_invoice_id) return json({ error: "This job already has a Xero invoice." }, 400);
       if (!job.customer_id) return json({ error: "The job has no customer." }, 400);
       const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
       const s = conn?.settings || {};
@@ -159,12 +160,13 @@ Deno.serve(async (req) => {
       const x = inv?.Invoices?.[0];
       if (!x?.InvoiceID) throw new Error("Xero didn't return the invoice.");
       const now = new Date().toISOString();
-      await admin.from("jobs").update({ xero_invoice_id: x.InvoiceID, invoice_number: x.InvoiceNumber || null, xero_invoice_status: x.Status, xero_invoice_total: x.Total, invoice_net_amount: x.SubTotal, invoiced_at: now, invoiced_by_name: user.full_name, xero_synced_at: now }).eq("id", job.id);
+      await admin.from("jobs").update({ invoiced_at: now, invoiced_by_name: user.full_name }).eq("id", job.id);
+      await admin.from("job_finance").upsert({ job_id: job.id, xero_invoice_id: x.InvoiceID, invoice_number: x.InvoiceNumber || null, xero_invoice_status: x.Status, xero_invoice_total: x.Total, invoice_net_amount: x.SubTotal, xero_synced_at: now, updated_at: now }, { onConflict: "job_id" });
       return json({ ok: true, invoice: { id: x.InvoiceID, number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
     }
 
     if (action === "attach") {
-      const { data: job } = await admin.from("jobs").select("xero_invoice_id").eq("id", body.job_id).maybeSingle();
+      const { data: job } = await admin.from("job_finance").select("xero_invoice_id").eq("job_id", body.job_id).maybeSingle();
       if (!job?.xero_invoice_id) return json({ error: "No Xero invoice on this job." }, 400);
       const bytes = Uint8Array.from(atob(body.base64 || ""), (ch) => ch.charCodeAt(0));
       const name = String(body.filename || "document.pdf").replace(/[^A-Za-z0-9 ._-]+/g, "-");
@@ -173,14 +175,17 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync_invoice") {
-      const { data: job } = await admin.from("jobs").select("id,xero_invoice_id").eq("id", body.job_id).maybeSingle();
+      const { data: job } = await admin.from("job_finance").select("job_id,xero_invoice_id").eq("job_id", body.job_id).maybeSingle();
       if (!job?.xero_invoice_id) return json({ error: "No Xero invoice on this job." }, 400);
       const r = await xero(`Invoices/${job.xero_invoice_id}`);
       const x = r?.Invoices?.[0];
       if (!x) throw new Error("Invoice not found in Xero.");
       const upd: any = { invoice_number: x.InvoiceNumber || null, xero_invoice_status: x.Status, xero_invoice_total: x.Total, invoice_net_amount: x.SubTotal, xero_synced_at: new Date().toISOString() };
-      if (x.Status === "VOIDED" || x.Status === "DELETED") { upd.xero_invoice_id = null; upd.invoiced_at = null; upd.invoice_number = null; upd.invoice_net_amount = null; }
-      await admin.from("jobs").update(upd).eq("id", job.id);
+      if (x.Status === "VOIDED" || x.Status === "DELETED") {
+        upd.xero_invoice_id = null; upd.invoice_number = null; upd.invoice_net_amount = null; upd.invoice_lines = null;
+        await admin.from("jobs").update({ invoiced_at: null, invoiced_by_name: null }).eq("id", job.job_id);
+      }
+      await admin.from("job_finance").update({ ...upd, updated_at: new Date().toISOString() }).eq("job_id", job.job_id);
       return json({ ok: true, invoice: { number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total, amount_due: x.AmountDue, amount_paid: x.AmountPaid } });
     }
 
