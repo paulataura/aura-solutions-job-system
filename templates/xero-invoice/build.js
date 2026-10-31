@@ -5,7 +5,7 @@ const PREVIEW=process.argv[2]==='preview';
 const GREEN='0C3E17',MID='2F6B3A',LIME='79CF36',GREY='5B6B60',LINE='CDD6CF',PALE='F6F9F6',HEAD='EEF4EF';
 const FONT='Arial';
 // merge field tokens: the text "⟦n⟧" is turned into a real Word MERGEFIELD afterwards
-const fields=[];const SAMPLE={InvoiceTitle:'TAX INVOICE',InvoiceNumber:'INV-10225',InvoiceDate:'26 Oct 2026',InvoiceDueDate:'30 Nov 2026',Reference:'PO 0961 - Wastesavers',InvoiceAmountDue:'731.81',ContactName:'Zwanny LTD',ContactPostalAddress:'Unit 308, Woodside Way\nSpringvale Industrial Estate\nCwmbran, Torfaen  NP44 5BR',ContactTaxNumber:'',Description:'Work completed: Friday 24 October 2026\nOur job no.: ASG-20261025-123138\nSite: Unit 4, Hanson Way, Redditch, B98 0XX',Quantity:'',UnitAmount:'',TaxPercentageOrName:'',LineAmount:'',InvoiceSubTotal:'609.84',TaxCode:'VAT 20%',TaxTotal:'121.97',InvoiceTotal:'731.81',InvoiceTotalNetPayments:'0.00',PaymentMessageAndUrl:'View and pay online: https://in.xero.com/…',PaymentImage:'',TaxUnitName:'VAT'};
+const fields=[];const SAMPLE={InvoiceTitle:'TAX INVOICE',InvoiceNumber:'INV-10225',InvoiceDate:'26 Oct 2026',InvoiceDueDate:'30 Nov 2026',Reference:'PO 0961 - Wastesavers',InvoiceAmountDue:'731.81',ContactName:'Zwanny LTD',ContactPostalAddress:'Unit 308, Woodside Way\nSpringvale Industrial Estate\nCwmbran, Torfaen  NP44 5BR',ContactTaxNumber:'',Description:'24 Oct 2026 – Haulage – bulk tanker',Quantity:'1.00',UnitAmount:'400.00',TaxPercentageOrName:'20%',LineAmount:'400.00',InvoiceSubTotal:'609.84',TaxCode:'VAT 20%',TaxTotal:'121.97',InvoiceTotal:'731.81',InvoiceTotalNetPayments:'0.00',PaymentMessageAndUrl:'View and pay online: https://in.xero.com/…',PaymentImage:'',TaxUnitName:'VAT'};
 function F(name,sw){if(PREVIEW){if(/^Table(Start|End)/.test(name))return '';return SAMPLE[name]??'';}fields.push({name,sw:sw||''});return '⟦'+(fields.length-1)+'⟧';}
 const run=(t,o={})=>new TextRun({text:t,font:FONT,size:o.size||18,bold:!!o.bold,color:o.color||'17221B',allCaps:!!o.caps,characterSpacing:o.spacing});
 // a run list that may contain field tokens and newlines (preview text may have \n)
@@ -33,7 +33,7 @@ const header=tbl([half,CW-half],[new TableRow({children:[
 const rule=new Paragraph({spacing:{before:80,after:140},border:{bottom:{style:BorderStyle.SINGLE,size:6,color:MID,space:1}},children:[]});
 // ---- key details strip ----
 const sw=[1900,1800,1800,2866,2100];
-const strip=(lbl,val,w,hl)=>cell([P(lbl,{size:14,color:hl?'FFFFFF':GREY,caps:true,spacing:8,after:20,bold:hl}),P(val,{size:hl?24:18,bold:true,color:hl?'FFFFFF':'17221B',after:0})],w,{fill:hl?'72C936':PALE,borders:{top:B(),bottom:B(),left:B(),right:B()},m:{top:70,bottom:70,left:110,right:90}});
+const strip=(lbl,val,w,hl)=>cell([P(lbl,{size:14,color:hl?MID:GREY,caps:true,spacing:8,after:20,bold:hl}),P(val,{size:hl?24:18,bold:true,color:hl?GREEN:'17221B',after:0})],w,{fill:hl?'E3F2E6':PALE,borders:{top:B(),bottom:B(),left:B(),right:B()},m:{top:70,bottom:70,left:110,right:90}});
 const keyStrip=tbl(sw,[new TableRow({children:[strip('Invoice number',F('InvoiceNumber'),sw[0]),strip('Issue date',F('InvoiceDate','\\@ "dd MMM yyyy"'),sw[1]),strip('Due date',F('InvoiceDueDate','\\@ "dd MMM yyyy"'),sw[2]),strip('Your reference',F('Reference'),sw[3]),strip('Amount due',['£',money('InvoiceAmountDue')],sw[4],true)]})]);
 // ---- 1. invoice to ----
 const gap=160,bw=(CW-gap)/2|0;
@@ -47,12 +47,12 @@ const td=(parts,w,al)=>cell([P(parts,{size:17,align:al,after:0})],w,{borders:{to
 const R=AlignmentType.RIGHT;
 const lines=tbl(lw,[new TableRow({tableHeader:true,children:[th('Description',lw[0]),th('Qty',lw[1],R),th('Unit price',lw[2],R),th(F('TaxUnitName'),lw[3],R),th('Amount £',lw[4],R)]}),
  new TableRow({cantSplit:true,children:[td([F('TableStart:LineItem'),F('Description')],lw[0]),td(F('Quantity','\\# #,##0.00##'),lw[1],R),td(F('UnitAmount','\\# "#,##0.00##;(#,##0.00##)"'),lw[2],R),td(F('TaxPercentageOrName'),lw[3],R),td([money('LineAmount'),F('TableEnd:LineItem')],lw[4],R)]})]);
-if(PREVIEW){[['Haulage – bulk tanker','1.00','400.00','20%','400.00'],['Disposal (m³)','6.88','30.50','20%','209.84']].forEach(r=>lines.root.push(new TableRow({cantSplit:true,children:[td(r[0],lw[0]),td(r[1],lw[1],R),td(r[2],lw[2],R),td(r[3],lw[3],R),td(r[4],lw[4],R)]})));}
+if(PREVIEW){[['24 Oct 2026 – Disposal (m³)','6.88','30.50','20%','209.84']].forEach(r=>lines.root.push(new TableRow({cantSplit:true,children:[td(r[0],lw[0]),td(r[1],lw[1],R),td(r[2],lw[2],R),td(r[3],lw[3],R),td(r[4],lw[4],R)]})));}
 const tw=[CW-4300,2700,1600];
 const trow=(label,val,o={})=>new TableRow({cantSplit:true,children:[cell([P('')],tw[0],{m:{top:0,bottom:0,left:0,right:0}}),cell([P(label,{size:o.big?20:17,bold:!!o.big,color:o.white?'FFFFFF':o.big?GREEN:'17221B',after:0})],tw[1],{fill:o.fill,borders:{top:o.top?B(MID,6):NB,bottom:o.bottom?B():NB,left:NB,right:NB},m:{top:o.big?90:45,bottom:o.big?90:45,left:120,right:100}}),cell([P(val,{size:o.big?22:17,bold:!!o.big||!!o.b,color:o.white?'FFFFFF':o.big?GREEN:'17221B',align:R,after:0})],tw[2],{fill:o.fill,borders:{top:o.top?B(MID,6):NB,bottom:o.bottom?B():NB,left:NB,right:NB},m:{top:o.big?90:45,bottom:o.big?90:45,left:100,right:100}})]});
 const totals=tbl(tw,[trow('Subtotal',['£',money('InvoiceSubTotal')]),
  new TableRow({cantSplit:true,children:[cell([P('')],tw[0],{m:{top:0,bottom:0,left:0,right:0}}),cell([P([F('TableStart:TaxSubTotal'),'Total ',F('TaxCode')],{size:17,after:0})],tw[1],{m:{top:45,bottom:45,left:120,right:100}}),cell([P(['£',money('TaxTotal'),F('TableEnd:TaxSubTotal')],{size:17,align:R,after:0})],tw[2],{m:{top:45,bottom:45,left:100,right:100}})]}),
- trow('Invoice total',['£',money('InvoiceTotal')],{top:true,b:true}),trow('Less payments',['£',money('InvoiceTotalNetPayments')]),trow('Amount due',['£',money('InvoiceAmountDue')],{big:true,fill:'72C936',white:true})]);
+ trow('Invoice total',['£',money('InvoiceTotal')],{top:true,b:true}),trow('Less payments',['£',money('InvoiceTotalNetPayments')]),trow('Amount due',['£',money('InvoiceAmountDue')],{big:true,fill:'E3F2E6'})]);
 // ---- 3. how to pay ----
 const qr=PREVIEW?new ImageRun({type:'png',data:fs.readFileSync('qr_sample.png'),transformation:{width:80,height:80}}):null;
 const pw=[5200,160,CW-5200-160],kvw=5000;

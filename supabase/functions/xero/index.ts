@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create_invoice") {
-      const { data: job } = await admin.from("jobs").select("id,job_number,reference,customer_po,customer_id,job_date,site_address,postcode").eq("id", body.job_id).maybeSingle();
+      const { data: job } = await admin.from("jobs").select("id,job_number,reference,customer_po,customer_id").eq("id", body.job_id).maybeSingle();
       if (!job) return json({ error: "Job not found." }, 404);
       const { data: fin0 } = await admin.from("job_finance").select("xero_invoice_id").eq("job_id", job.id).maybeSingle();
       if (fin0?.xero_invoice_id) return json({ error: "This job already has a Xero invoice." }, 400);
@@ -148,21 +148,13 @@ Deno.serve(async (req) => {
       const contactId = await ensureContact("customers", job.customer_id);
       const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", job.customer_id).maybeSingle();
       const today = new Date();
-      // first line (no price): when the work was completed, the job number and the site – so the customer can match it to the job card and WTN
-      const { data: visits } = await admin.from("job_visits").select("completed_at,left_site_at,submitted_at,planned_date").eq("job_id", job.id).order("visit_number");
-      const fmt = (d: string) => new Date(d).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" });
-      const done = [...new Set((visits || []).map((v: any) => v.completed_at || v.left_site_at || v.submitted_at).filter(Boolean).map((d: string) => String(d).slice(0, 10)))].sort();
-      const doneTxt = done.length > 1 ? "Work completed on " + done.length + " visits: " + done.map((d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })).join(", ")
-        : "Work completed: " + fmt(done[0] || (job.job_date ? job.job_date + "T12:00:00Z" : today.toISOString()));
-      const site = [String(job.site_address || "").replace(/\s*\n\s*/g, ", ").trim(), job.postcode].filter(Boolean).join(", ");
-      const header = { Description: doneTxt + "\nOur job no.: " + job.job_number + (site ? "\nSite: " + site : "") };
       const inv = await xero("Invoices", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
           Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, today),
-          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: String(job.customer_po || job.reference || "").slice(0, 255) || undefined,
+          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: String(job.customer_po || job.reference || job.job_number || "").slice(0, 255) || undefined,
           BrandingThemeID: s.branding_theme_id || undefined,
-          LineItems: [header, ...lines.map(lineItem(s.sales_account_code, s.sales_tax_type))],
+          LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)),
         }] }),
       });
       const x = inv?.Invoices?.[0];
