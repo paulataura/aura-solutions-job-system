@@ -3635,6 +3635,14 @@ function auraSpell(n){const skip=/ewc|postcode|post_code|email|phone|tel|code|re
   if(skip.test((e.id||'')+' '+(e.name||'')+' '+(e.className||''))||e.inputMode==='decimal'||e.inputMode==='numeric'){e.spellcheck=false;return;}e.spellcheck=true;e.setAttribute('lang','en-GB');});}
 new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(x=>{if(x.nodeType===1)auraSpell(x);}))).observe(document.documentElement,{childList:true,subtree:true});
 document.addEventListener('DOMContentLoaded',()=>auraSpell(document));auraSpell(document);
+/* ===== 31 Oct 2026: multi-visit flow – each visit starts with the work sections open, and the waste must be confirmed again for each visit ===== */
+function resetVisitFlowSections(){if(!activeJob)return;if(['draft','issued','accepted','on_site'].includes(activeJob.status)){try{setSectionCollapsed('cleanOperatorPanel',false);setSectionCollapsed('siteSignoffSection',false);}catch(_){}}}
+async function syncWasteConfirmForVisit(){if(!activeJob)return;try{const q=await db.from('job_visits').select('id').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);const vid=q.data?.[0]?.id||null;
+ if(window.asgWasteConfirmedForJob===activeJob.id&&window.__wasteConfirmedVisit!==vid){window.asgWasteConfirmedForJob=null;el('customerSignoffFinal')?.classList.add('hidden');}window.__currentVisitId=vid;}catch(_){}}
+(function(){const o=window.openJob;if(typeof o!=='function')return;window.openJob=async function(){const r=await o.apply(this,arguments);resetVisitFlowSections();await syncWasteConfirmForVisit();return r;};})();
+(function(){const o=window.persistJobStatus;if(typeof o!=='function')return;window.persistJobStatus=async function(status){const r=await o.apply(this,arguments);if(['issued','accepted','on_site'].includes(status))resetVisitFlowSections();return r;};})();
+/* remember which visit the waste was confirmed for */
+(function(){const names=['confirmWasteDetails','confirmWaste','confirmWasteAndCreateWtn'];names.forEach(n=>{const o=window[n];if(typeof o!=='function')return;window[n]=async function(){const r=await o.apply(this,arguments);try{if(window.asgWasteConfirmedForJob===activeJob?.id){const q=await db.from('job_visits').select('id').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);window.__wasteConfirmedVisit=q.data?.[0]?.id||null;}}catch(_){}return r;};});})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
