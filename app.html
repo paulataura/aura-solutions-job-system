@@ -3562,6 +3562,31 @@ async function xeroSyncInvoice(btn){const j=activeJob;if(!j)return;if(btn)btn.di
  const txt={'xero-connected':['ok','✓ Xero is connected. Now choose the sales account and VAT rate below.'],'xero-cancelled':['err','Xero connection was cancelled.'],'xero-expired':['err','The Xero sign-in took too long – please try Connect again.'],'xero-noorg':['err','No Xero organisation was chosen – please try again and pick Aura Solutions.'],'xero-error':['err','Xero sign-in did not complete – please try again.']}[h]||['err','Xero: '+h];
  let n=0;const t=setInterval(async()=>{if(++n>120)return clearInterval(t);if(!activeProfile||!['admin','manager'].includes(activeProfile.role)||!el('financeModeBtn'))return;clearInterval(t);setCentreMode('finance');await new Promise(r=>setTimeout(r,800));await renderXeroBox();alertBox('xeroMsg',txt[0],txt[1]);if(h==='xero-connected')xeroShowSettings();},500);})();
 
+/* ===== 31 Oct 2026: drag and drop for every photo / file picker (as well as browse or take a photo) =====
+   Each file input gets a drop area around it; dropping files there fills the input and runs its normal "files chosen" step. */
+(function(){
+ const st=document.createElement('style');st.textContent='.aura-drop{transition:outline-color .15s,background .15s;outline:2px dashed transparent;outline-offset:3px;border-radius:8px}.aura-drop.aura-over{outline-color:#79cf36;background:#f1f9ea}.aura-drop-hint{display:block;font-size:12px;color:#5b6b60;margin-top:3px}.aura-drop.aura-over .aura-drop-hint{color:#2f6b3a;font-weight:700}';document.head.appendChild(st);
+ const fileOk=(f,accept)=>{if(!accept)return true;const name=(f.name||'').toLowerCase(),type=(f.type||'').toLowerCase();
+  return accept.split(',').map(a=>a.trim().toLowerCase()).filter(Boolean).some(a=>a.endsWith('/*')?type.startsWith(a.slice(0,-1)):a.startsWith('.')?name.endsWith(a):type===a);};
+ function zoneFor(input){let z=input.parentElement,d=0;while(z&&z.parentElement&&d<2&&z.parentElement.querySelectorAll('input[type=file]').length===1&&!z.parentElement.matches('body,#jobDetail,section,form'))z=z.parentElement,d++;return z;}
+ function feed(input,files){const ok=files.filter(f=>fileOk(f,input.getAttribute('accept')));
+  if(!ok.length){alert(files.length?'Those files are not the right type for this box.':'Nothing to add – if you dragged a picture straight out of an email, save it first (or drag the attachment itself).');return;}
+  const use=input.multiple?ok:ok.slice(0,1);const dt=new DataTransfer();use.forEach(f=>dt.items.add(f));input.files=dt.files;
+  input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+  if(!input.multiple&&ok.length>1)setTimeout(()=>alert('This box takes one file – the first one was used.'),50);}
+ function enhance(input){if(input.dataset.auraDrop)return;input.dataset.auraDrop='1';const z=zoneFor(input);if(!z||z.dataset.auraDropZone)return;z.dataset.auraDropZone='1';z.classList.add('aura-drop');
+  if(!z.querySelector('.aura-drop-hint')){const h=document.createElement('span');h.className='aura-drop-hint';h.textContent='…or drag '+(/image/.test(input.getAttribute('accept')||'')&&!/pdf|doc/.test(input.getAttribute('accept')||'')?'photos':'files')+' here';z.appendChild(h);}
+  let n=0;z.addEventListener('dragenter',e=>{if(!e.dataTransfer||![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();n++;z.classList.add('aura-over');});
+  z.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();e.dataTransfer.dropEffect='copy';}});
+  z.addEventListener('dragleave',()=>{if(--n<=0){n=0;z.classList.remove('aura-over');}});
+  z.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();n=0;z.classList.remove('aura-over');const inp=z.querySelector('input[type=file]')||input;if(inp.disabled)return;feed(inp,[...(e.dataTransfer?.files||[])]);});}
+ const scan=root=>{(root.querySelectorAll?root.querySelectorAll('input[type=file]'):[]).forEach(enhance);if(root.matches&&root.matches('input[type=file]'))enhance(root);};
+ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1)scan(n);}))).observe(document.documentElement,{childList:true,subtree:true});
+ document.addEventListener('DOMContentLoaded',()=>scan(document));scan(document);
+ /* a file dropped anywhere else must not open in the tab and lose the work */
+ window.addEventListener('dragover',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault();});
+ window.addEventListener('drop',e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files'))e.preventDefault();});
+})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
