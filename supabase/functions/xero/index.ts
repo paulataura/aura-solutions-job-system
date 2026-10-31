@@ -69,6 +69,13 @@ function dueDate(terms: string | null, d: Date) {
   return new Date(d.getTime() + (isNaN(n) ? 30 : n) * 864e5).toISOString().slice(0, 10);
 }
 
+// one Xero line: account, VAT and tracking (e.g. Service: Waste removal) can be set per line
+const lineItem = (defAcc: string, defTax: string) => (l: any) => ({
+  Description: String(l.description).slice(0, 4000), Quantity: Number(l.quantity) || 1, UnitAmount: Number(l.unit_amount),
+  AccountCode: l.account_code || defAcc || undefined, TaxType: l.tax_type || defTax || undefined,
+  Tracking: (l.tracking || []).filter((t: any) => t && t.name && t.option).map((t: any) => ({ Name: t.name, Option: t.option })),
+});
+
 async function ensureContact(table: "customers" | "suppliers", id: string) {
   const { data: c } = await admin.from(table).select("*").eq("id", id).maybeSingle();
   if (!c) throw new Error("Contact not found.");
@@ -110,12 +117,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "options") {
-      const [acc, tax, themes] = await Promise.all([xero("Accounts"), xero("TaxRates"), xero("BrandingThemes")]);
+      const [acc, tax, themes, trk] = await Promise.all([xero("Accounts"), xero("TaxRates"), xero("BrandingThemes"), xero("TrackingCategories?includeArchived=false")]);
       return json({
         accounts: (acc?.Accounts || []).filter((a: any) => a.Status === "ACTIVE" && ["REVENUE", "SALES", "OTHERINCOME"].includes(a.Type)).map((a: any) => ({ code: a.Code, name: a.Name })),
         expenseAccounts: (acc?.Accounts || []).filter((a: any) => a.Status === "ACTIVE" && ["DIRECTCOSTS", "EXPENSE", "OVERHEADS"].includes(a.Type)).map((a: any) => ({ code: a.Code, name: a.Name })),
         taxRates: (tax?.TaxRates || []).filter((t: any) => t.Status === "ACTIVE").map((t: any) => ({ type: t.TaxType, name: t.Name, rate: t.EffectiveRate, sales: t.CanApplyToRevenue, purchases: t.CanApplyToExpenses })),
         themes: (themes?.BrandingThemes || []).map((t: any) => ({ id: t.BrandingThemeID, name: t.Name })),
+        tracking: (trk?.TrackingCategories || []).filter((c: any) => c.Status === "ACTIVE").map((c: any) => ({ id: c.TrackingCategoryID, name: c.Name, options: (c.Options || []).filter((o: any) => o.Status === "ACTIVE").map((o: any) => ({ id: o.TrackingOptionID, name: o.Name })) })),
       });
     }
 
@@ -145,7 +153,7 @@ Deno.serve(async (req) => {
           Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, today),
           LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: [job.job_number, job.customer_po ? "PO " + job.customer_po : ""].filter(Boolean).join(" / ").slice(0, 255),
           BrandingThemeID: s.branding_theme_id || undefined,
-          LineItems: lines.map((l: any) => ({ Description: String(l.description).slice(0, 4000), Quantity: Number(l.quantity) || 1, UnitAmount: Number(l.unit_amount), AccountCode: l.account_code || s.sales_account_code, TaxType: s.sales_tax_type })),
+          LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)),
         }] }),
       });
       const x = inv?.Invoices?.[0];
@@ -174,6 +182,49 @@ Deno.serve(async (req) => {
       if (x.Status === "VOIDED" || x.Status === "DELETED") { upd.xero_invoice_id = null; upd.invoiced_at = null; upd.invoice_number = null; upd.invoice_net_amount = null; }
       await admin.from("jobs").update(upd).eq("id", job.id);
       return json({ ok: true, invoice: { number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total, amount_due: x.AmountDue, amount_paid: x.AmountPaid } });
+    }
+
+    if (action === "push_po") {
+      const { data: po } = await admin.from("purchase_orders").select("*").eq("id", body.po_id).maybeSingle();
+      if (!po) return json({ error: "PO not found." }, 404);
+      if (!po.supplier_id) return json({ error: "The PO has no supplier." }, 400);
+      const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
+      const s = conn?.settings || {};
+      const contactId = await ensureContact("suppliers", po.supplier_id);
+      let ref = "";
+      if (po.job_id) { const { data: j } = await admin.from("jobs").select("job_number").eq("id", po.job_id).maybeSingle(); ref = j?.job_number || ""; }
+      const lines = (po.lines || []).filter((l: any) => l.description).map((l: any) => ({ description: l.description + (l.unit ? " (" + l.unit + ")" : ""), quantity: l.qty, unit_amount: l.unit_price, account_code: l.account_code, tax_type: l.tax_type, tracking: l.tracking }));
+      if (!lines.length) return json({ error: "The PO has no lines." }, 400);
+      const payload: any = {
+        PurchaseOrderNumber: po.po_number, Contact: { ContactID: contactId }, Date: po.order_date, DeliveryDate: po.required_date || undefined,
+        Reference: ref || (po.job_id ? "" : "Overhead"), LineAmountTypes: "Exclusive", Status: po.status === "cancelled" ? "DELETED" : po.status === "draft" ? "DRAFT" : "AUTHORISED",
+        DeliveryInstructions: po.notes ? String(po.notes).slice(0, 500) : undefined,
+        LineItems: lines.map(lineItem(s.cost_account_code || "325", s.purchase_tax_type || "INPUT2")),
+      };
+      if (po.xero_po_id) payload.PurchaseOrderID = po.xero_po_id;
+      const r = await xero("PurchaseOrders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ PurchaseOrders: [payload] }) });
+      const x = r?.PurchaseOrders?.[0];
+      if (!x?.PurchaseOrderID) throw new Error("Xero didn't return the purchase order.");
+      await admin.from("purchase_orders").update({ xero_po_id: x.PurchaseOrderID }).eq("id", po.id);
+      return json({ ok: true, xero_po_id: x.PurchaseOrderID, status: x.Status });
+    }
+
+    if (action === "sync_po") {
+      // Bills made from a Xero PO carry the PO number as their reference
+      const { data: po } = await admin.from("purchase_orders").select("id,po_number,supplier_id,xero_po_id").eq("id", body.po_id).maybeSingle();
+      if (!po) return json({ error: "PO not found." }, 404);
+      const where = encodeURIComponent(`Type=="ACCPAY" AND Reference=="${q(po.po_number)}" AND Status!="DELETED" AND Status!="VOIDED"`);
+      const r = await xero(`Invoices?where=${where}&summaryOnly=true`);
+      const bills = (r?.Invoices || []);
+      let poStatus = null;
+      if (po.xero_po_id) { try { const p = await xero(`PurchaseOrders/${po.xero_po_id}`); poStatus = p?.PurchaseOrders?.[0]?.Status || null; } catch (_) { /* ignore */ } }
+      if (bills.length) {
+        const amt = Math.round(bills.reduce((a: number, b: any) => a + Number(b.SubTotal || 0), 0) * 100) / 100;
+        const b0 = bills[0];
+        const d = String(b0.DateString || b0.Date || "").slice(0, 10);
+        await admin.from("purchase_orders").update({ supplier_invoice_amount: amt, supplier_invoice_number: bills.map((b: any) => b.InvoiceNumber).filter(Boolean).join(", ") || null, supplier_invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null, status: "invoiced" }).eq("id", po.id);
+      }
+      return json({ ok: true, po_status: poStatus, bills: bills.map((b: any) => ({ number: b.InvoiceNumber, subtotal: b.SubTotal, total: b.Total, status: b.Status, due: b.AmountDue })) });
     }
 
     return json({ error: "Unknown action." }, 400);
