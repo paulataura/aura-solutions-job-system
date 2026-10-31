@@ -13,6 +13,9 @@ for it in zin.infolist():
       r=lambda inner:'<w:r>'+rpr+inner+'</w:r>'
       return r('<w:fldChar w:fldCharType="begin"/>')+r('<w:instrText xml:space="preserve">'+esc(instr)+'</w:instrText>')+r('<w:fldChar w:fldCharType="separate"/>')+r('<w:t xml:space="preserve">«'+esc(f['name'])+'»</w:t>')+r('<w:fldChar w:fldCharType="end"/>')
     x=re.sub(r'<w:r>(<w:rPr>(?:(?!</w:rPr>).)*</w:rPr>)?<w:t xml:space="preserve">⟦(\d+)⟧</w:t></w:r>',rep,x)
+    # page-number fields: give each part its own run (with formatting) so the number keeps the footer colour
+    x=re.sub(r'<w:r>(<w:rPr>(?:(?!</w:rPr>).)*</w:rPr>)<w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve">(PAGE|NUMPAGES)</w:instrText><w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/></w:r>',
+      lambda m:'<w:r>'+m.group(1)+'<w:fldChar w:fldCharType="begin"/></w:r><w:r>'+m.group(1)+'<w:instrText xml:space="preserve"> '+m.group(2)+' </w:instrText></w:r><w:r>'+m.group(1)+'<w:fldChar w:fldCharType="separate"/></w:r><w:r>'+m.group(1)+'<w:t>1</w:t></w:r><w:r>'+m.group(1)+'<w:fldChar w:fldCharType="end"/></w:r>',x)
     if '⟦' in x:print('LEFTOVER token in',it.filename);sys.exit(1)
     data=x.encode('utf8')
   zout.writestr(it,data)
