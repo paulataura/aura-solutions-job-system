@@ -4235,7 +4235,69 @@ async function renderFinCashflow(){const body=el('financeBody');if(!body)return;
  el('finTabCash')?.classList.toggle('active',financeTab==='cashflow');
  if(financeTab==='cashflow'){['Jobs','Cust','POs','Sup','Rep','Oh','Cat'].forEach(k=>el('finTab'+k)?.classList.remove('active'));if(financeData)renderFinCashflow();return;}return o.apply(this,arguments);};})();
 /* the menu's Finance link opens on Cashflow & charts */
-(function(){const o=window.navGo;if(typeof o!=='function')return;window.navGo=async function(key){if(key==='finance')financeTab='cashflow';return o.apply(this,arguments);};})();
+(function(){const o=window.navGo;if(typeof o!=='function')return;window.navGo=async function(key){return o.apply(this,arguments);};})();
+/* ===== 1 Nov 2026: an overview for every menu group; clicking a group heading opens it ===== */
+AURA_NAV.forEach(g=>{const ov={Customers:['custoverview','📊','Overview'],Finance:['finoverview','📊','Overview & cashflow'],Setup:['setupoverview','📊','Overview']}[g.g];if(ov&&!g.items.some(i=>i[0]===ov[0]))g.items.unshift(ov);g.home=g.g==='Work'?'overview':ov?.[0];});
+window.auraNavHtml=function(){return '<button type="button" class="btn primary" style="width:100%;margin:6px 0 4px" onclick="auraDrawer(false);showCreateJob()">+ Create job</button>'+AURA_NAV.filter(g=>!g.admin||isFinanceAdmin()).map(g=>{const open=auraNavIsOpen(g);
+ return '<div class="aura-navgrp" role="button" tabindex="0" onclick="auraNavHead(\''+g.g+'\')" title="Open the '+g.g+' overview"><span>'+g.g+'</span><span class="aura-car" title="Show or hide" onclick="event.stopPropagation();auraNavToggle(\''+g.g+'\')">'+(open?'▾':'▸')+'</span></div>'
+  +(open?g.items.filter(i=>!i[3]||activeProfile?.role==='admin').map(i=>'<button type="button" class="aura-navlink'+(auraNavCurrent===i[0]?' active':'')+'" onclick="navGo(\''+i[0]+'\')"><span style="width:20px;text-align:center">'+i[1]+'</span>'+esc(i[2])+'</button>').join(''):'');}).join('')
+ +'<button type="button" class="aura-navlink" style="margin-top:14px;color:#6b7c6f" onclick="signOut()"><span style="width:20px;text-align:center">⏻</span>Sign out</button>';};
+function auraNavHead(name){const g=AURA_NAV.find(x=>x.g===name);if(!g)return;auraNavOpen[name]=true;try{localStorage.setItem('auraNavOpen',JSON.stringify(auraNavOpen));}catch(_){}if(g.home)navGo(g.home);else renderAuraNav();}
+(function(){const st=document.createElement('style');st.textContent='.aura-navgrp .aura-car{padding:2px 6px;border-radius:4px}.aura-navgrp .aura-car:hover{background:#e3ebe4}';document.head.appendChild(st);})();
+/* the Finance overview is the Cashflow & charts tab; Finance & POs opens on job margins */
+(function(){const o=window.navGo;if(typeof o!=='function')return;window.navGo=async function(key){if(key==='finoverview'){financeTab='cashflow';await o.call(this,'finance');auraNavCurrent='finoverview';renderAuraNav();return;}if(key==='finance'&&financeTab==='cashflow')financeTab='jobs';
+ if(key==='custoverview'||key==='setupoverview'){window.__grpKey=key;}return o.apply(this,arguments);};})();
+function ensureGrpPanel(){let p=el('grpOverviewPanel');if(p)return p;p=document.createElement('div');p.id='grpOverviewPanel';p.className='hidden';const at=el('jobCentrePanel');at.parentNode.insertBefore(p,at);return p;}
+(function(){const o=window.setCentreMode;if(typeof o!=='function')return;window.setCentreMode=function(mode){const r=o.apply(this,[mode]);const on=mode==='custoverview'||mode==='setupoverview';ensureGrpPanel().classList.toggle('hidden',!on);if(mode==='custoverview')loadCustOverview();if(mode==='setupoverview')loadSetupOverview();return r;};})();
+const ovCard=(id,title,sub,wide)=>'<div class="ov-card'+(wide?' wide':'')+'"><h3>'+title+'</h3><div class="muted">'+sub+'</div><div class="ov-c"><canvas id="'+id+'"></canvas></div></div>';
+const ovHead=(title,sub,hero,again)=>'<div class="card" style="margin-bottom:12px"><div class="row"><div><h2 style="margin:0">'+title+'</h2><div class="muted">'+sub+'</div></div><button class="mini-btn" type="button" onclick="'+again+'()">↻ Refresh</button></div><div class="ov-hero">'+hero.map(h=>'<div><span>'+h[0]+'</span><b>'+h[1]+'</b><small>'+(h[2]||'&nbsp;')+'</small></div>').join('')+'</div></div>'+(window.Chart?'':'<div class="err">The charts could not load – check the internet connection and press Refresh.</div>');
+
+/* ---------- Customers overview ---------- */
+async function loadCustOverview(){const p=ensureGrpPanel();p.innerHTML='<div class="card"><h2 style="margin:0">Customers overview</h2><div class="muted">Loading…</div></div>';
+ const [cr,sr]=await Promise.all([db.from('customers').select('id,company_name,active,created_at,account_opened_at,payment_terms'),db.from('customer_sites').select('id,customer_id,active')]);
+ try{await loadChartJs();}catch(_){}if(typeof loadCustomerApplications==='function'&&!customerApplications.length){try{await loadCustomerApplications();}catch(_){}}
+ const C=(cr.data||[]),S=(sr.data||[]).filter(s=>s.active!==false),J=(jobCentreJobs||[]),admin=isFinanceAdmin(),now=new Date(),thisM=ctMonthKey(now),yAgo=new Date(now.getTime()-365*864e5),act=C.filter(c=>c.active!==false);
+ const opened=c=>c.account_opened_at||c.created_at,newThis=act.filter(c=>opened(c)&&ctMonthKey(new Date(opened(c)))===thisM).length;
+ const onContract=new Set((contractsCache||[]).filter(c=>c.status==='active'&&c.end_date>=localDateKey(now)).map(c=>c.customer_id));
+ const apps=(typeof customerApplications!=='undefined'?customerApplications:[]);
+ const name={};C.forEach(c=>name[c.id]=c.company_name);
+ const jobsBy={},invBy={};J.forEach(j=>{if(!j.customer_id||j.status==='aborted')return;const d=j.job_date||j.created_at;if(d&&new Date(d)>=yAgo)jobsBy[j.customer_id]=(jobsBy[j.customer_id]||0)+1;if(admin&&j.invoiced_at&&new Date(j.invoiced_at)>=yAgo)invBy[j.customer_id]=(invBy[j.customer_id]||0)+(Number(j.invoice_net_amount)||0);});
+ const lastJob={};J.forEach(j=>{if(j.customer_id&&j.job_date&&(!lastJob[j.customer_id]||j.job_date>lastJob[j.customer_id]))lastJob[j.customer_id]=j.job_date;});
+ const quiet=act.filter(c=>!lastJob[c.id]||(now-new Date(lastJob[c.id]+'T12:00:00'))/864e5>90);
+ p.innerHTML=ovHead('Customers overview','Your customers, their sites and how much work they bring',[['Active customers',act.length,newThis+' new this month'],['Sites',S.length,(act.length?(S.length/act.length).toFixed(1):'0')+' per customer'],['On a contract',onContract.size,'customers with an active contract'],['Forms waiting',apps.filter(a=>a.status==='submitted').length,apps.filter(a=>a.status!=='submitted'&&a.status!=='opened'&&a.status!=='converted').length+' still with the customer'],['Quiet for 90+ days',quiet.length,'no job booked in 3 months']],'loadCustOverview')
+  +'<div class="ov-grid">'+ovCard('coJobs','Jobs per customer','Last 12 months · top 8')+ovCard('coNew','New customers per month','Accounts opened · last 12 months')+ovCard('coSites','Sites per customer','Top 8')+(admin?ovCard('coInv','Invoiced per customer','Last 12 months, ex VAT · top 8'):ovCard('coContract','Customers on contract','Share of active customers'))
+  +'<div class="ov-card wide"><h3>Customers to get back in touch with</h3><div class="muted">Active customers with no job booked in the last 90 days</div><table class="ov-tbl"><thead><tr><th>Customer</th><th>Last job</th><th class="n">Sites</th><th></th></tr></thead><tbody>'
+  +(quiet.length?quiet.sort((a,b)=>String(lastJob[a.id]||'').localeCompare(String(lastJob[b.id]||''))).slice(0,15).map(c=>'<tr><td>'+esc(c.company_name)+'</td><td>'+(lastJob[c.id]?esc(new Date(lastJob[c.id]+'T12:00:00').toLocaleDateString('en-GB')):'<span class="muted">never</span>')+'</td><td class="n">'+S.filter(s=>s.customer_id===c.id).length+'</td><td><button class="mini-btn" type="button" onclick="showCreateJob()">Book a job</button></td></tr>').join(''):'<tr><td colspan="4" class="muted">Everyone has had a job in the last 90 days.</td></tr>')+'</tbody></table></div></div>';
+ if(!window.Chart)return;
+ const top=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);const tj=top(jobsBy,8);
+ ovChart('coJobs',{horizontal:true,data:{labels:tj.length?tj.map(x=>(name[x[0]]||'?').slice(0,28)):['No jobs yet'],datasets:[{label:'Jobs',data:tj.map(x=>x[1]),backgroundColor:OV.green}]}});
+ const m12=ovMonthKeys(12,-11),nm={};C.forEach(c=>{const d=opened(c);if(d){const k=ctMonthKey(new Date(d));nm[k]=(nm[k]||0)+1;}});
+ ovChart('coNew',{data:{labels:m12.map(ovMonthLbl),datasets:[{label:'New customers',data:m12.map(m=>nm[m]||0),backgroundColor:OV.green}]}});
+ const sc={};S.forEach(s=>sc[s.customer_id]=(sc[s.customer_id]||0)+1);const ts=top(sc,8);
+ ovChart('coSites',{horizontal:true,data:{labels:ts.length?ts.map(x=>(name[x[0]]||'?').slice(0,28)):['No sites yet'],datasets:[{label:'Sites',data:ts.map(x=>x[1]),backgroundColor:OV.blue}]}});
+ if(admin){const ti=top(invBy,8);ovChart('coInv',{horizontal:true,money:true,data:{labels:ti.length?ti.map(x=>(name[x[0]]||'?').slice(0,28)):['No invoices yet'],datasets:[{label:'Invoiced',data:ti.map(x=>x[1]),backgroundColor:OV.blue}]}});}
+ else ovChart('coContract',{type:'doughnut',data:{labels:['On a contract','No contract'],datasets:[{data:[onContract.size,Math.max(0,act.length-onContract.size)],backgroundColor:[OV.green,OV.grey],borderWidth:2,borderColor:'#fff'}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});}
+
+/* ---------- Setup overview ---------- */
+async function loadSetupOverview(){const p=ensureGrpPanel();p.innerHTML='<div class="card"><h2 style="margin:0">Setup overview</h2><div class="muted">Loading…</div></div>';
+ const since=new Date(Date.now()-365*864e5).toISOString();
+ const [pr,kr,dr,tr,vr,lr]=await Promise.all([db.from('profiles').select('id,full_name,role,active'),db.from('contractors').select('id,company_name,active'),db.from('disposal_sites').select('id,site_name,active'),db.from('job_types').select('id,name,active'),db.from('job_visits').select('id,job_id,disposal_site,waste_removed,completed_at').gte('created_at',since),db.from('job_waste_loads').select('id,disposal_site_text,collected_at').gte('created_at',since)]);
+ try{await loadChartJs();}catch(_){}
+ const P=pr.data||[],K=kr.data||[],DS=(dr.data||[]),T=tr.data||[],J=jobCentreJobs||[],yAgo=new Date(Date.now()-365*864e5);
+ const ops=P.filter(x=>x.active!==false&&x.role==='operative'),kAct=K.filter(x=>x.active!==false),dAct=DS.filter(x=>x.active!==false),tAct=T.filter(x=>x.active!==false);
+ const recent=J.filter(j=>j.job_date&&new Date(j.job_date+'T12:00:00')>=yAgo&&j.status!=='aborted');
+ const byOp={},byK={};recent.forEach(j=>{if(j.assigned_to)byOp[j.assigned_to]=(byOp[j.assigned_to]||0)+1;if(j.contractor_id)byK[j.contractor_id]=(byK[j.contractor_id]||0)+1;});
+ const pn={};P.forEach(x=>pn[x.id]=x.full_name);const kn={};K.forEach(x=>kn[x.id]=x.company_name);
+ const norm=s=>String(s||'').split(/[,\n]/)[0].trim();const byDs={};(vr.data||[]).forEach(v=>{if(v.waste_removed&&v.disposal_site){const k=norm(v.disposal_site);byDs[k]=(byDs[k]||0)+1;}});(lr.data||[]).forEach(l=>{if(l.disposal_site_text){const k=norm(l.disposal_site_text);byDs[k]=(byDs[k]||0)+1;}});
+ const unusedTypes=tAct.filter(t=>!recent.some(j=>j.job_types?.name===t.name)).length;
+ const unassigned=J.filter(j=>typeof jobNeedsOperator==='function'&&jobNeedsOperator(j)).length;
+ p.innerHTML=ovHead('Setup overview','Who does the work, where the waste goes and the job types in use',[['Operatives',ops.length,P.filter(x=>x.active!==false&&['admin','manager'].includes(x.role)).length+' office users'],['Contractors',kAct.length,Object.keys(byK).length+' used this year'],['Disposal sites',dAct.length,Object.keys(byDs).length+' used this year'],['Job types',tAct.length,unusedTypes+' not used this year'],['Jobs with no operator',unassigned,'scheduled or planned']],'loadSetupOverview')
+  +'<div class="ov-grid">'+ovCard('soOps','Jobs per operative','Last 12 months')+ovCard('soK','Jobs per contractor','Last 12 months')+ovCard('soDs','Disposal sites used','Loads tipped · last 12 months')+ovCard('soTypes','Job types in use','Jobs in the last 12 months')+'</div>';
+ if(!window.Chart)return;const top=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);
+ const to=top(byOp,8);ovChart('soOps',{horizontal:true,data:{labels:to.length?to.map(x=>(pn[x[0]]||'Unknown').slice(0,26)):['No jobs assigned yet'],datasets:[{label:'Jobs',data:to.map(x=>x[1]),backgroundColor:OV.green}]}});
+ const tk=top(byK,8);ovChart('soK',{horizontal:true,data:{labels:tk.length?tk.map(x=>(kn[x[0]]||'Unknown').slice(0,26)):['No contractor jobs yet'],datasets:[{label:'Jobs',data:tk.map(x=>x[1]),backgroundColor:OV.blue}]}});
+ const td=top(byDs,8);ovChart('soDs',{horizontal:true,data:{labels:td.length?td.map(x=>x[0].slice(0,30)):['No loads tipped yet'],datasets:[{label:'Loads',data:td.map(x=>x[1]),backgroundColor:OV.orange}]}});
+ const tc={};recent.forEach(j=>{const n=displayJobTypeName(j.job_types)||'Other';tc[n]=(tc[n]||0)+1;});const tt=top(tc,8);ovChart('soTypes',{horizontal:true,data:{labels:tt.length?tt.map(x=>x[0]):['No jobs yet'],datasets:[{label:'Jobs',data:tt.map(x=>x[1]),backgroundColor:OV.green}]}});}
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
