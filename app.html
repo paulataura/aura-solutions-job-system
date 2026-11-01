@@ -4191,7 +4191,7 @@ function renderOverview(D){const since=new Date();since.setMonth(since.getMonth(
  ovChart('ovContracts',{horizontal:true,stacked:true,data:{labels:cs.length?cs.map(c=>c.n):['No active contracts'],datasets:[{label:'Done',data:cs.map(c=>c.d),backgroundColor:OV.green},{label:'Late',data:cs.map(c=>c.l),backgroundColor:OV.red},{label:'To do',data:cs.map(c=>c.todo),backgroundColor:OV.grey}]}});
  if(admin){const cost={};(D.pos||[]).forEach(p=>{const j=J.find(x=>x.id===p.job_id);if(!j||!j.invoiced_at)return;const m=mOf(localDateKey(new Date(j.invoiced_at)));cost[m]=(cost[m]||0)+poCost(p);});
   ovChart('ovMoney',{money:true,data:{labels:m6.map(ovMonthLbl),datasets:[{label:'Invoiced',data:m6.map(invM),backgroundColor:OV.green},{label:'Cost of those jobs',data:m6.map(m=>cost[m]||0),backgroundColor:OV.orange}]}});
-  const byC={};J.forEach(j=>{if(j.invoiced_at&&new Date(j.invoiced_at)>=since){const n=j.customers?.company_name||'Other';byC[n]=(byC[n]||0)+(Number(j.invoice_net_amount)||0);}});const top=Object.entries(byC).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const byC={};J.forEach(j=>{if(j.invoiced_at&&new Date(j.invoiced_at)>=since){const n=j.customers?.company_name||'Other';byC[n]=(byC[n]||0)+(Number(j.invoice_net_amount)||0);}});const top=Object.entries(byC).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
   ovChart('ovTopCust',{horizontal:true,money:true,data:{labels:top.length?top.map(t=>t[0]):['No invoices yet'],datasets:[{label:'Invoiced',data:top.map(t=>t[1]),backgroundColor:OV.blue}]}});}}
 
 /* ---------- Finance: cashflow forecast, contract value, PO charts ---------- */
@@ -4278,7 +4278,7 @@ async function loadCustOverview(){const p=ensureGrpPanel();p.innerHTML='<div cla
  ovChart('coNew',{data:{labels:m12.map(ovMonthLbl),datasets:[{label:'New customers',data:m12.map(m=>nm[m]||0),backgroundColor:OV.green}]}});
  const sc={};S.forEach(s=>sc[s.customer_id]=(sc[s.customer_id]||0)+1);const ts=top(sc,8);
  ovChart('coSites',{horizontal:true,data:{labels:ts.length?ts.map(x=>(name[x[0]]||'?')):['No sites yet'],datasets:[{label:'Sites',data:ts.map(x=>x[1]),backgroundColor:OV.blue}]}});
- if(admin){const ti=top(invBy,8);ovChart('coInv',{horizontal:true,money:true,data:{labels:ti.length?ti.map(x=>(name[x[0]]||'?')):['No invoices yet'],datasets:[{label:'Invoiced',data:ti.map(x=>x[1]),backgroundColor:OV.blue}]}});}
+ if(admin){const ti=top(invBy,8).filter(x=>x[1]>0);ovChart('coInv',{horizontal:true,money:true,data:{labels:ti.length?ti.map(x=>(name[x[0]]||'?')):['No invoices yet'],datasets:[{label:'Invoiced',data:ti.map(x=>x[1]),backgroundColor:OV.blue}]}});}
  else ovChart('coContract',{type:'doughnut',data:{labels:['On a contract','No contract'],datasets:[{data:[onContract.size,Math.max(0,act.length-onContract.size)],backgroundColor:[OV.green,OV.grey],borderWidth:2,borderColor:'#fff'}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});}
 
 /* ---------- Setup overview ---------- */
