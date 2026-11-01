@@ -3985,6 +3985,130 @@ function contractJobLate(j){const today=localDateKey(new Date());if(j.job_date)r
   const byNo={};jobCentreJobs.forEach(j=>byNo[j.id]=j);list.querySelectorAll('.job-card').forEach(card=>{const id=(card.getAttribute('onclick')||'').match(/openJob\('([^']+)'/)?.[1],j=byNo[id];if(!j)return;const c=contractsCache.find(x=>x.id===j.contract_id);
    card.insertAdjacentHTML('afterbegin','<div style="font-size:12.5px;margin-bottom:4px;'+(contractJobLate(j)?'color:#b42318;font-weight:700':'color:#2f6b3a')+'">📑 '+esc(c?.title||'Contract')+' · due '+esc(ctMonthLabel(j.contract_due_month,true))+(contractJobLate(j)?' · OVERDUE':'')+(j.job_date?'':' · not scheduled yet')+'</div>');});}catch(_){}
  return r;};})();
+/* ===== 1 Nov 2026: grouped menu (sidebar / phone menu), "Needs attention" bar on every screen, Contracts page ===== */
+(function(){const st=document.createElement('style');st.textContent=''
+ +'#auraSide,#auraBottom,#auraDrawer,#auraAttn{display:none}'
+ +'body.aura-nav #managementMode{display:none!important}'
+ +'body.aura-nav #auraAttn{display:flex}'
+ +'#auraAttn{position:sticky;top:0;z-index:45;gap:6px;flex-wrap:wrap;align-items:center;background:#f4f7f4;border-bottom:1px solid var(--line);padding:8px 0;margin:-6px 0 10px}'
+ +'#auraAttn .aa-t{font-size:12.5px;font-weight:800;color:#3d4f41;margin-right:2px}'
+ +'#auraAttn button{border:1px solid #edd3a1;background:#fff8ea;color:#6b4a00;border-radius:999px;padding:5px 11px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}'
+ +'#auraAttn button.red{border-color:#f1b3ad;background:#fde7e5;color:#9b1c13}#auraAttn button b{margin-left:4px}'
+ +'#auraAttn .aa-ok{font-size:13px;color:#1d5a2a;font-weight:700}'
+ +'.aura-navlink{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px;font-weight:700;color:#26352b;cursor:pointer;font-size:14px}'
+ +'.aura-navlink:hover{background:#eef7ef}.aura-navlink.active{background:#0c3e17;color:#fff}'
+ +'.aura-navgrp{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#6b7c6f;font-weight:800;margin:14px 10px 4px}'
+ +'@media(min-width:960px){body.aura-nav #auraSide{display:block;position:fixed;left:0;top:var(--aura-head,96px);bottom:0;width:214px;overflow:auto;background:#fff;border-right:1px solid var(--line);padding:6px 10px 20px;z-index:40}'
+ +'body.aura-nav main#appMain{margin-left:226px;margin-right:auto;max-width:min(1100px,calc(100vw - 242px))}}'
+ +'@media(max-width:959px){body.aura-nav #auraBottom{display:flex;position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:60;padding:4px 4px calc(4px + env(safe-area-inset-bottom))}'
+ +'body.aura-nav{padding-bottom:70px}#auraBottom button{flex:1;border:0;background:none;padding:6px 2px;font-size:11.5px;font-weight:700;color:#3d4f41;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}'
+ +'#auraBottom button.active{color:#0c3e17}#auraBottom button span{font-size:19px;line-height:1}'
+ +'body.aura-nav #auraDrawer.open{display:block;position:fixed;inset:0;z-index:70;background:rgba(12,30,16,.4)}'
+ +'#auraDrawer .ad-p{position:absolute;left:0;top:0;bottom:0;width:min(300px,85vw);background:#fff;overflow:auto;padding:12px 10px 30px}}'
+ +'body.aura-nav #dash .grid{grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin:12px 0}'
+ +'body.aura-nav #dash .grid .dashboard-stat-button{padding:8px 12px;border-radius:10px}body.aura-nav #dash .grid .stat{font-size:21px}'
+ +'body.aura-nav #dash .grid .dashboard-stat-button .muted{font-size:12.5px}body.aura-nav #dash .grid .zero{opacity:.5}'
+ +'.ctl-row{display:grid;grid-template-columns:2.2fr 1.3fr 1fr auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-left:4px solid #2f6b3a;border-radius:10px;margin:8px 0;background:#fff}'
+ +'.ctl-row.late{border-left-color:#c62828}.ctl-row.ended{opacity:.65;border-left-color:#999}@media(max-width:800px){.ctl-row{grid-template-columns:1fr}}'
+ +'.ctl-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}.ctl-sum div{background:#f4f8f4;border:1px solid #d9e8db;border-radius:8px;padding:8px 10px}.ctl-sum span{display:block;font-size:12px;color:#5b6b5e}.ctl-sum b{font-size:17px}';
+ document.head.appendChild(st);})();
+const isMgmt=()=>['admin','manager'].includes(activeProfile?.role);
+const AURA_NAV=[
+ {g:'Work',items:[['jobs','☰','Job Centre'],['calendar','▦','Calendar'],['contracts','📑','Contracts'],['reports','📝','Reports due']]},
+ {g:'Customers',items:[['customers','👥','Customers & sites'],['forms','✉','Customer forms'],['ratecard','£','Rate card']]},
+ {g:'Finance',admin:true,items:[['finance','💷','Finance & POs'],['suppliers','🏭','Suppliers'],['xero','🔗','Xero']]},
+ {g:'Setup',items:[['people','♟','People & assignment'],['disposal','🚛','Disposal sites'],['jobtypes','⚙','Job types',true]]}];
+let auraNavCurrent='jobs';
+function auraNavHtml(){return AURA_NAV.filter(g=>!g.admin||isFinanceAdmin()).map(g=>'<div class="aura-navgrp">'+g.g+'</div>'+g.items.filter(i=>!i[3]||activeProfile?.role==='admin').map(i=>'<button type="button" class="aura-navlink'+(auraNavCurrent===i[0]?' active':'')+'" onclick="navGo(\''+i[0]+'\')"><span style="width:20px;text-align:center">'+i[1]+'</span>'+esc(i[2])+'</button>').join('')).join('');}
+function renderAuraNav(){if(!isMgmt()){document.body.classList.remove('aura-nav');return;}document.body.classList.add('aura-nav');
+ let side=el('auraSide');if(!side){side=document.createElement('nav');side.id='auraSide';document.body.appendChild(side);}side.innerHTML=auraNavHtml();
+ let bot=el('auraBottom');if(!bot){bot=document.createElement('nav');bot.id='auraBottom';document.body.appendChild(bot);}
+ bot.innerHTML=[['jobs','☰','Jobs'],['calendar','▦','Calendar'],['contracts','📑','Contracts'],['customers','👥','Customers']].map(i=>'<button type="button" class="'+(auraNavCurrent===i[0]?'active':'')+'" onclick="navGo(\''+i[0]+'\')"><span>'+i[1]+'</span>'+i[2]+'</button>').join('')+'<button type="button" onclick="auraDrawer(true)"><span>≡</span>Menu</button>';
+ let dr=el('auraDrawer');if(!dr){dr=document.createElement('div');dr.id='auraDrawer';dr.onclick=e=>{if(e.target===dr)auraDrawer(false);};document.body.appendChild(dr);}dr.innerHTML='<div class="ad-p"><div class="row"><b>Menu</b><button class="mini-btn" type="button" onclick="auraDrawer(false)">✕</button></div>'+auraNavHtml()+'</div>';
+ const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--aura-head',h.getBoundingClientRect().height+'px');
+ let at=el('auraAttn');if(!at){at=document.createElement('div');at.id='auraAttn';el('appMain')?.prepend(at);}renderAttention();}
+function auraDrawer(open){el('auraDrawer')?.classList.toggle('open',!!open);}
+async function navGo(key){auraDrawer(false);window.__attnFilter=null;const inDash=!el('dash')?.classList.contains('hidden');if(!inDash){showDashboard();await new Promise(r=>setTimeout(r,50));}
+ const mode={reports:'contracts',forms:'customers',suppliers:'finance',xero:'finance'}[key]||key;window.__navKey=key;try{setCentreMode(mode);}finally{window.__navKey=null;}auraNavCurrent=key;
+ if(key==='jobs'&&typeof setJobView==='function')setJobView('active');
+ if(key==='forms')setTimeout(()=>el('custFormsBox')?.scrollIntoView({behavior:'smooth'}),350);
+ if(key==='suppliers')setTimeout(()=>{financeTab='suppliers';if(typeof renderFinance==='function')renderFinance();},700);
+ if(key==='xero')setTimeout(()=>el('xeroBox')?.scrollIntoView({behavior:'smooth'}),900);
+ if(key==='reports'){contractsView.filter='reports';renderContractsPage();}
+ renderAuraNav();window.scrollTo({top:0});}
+
+/* ---------- needs attention ---------- */
+function attentionItems(){const t=new Date(),today=localDateKey(t),in2=localDateKey(new Date(t.getTime()+2*864e5)),thisMonth=today.slice(0,7)+'-01';const J=jobCentreJobs||[];
+ const live=['draft','issued','accepted','on_site'];
+ const overdue=J.filter(j=>(j.job_date&&j.job_date<today&&live.includes(j.status))||(j.contract_id&&!j.job_date&&typeof contractJobLate==='function'&&contractJobDue(j)&&contractJobLate(j)));
+ const assign=J.filter(j=>typeof jobNeedsOperator==='function'&&jobNeedsOperator(j)&&j.job_date&&j.job_date<=in2);
+ const review=J.filter(j=>j.status==='returned');
+ const docs=J.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at);
+ const inv=isFinanceAdmin()?J.filter(j=>['reviewed','closed'].includes(j.status)&&!j.invoiced_at&&!j.contract_id):[];
+ const forms=(typeof customerApplications!=='undefined'?customerApplications:[]).filter(a=>a.status==='submitted');
+ const reports=J.filter(j=>j.contract_id&&j.job_types?.code==='monthly_site_report'&&j.contract_due_month<=thisMonth&&!['closed','aborted','reviewed','returned','completed'].includes(j.status));
+ const renew=(contractsCache||[]).filter(contractRenewalDue);
+ return [
+  {k:'overdue',label:'Overdue jobs',n:overdue.length,red:true,list:overdue},
+  {k:'assign',label:'To assign (next 2 days)',n:assign.length,red:true,list:assign},
+  {k:'review',label:'Awaiting review',n:review.length,list:review},
+  {k:'docs',label:'Docs to send',n:docs.length,list:docs},
+  {k:'invoice',label:'To invoice',n:inv.length,list:inv},
+  {k:'forms',label:'Customer forms returned',n:forms.length},
+  {k:'reports',label:'Reports due',n:reports.length,list:reports},
+  {k:'renew',label:'Contract renewals',n:renew.length}];}
+function renderAttention(){const at=el('auraAttn');if(!at||!isMgmt())return;const items=attentionItems().filter(x=>x.n);
+ at.innerHTML='<span class="aa-t">Needs attention</span>'+(items.length?items.map(x=>'<button type="button" class="'+(x.red?'red':'')+'" onclick="attentionGo(\''+x.k+'\')">'+esc(x.label)+'<b>'+x.n+'</b></button>').join(''):'<span class="aa-ok">✓ Nothing urgent</span>');}
+async function attentionGo(k){if(k==='forms')return navGo('forms');if(k==='renew'){await navGo('contracts');contractsView.filter='renewal';return renderContractsPage();}if(k==='reports')return navGo('reports');
+ await navGo('jobs');const it=attentionItems().find(x=>x.k===k);window.__attnFilter=it?{label:it.label,ids:new Set(it.list.map(j=>j.id))}:null;renderJobCentre();}
+(function(){const o=window.renderJobCentre;if(typeof o!=='function')return;window.renderJobCentre=function(){const f=window.__attnFilter;let r;
+ if(f&&isMgmt()){const all=jobCentreJobs,sv=jobCentreView;try{jobCentreJobs=all.filter(j=>f.ids.has(j.id));jobCentreView='all';r=o.apply(this,arguments);}finally{jobCentreJobs=all;jobCentreView=sv;}
+  el('jobs')?.insertAdjacentHTML('afterbegin','<div class="flag" style="margin:0 0 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>Showing: '+esc(f.label)+'</b><button class="mini-btn" type="button" onclick="window.__attnFilter=null;renderJobCentre()">✕ Show all jobs</button></div>');}
+ else r=o.apply(this,arguments);try{renderAttention();}catch(_){}return r;};})();
+/* the counters ignore contract drafts that aren't due for a while */
+(function(){const o=window.loadJobs;if(typeof o!=='function')return;window.loadJobs=async function(){const r=await o.apply(this,arguments);try{if(isMgmt()){const soon=localDateKey(new Date(Date.now()+14*864e5)),far=j=>j.contract_id&&j.status==='draft'&&!j.job_date&&j.contract_due_month>soon,J=jobCentreJobs.filter(j=>!far(j));
+  el('total').textContent=J.filter(j=>!['closed','aborted'].includes(j.status)).length;el('draft').textContent=J.filter(j=>j.status==='draft').length;
+  document.querySelectorAll('#dash .grid .dashboard-stat-button').forEach(b=>b.classList.toggle('zero',(b.querySelector('.stat')?.textContent||'0').trim()==='0'));
+  if(typeof loadCustomerApplications==='function'&&!window.__formsLoaded){window.__formsLoaded=true;try{await loadCustomerApplications();}catch(_){}}}renderAuraNav();}catch(_){}return r;};})();
+(function(){const o=window.renderCustomerFormsAlert;if(typeof o!=='function')return;window.renderCustomerFormsAlert=function(){const r=o.apply(this,arguments);try{renderAttention();}catch(_){}return r;};})();
+(function(){const o=window.showLogin;if(typeof o!=='function')return;window.showLogin=function(){document.body.classList.remove('aura-nav');return o.apply(this,arguments);};})();
+window.addEventListener('resize',()=>{const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--aura-head',h.getBoundingClientRect().height+'px');});
+
+/* ---------- Contracts page ---------- */
+const contractsView={filter:'active',q:'',customer:null};let contractFees={};
+function contractRenewalDue(c){const today=localDateKey(new Date());if(c.status!=='active'||c.end_date<today)return false;return (new Date(c.end_date+'T12:00:00')-new Date(today+'T12:00:00'))/864e5<=(c.renewal_reminder_days||60);}
+function ensureContractsPanel(){let p=el('contractsPanel');if(p)return p;p=document.createElement('div');p.id='contractsPanel';p.className='card hidden';const after=el('customersPanel');after.parentNode.insertBefore(p,after.nextSibling);return p;}
+(function(){const o=window.setCentreMode;if(typeof o!=='function')return;window.setCentreMode=function(mode){const r=o.apply(this,[mode]);const p=ensureContractsPanel();p.classList.toggle('hidden',mode!=='contracts');
+ auraNavCurrent=window.__navKey||mode;if(mode==='contracts'){if(auraNavCurrent!=='reports'&&contractsView.filter==='reports')contractsView.filter='active';loadContractsPage();}try{renderAuraNav();}catch(_){}return r;};})();
+async function loadContractsPage(){const p=ensureContractsPanel();if(!contractsCache.length)p.innerHTML='<div class="muted">Loading contracts…</div>';await loadContracts();
+ if(isFinanceAdmin()){const f=await db.from('contract_finance').select('contract_id,monthly_fee');contractFees={};(f.data||[]).forEach(x=>contractFees[x.contract_id]=Number(x.monthly_fee)||0);}renderContractsPage();}
+function renderContractsPage(){const p=ensureContractsPanel(),V=contractsView,today=localDateKey(new Date()),thisMonth=today.slice(0,7)+'-01';
+ const isActive=c=>c.status==='active'&&c.end_date>=today;
+ let list=contractsCache.slice();if(V.customer)list=list.filter(c=>c.customer_id===V.customer);
+ if(V.q){const q=V.q.toLowerCase();list=list.filter(c=>[c.title,c.reference,c.customers?.company_name,c.customer_sites?.site_name,c.customer_sites?.site_address].some(x=>String(x||'').toLowerCase().includes(q)));}
+ const shown=V.filter==='active'?list.filter(isActive):V.filter==='renewal'?list.filter(contractRenewalDue):V.filter==='ended'?list.filter(c=>!isActive(c)):list;
+ const active=contractsCache.filter(isActive),late=active.reduce((a,c)=>a+contractProgress(c).reduce((x,s)=>x+s.late,0),0),monthly=active.reduce((a,c)=>a+(contractFees[c.id]||0),0);
+ const reports=(jobCentreJobs||[]).filter(j=>j.contract_id&&j.job_types?.code==='monthly_site_report'&&j.contract_due_month<=thisMonth&&!['closed','aborted'].includes(j.status)).sort((a,b)=>String(a.contract_due_month).localeCompare(b.contract_due_month));
+ const custName=V.customer?(contractsCache.find(c=>c.customer_id===V.customer)?.customers?.company_name||(directoryCustomers||[]).find(c=>c.id===V.customer)?.company_name||'this customer'):'';
+ const tab=(k,t)=>'<button class="tabbtn'+(V.filter===k?' active':'')+'" type="button" onclick="contractsView.filter=\''+k+'\';renderContractsPage()">'+t+'</button>';
+ p.innerHTML='<div class="row"><div><h2>Contracts</h2><div class="muted" style="font-size:13px">Maintenance and monitoring contracts across all customers and sites.</div></div><button class="btn primary" type="button" onclick="newContractPick()">+ New contract</button></div><div id="ctPick"></div>'
+  +'<div class="ctl-sum"><div><span>Active contracts</span><b>'+active.length+'</b></div><div><span>Renewals due</span><b>'+active.filter(contractRenewalDue).length+'</b></div><div><span>Late visits</span><b style="'+(late?'color:#b42318':'')+'">'+late+'</b></div><div><span>Reports due</span><b>'+reports.filter(j=>!ctDoneStatuses.includes(j.status)).length+'</b></div>'+(isFinanceAdmin()?'<div><span>Monthly contract income</span><b>£'+monthly.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})+'</b></div>':'')+'</div>'
+  +'<div class="dashboard-tabs" style="margin:6px 0">'+tab('active','Active')+tab('renewal','Renewal due')+tab('ended','Ended')+tab('all','All')+tab('reports','📝 Reports due')+'</div>'
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0"><input type="search" placeholder="Search contract, customer or site…" value="'+esc(V.q)+'" oninput="contractsView.q=this.value;renderContractsPage();this.focus();this.setSelectionRange(this.value.length,this.value.length)" style="max-width:340px">'+(V.customer?'<span class="pill">Customer: '+esc(custName)+' <a href="#" onclick="contractsView.customer=null;renderContractsPage();return false">✕</a></span>':'')+'</div>'
+  +(V.filter==='reports'?(reports.length?reports.map(j=>{const c=contractsCache.find(x=>x.id===j.contract_id),done=ctDoneStatuses.includes(j.status);return '<div class="ctl-row'+(j.contract_due_month<thisMonth&&!done?' late':'')+(done?' ended':'')+'"><div><b>'+esc(c?.customers?.company_name||'')+' · '+esc(c?.customer_sites?.site_name||'')+'</b><div class="muted" style="font-size:13px">'+esc(c?.title||'')+'</div></div><div>'+esc(ctMonthLabel(j.contract_due_month,true))+(j.contract_due_month<thisMonth&&!done?' <b style="color:#b42318">overdue</b>':'')+'</div><div>'+esc(statusLabel(j.status))+'</div><button class="mini-btn" type="button" onclick="openJob(\''+j.id+'\')">Open '+esc(j.job_number)+'</button></div>';}).join(''):'<div class="muted" style="margin-top:8px">No monthly reports due. Reports appear here from the start of the month they cover, so you can do them early.</div>')
+  :(shown.length?shown.map(c=>{const prog=contractProgress(c),lt=prog.reduce((a,s)=>a+s.late,0),ended=!isActive(c),months=contractDurationOf(c.start_date,c.end_date);
+   return '<div class="ctl-row'+(lt?' late':'')+(ended?' ended':'')+'"><div><b>'+esc(c.title)+'</b><div class="muted" style="font-size:13px">'+esc(c.customers?.company_name||'')+' · '+esc(c.customer_sites?.site_name||c.customer_sites?.site_address||'')+(c.reference?' · Ref '+esc(c.reference):'')+'</div>'+contractProgressHtml(c)+'</div>'
+    +'<div style="font-size:13px">'+esc(new Date(c.start_date+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}))+' → '+esc(new Date(c.end_date+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}))+'<div class="muted">'+months+' months</div>'+(contractRenewalDue(c)?'<span class="pill" style="background:#fff3d6;color:#7a5200">Renewal due</span>':'')+(ended?'<span class="pill">'+esc(c.status==='active'?'Ended':c.status)+'</span>':'')+'</div>'
+    +'<div style="font-size:13px">'+(isFinanceAdmin()&&contractFees[c.id]?'<b>£'+contractFees[c.id].toLocaleString('en-GB',{minimumFractionDigits:2})+'</b>/month':'')+(lt?'<div style="color:#b42318;font-weight:700">'+lt+' late visit'+(lt===1?'':'s')+'</div>':'')+'</div>'
+    +'<button class="mini-btn" type="button" onclick="openContractEditor(\''+c.id+'\')">Open</button></div>';}).join(''):'<div class="muted" style="margin-top:8px">No contracts here'+(V.filter==='active'?' yet – use “+ New contract”':'')+'.</div>'));}
+async function newContractPick(){const box=el('ctPick');if(!box)return;const r=await db.from('customers').select('id,company_name').eq('active',true).order('company_name');
+ box.innerHTML='<div style="margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8faf8;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b>Which customer?</b><select id="ctPickCust" style="max-width:320px"><option value="">Choose…</option>'+(r.data||[]).map(c=>'<option value="'+c.id+'"'+(c.id===contractsView.customer?' selected':'')+'>'+esc(c.company_name)+'</option>').join('')+'</select><button class="btn primary" type="button" onclick="const v=el(\'ctPickCust\').value;if(v)openContractEditor(null,v)">Continue</button><button class="mini-btn" type="button" onclick="el(\'ctPick\').innerHTML=\'\'">Cancel</button></div>';}
+/* the customer card's Contracts button opens the Contracts page for that customer */
+window.toggleCustomerMaintenance=async function(customerId){contractsView.customer=customerId;contractsView.filter='all';await navGo('contracts');};
+/* saving or closing a contract refreshes the Contracts page */
+(function(){const o=window.closeContractEditor;if(typeof o!=='function')return;window.closeContractEditor=function(){const r=o.apply(this,arguments);if(!el('contractsPanel')?.classList.contains('hidden'))loadContractsPage();return r;};})();
+(function(){const o=window.showDashboard;if(typeof o!=='function')return;window.showDashboard=function(){const r=o.apply(this,arguments);try{renderAuraNav();}catch(_){}return r;};})();
+(function(){const o=window.openJob;if(typeof o!=='function')return;window.openJob=async function(){const r=await o.apply(this,arguments);try{renderAuraNav();}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
