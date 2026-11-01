@@ -4128,9 +4128,12 @@ let ovCharts={};
 function loadChartJs(){if(window.Chart)return Promise.resolve();if(window.__chartP)return window.__chartP;window.__chartP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';s.onload=()=>{Chart.defaults.font.family=getComputedStyle(document.body).fontFamily;Chart.defaults.color=OV.muted;Chart.defaults.plugins.legend.labels.boxWidth=12;Chart.defaults.plugins.tooltip.backgroundColor='#17261c';res();};s.onerror=()=>rej(new Error('Charts could not load'));document.head.appendChild(s);});return window.__chartP;}
 const gbp0=n=>'£'+Math.round(Number(n)||0).toLocaleString('en-GB');
 function ovChart(id,cfg){if(ovCharts[id]){ovCharts[id].destroy();delete ovCharts[id];}const c=el(id);if(!c||!window.Chart)return;
+ /* long names wrap onto two lines and end with … ; the full name shows when you hover */
+ const full=(cfg.data.labels||[]).slice(),wrapL=(t,w)=>{t=String(t||'');if(t.length<=w)return t;const words=t.split(/\s+/),lines=[''];words.forEach(x=>{const cur=lines[lines.length-1];if((cur+' '+x).trim().length<=w)lines[lines.length-1]=(cur+' '+x).trim();else lines.push(x);});let out=lines.slice(0,2).map(l=>l.length>w?l.slice(0,w-1)+'…':l);if(lines.length>2)out[1]=(out[1].length>w-1?out[1].slice(0,w-1):out[1])+'…';return out;};
+ if(cfg.horizontal)cfg.data.labels=full.map(l=>wrapL(l,22));
  const base={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:(cfg.data.datasets||[]).length>1,position:'bottom'}},scales:cfg.type==='doughnut'?undefined:{x:{grid:{display:false},stacked:!!cfg.stacked},y:{grid:{color:OV.grid},beginAtZero:true,stacked:!!cfg.stacked,ticks:{precision:0,callback:cfg.money?(v=>gbp0(v)):undefined}}}};
  if(cfg.horizontal){base.indexAxis='y';base.scales={x:{grid:{color:OV.grid},beginAtZero:true,stacked:!!cfg.stacked,ticks:{precision:0,callback:cfg.money?(v=>gbp0(v)):undefined}},y:{grid:{display:false},stacked:!!cfg.stacked}};}
- if(cfg.money)base.plugins.tooltip={callbacks:{label:x=>(x.dataset.label?x.dataset.label+': ':'')+poGbp(x.parsed[cfg.horizontal?'x':'y'])}};
+ base.plugins.tooltip={callbacks:{title:items=>items.length?String(full[items[0].dataIndex]??''):''}};if(cfg.money)base.plugins.tooltip.callbacks.label=x=>(x.dataset.label?x.dataset.label+': ':'')+poGbp(x.parsed[cfg.horizontal?'x':'y']);
  (cfg.data.datasets||[]).forEach(d=>{if(d.type!=='line'&&cfg.type!=='doughnut'){d.borderRadius=d.borderRadius??4;d.borderSkipped=false;d.maxBarThickness=d.maxBarThickness||34;d.categoryPercentage=.7;d.barPercentage=.85;}if(d.type==='line'){d.borderWidth=2;d.pointRadius=3;d.tension=.25;}});
  ovCharts[id]=new Chart(c,{type:cfg.type||'bar',data:cfg.data,options:Object.assign(base,cfg.options||{})});}
 const ovMonthKeys=(n,offset)=>{const out=[],d=new Date();d.setDate(1);d.setMonth(d.getMonth()+(offset||0));for(let i=0;i<n;i++){out.push(ctMonthKey(d));d.setMonth(d.getMonth()+1);}return out;};
@@ -4184,12 +4187,12 @@ function renderOverview(D){const since=new Date();since.setMonth(since.getMonth(
  /* waste per month */
  const m6=ovMonthKeys(6,-5);ovChart('ovWaste',{data:{labels:m6.map(ovMonthLbl),datasets:[{label:'Tonnes (est.)',data:m6.map(m=>Math.round(kgMonth(m)/100)/10),backgroundColor:OV.green}]}});
  /* contracts */
- const cs=actC.map(c=>{const pr=contractProgress(c),d=pr.reduce((a,s)=>a+s.done,0),t=pr.reduce((a,s)=>a+s.total,0),l=pr.reduce((a,s)=>a+s.late,0);return {n:(c.customer_sites?.site_name||c.title).slice(0,28),d,l,todo:Math.max(0,t-d-l)};});
+ const cs=actC.map(c=>{const pr=contractProgress(c),d=pr.reduce((a,s)=>a+s.done,0),t=pr.reduce((a,s)=>a+s.total,0),l=pr.reduce((a,s)=>a+s.late,0);return {n:(c.customer_sites?.site_name||c.title),d,l,todo:Math.max(0,t-d-l)};});
  ovChart('ovContracts',{horizontal:true,stacked:true,data:{labels:cs.length?cs.map(c=>c.n):['No active contracts'],datasets:[{label:'Done',data:cs.map(c=>c.d),backgroundColor:OV.green},{label:'Late',data:cs.map(c=>c.l),backgroundColor:OV.red},{label:'To do',data:cs.map(c=>c.todo),backgroundColor:OV.grey}]}});
  if(admin){const cost={};(D.pos||[]).forEach(p=>{const j=J.find(x=>x.id===p.job_id);if(!j||!j.invoiced_at)return;const m=mOf(localDateKey(new Date(j.invoiced_at)));cost[m]=(cost[m]||0)+poCost(p);});
   ovChart('ovMoney',{money:true,data:{labels:m6.map(ovMonthLbl),datasets:[{label:'Invoiced',data:m6.map(invM),backgroundColor:OV.green},{label:'Cost of those jobs',data:m6.map(m=>cost[m]||0),backgroundColor:OV.orange}]}});
   const byC={};J.forEach(j=>{if(j.invoiced_at&&new Date(j.invoiced_at)>=since){const n=j.customers?.company_name||'Other';byC[n]=(byC[n]||0)+(Number(j.invoice_net_amount)||0);}});const top=Object.entries(byC).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  ovChart('ovTopCust',{horizontal:true,money:true,data:{labels:top.length?top.map(t=>t[0].slice(0,30)):['No invoices yet'],datasets:[{label:'Invoiced',data:top.map(t=>t[1]),backgroundColor:OV.blue}]}});}}
+  ovChart('ovTopCust',{horizontal:true,money:true,data:{labels:top.length?top.map(t=>t[0]):['No invoices yet'],datasets:[{label:'Invoiced',data:top.map(t=>t[1]),backgroundColor:OV.blue}]}});}}
 
 /* ---------- Finance: cashflow forecast, contract value, PO charts ---------- */
 async function finCashflowData(){const [cr,fr,rc]=await Promise.all([loadContracts(),db.from('contract_finance').select('contract_id,monthly_fee'),loadRecurring()]);
@@ -4230,7 +4233,7 @@ async function renderFinCashflow(){const body=el('financeBody');if(!body)return;
  ovChart('fcCash',{money:true,data:{labels:months.map(ovMonthLbl),datasets:[{label:'Money in',data:inT,backgroundColor:OV.green,order:2},{label:'Money out',data:outT,backgroundColor:OV.orange,order:2},{type:'line',label:'Running total',data:cum,borderColor:OV.blue,backgroundColor:OV.blue,order:1}]}});
  ovChart('fcPoMonth',{money:true,stacked:true,data:{labels:m12.map(ovMonthLbl),datasets:[{label:'Invoiced by supplier',data:m12.map(m=>poM(m,true)),backgroundColor:OV.green},{label:'Open',data:m12.map(m=>poM(m,false)),backgroundColor:OV.greenL}]}});
  ovChart('fcPoCat',{horizontal:true,money:true,data:{labels:cats.length?cats.map(c=>c[0]):['No POs yet'],datasets:[{label:'Spend',data:cats.map(c=>Math.round(c[1]*100)/100),backgroundColor:OV.orange}]}});
- ovChart('fcPoSup',{horizontal:true,money:true,data:{labels:sups.length?sups.map(s=>s[0].slice(0,28)):['No POs yet'],datasets:[{label:'Spend',data:sups.map(s=>s[1]),backgroundColor:OV.blue}]}});}
+ ovChart('fcPoSup',{horizontal:true,money:true,data:{labels:sups.length?sups.map(s=>s[0]):['No POs yet'],datasets:[{label:'Spend',data:sups.map(s=>s[1]),backgroundColor:OV.blue}]}});}
 (function(){const o=window.renderFinance;if(typeof o!=='function')return;window.renderFinance=function(){const tabs=el('finTabJobs')?.parentElement;if(tabs&&!el('finTabCash'))tabs.insertAdjacentHTML('afterbegin','<button class="modebtn" id="finTabCash" type="button" onclick="financeTab=\'cashflow\';renderFinance()">📈 Cashflow & charts</button>');
  el('finTabCash')?.classList.toggle('active',financeTab==='cashflow');
  if(financeTab==='cashflow'){['Jobs','Cust','POs','Sup','Rep','Oh','Cat'].forEach(k=>el('finTab'+k)?.classList.remove('active'));if(financeData)renderFinCashflow();return;}return o.apply(this,arguments);};})();
@@ -4270,12 +4273,12 @@ async function loadCustOverview(){const p=ensureGrpPanel();p.innerHTML='<div cla
   +(quiet.length?quiet.sort((a,b)=>String(lastJob[a.id]||'').localeCompare(String(lastJob[b.id]||''))).slice(0,15).map(c=>'<tr><td>'+esc(c.company_name)+'</td><td>'+(lastJob[c.id]?esc(new Date(lastJob[c.id]+'T12:00:00').toLocaleDateString('en-GB')):'<span class="muted">never</span>')+'</td><td class="n">'+S.filter(s=>s.customer_id===c.id).length+'</td><td><button class="mini-btn" type="button" onclick="showCreateJob()">Book a job</button></td></tr>').join(''):'<tr><td colspan="4" class="muted">Everyone has had a job in the last 90 days.</td></tr>')+'</tbody></table></div></div>';
  if(!window.Chart)return;
  const top=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);const tj=top(jobsBy,8);
- ovChart('coJobs',{horizontal:true,data:{labels:tj.length?tj.map(x=>(name[x[0]]||'?').slice(0,28)):['No jobs yet'],datasets:[{label:'Jobs',data:tj.map(x=>x[1]),backgroundColor:OV.green}]}});
+ ovChart('coJobs',{horizontal:true,data:{labels:tj.length?tj.map(x=>(name[x[0]]||'?')):['No jobs yet'],datasets:[{label:'Jobs',data:tj.map(x=>x[1]),backgroundColor:OV.green}]}});
  const m12=ovMonthKeys(12,-11),nm={};C.forEach(c=>{const d=opened(c);if(d){const k=ctMonthKey(new Date(d));nm[k]=(nm[k]||0)+1;}});
  ovChart('coNew',{data:{labels:m12.map(ovMonthLbl),datasets:[{label:'New customers',data:m12.map(m=>nm[m]||0),backgroundColor:OV.green}]}});
  const sc={};S.forEach(s=>sc[s.customer_id]=(sc[s.customer_id]||0)+1);const ts=top(sc,8);
- ovChart('coSites',{horizontal:true,data:{labels:ts.length?ts.map(x=>(name[x[0]]||'?').slice(0,28)):['No sites yet'],datasets:[{label:'Sites',data:ts.map(x=>x[1]),backgroundColor:OV.blue}]}});
- if(admin){const ti=top(invBy,8);ovChart('coInv',{horizontal:true,money:true,data:{labels:ti.length?ti.map(x=>(name[x[0]]||'?').slice(0,28)):['No invoices yet'],datasets:[{label:'Invoiced',data:ti.map(x=>x[1]),backgroundColor:OV.blue}]}});}
+ ovChart('coSites',{horizontal:true,data:{labels:ts.length?ts.map(x=>(name[x[0]]||'?')):['No sites yet'],datasets:[{label:'Sites',data:ts.map(x=>x[1]),backgroundColor:OV.blue}]}});
+ if(admin){const ti=top(invBy,8);ovChart('coInv',{horizontal:true,money:true,data:{labels:ti.length?ti.map(x=>(name[x[0]]||'?')):['No invoices yet'],datasets:[{label:'Invoiced',data:ti.map(x=>x[1]),backgroundColor:OV.blue}]}});}
  else ovChart('coContract',{type:'doughnut',data:{labels:['On a contract','No contract'],datasets:[{data:[onContract.size,Math.max(0,act.length-onContract.size)],backgroundColor:[OV.green,OV.grey],borderWidth:2,borderColor:'#fff'}]},options:{plugins:{legend:{display:true,position:'bottom'}}}});}
 
 /* ---------- Setup overview ---------- */
@@ -4294,9 +4297,9 @@ async function loadSetupOverview(){const p=ensureGrpPanel();p.innerHTML='<div cl
  p.innerHTML=ovHead('Setup overview','Who does the work, where the waste goes and the job types in use',[['Operatives',ops.length,P.filter(x=>x.active!==false&&['admin','manager'].includes(x.role)).length+' office users'],['Contractors',kAct.length,Object.keys(byK).length+' used this year'],['Disposal sites',dAct.length,Object.keys(byDs).length+' used this year'],['Job types',tAct.length,unusedTypes+' not used this year'],['Jobs with no operator',unassigned,'scheduled or planned']],'loadSetupOverview')
   +'<div class="ov-grid">'+ovCard('soOps','Jobs per operative','Last 12 months')+ovCard('soK','Jobs per contractor','Last 12 months')+ovCard('soDs','Disposal sites used','Loads tipped · last 12 months')+ovCard('soTypes','Job types in use','Jobs in the last 12 months')+'</div>';
  if(!window.Chart)return;const top=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);
- const to=top(byOp,8);ovChart('soOps',{horizontal:true,data:{labels:to.length?to.map(x=>(pn[x[0]]||'Unknown').slice(0,26)):['No jobs assigned yet'],datasets:[{label:'Jobs',data:to.map(x=>x[1]),backgroundColor:OV.green}]}});
- const tk=top(byK,8);ovChart('soK',{horizontal:true,data:{labels:tk.length?tk.map(x=>(kn[x[0]]||'Unknown').slice(0,26)):['No contractor jobs yet'],datasets:[{label:'Jobs',data:tk.map(x=>x[1]),backgroundColor:OV.blue}]}});
- const td=top(byDs,8);ovChart('soDs',{horizontal:true,data:{labels:td.length?td.map(x=>x[0].slice(0,30)):['No loads tipped yet'],datasets:[{label:'Loads',data:td.map(x=>x[1]),backgroundColor:OV.orange}]}});
+ const to=top(byOp,8);ovChart('soOps',{horizontal:true,data:{labels:to.length?to.map(x=>(pn[x[0]]||'Unknown')):['No jobs assigned yet'],datasets:[{label:'Jobs',data:to.map(x=>x[1]),backgroundColor:OV.green}]}});
+ const tk=top(byK,8);ovChart('soK',{horizontal:true,data:{labels:tk.length?tk.map(x=>(kn[x[0]]||'Unknown')):['No contractor jobs yet'],datasets:[{label:'Jobs',data:tk.map(x=>x[1]),backgroundColor:OV.blue}]}});
+ const td=top(byDs,8);ovChart('soDs',{horizontal:true,data:{labels:td.length?td.map(x=>x[0]):['No loads tipped yet'],datasets:[{label:'Loads',data:td.map(x=>x[1]),backgroundColor:OV.orange}]}});
  const tc={};recent.forEach(j=>{const n=displayJobTypeName(j.job_types)||'Other';tc[n]=(tc[n]||0)+1;});const tt=top(tc,8);ovChart('soTypes',{horizontal:true,data:{labels:tt.length?tt.map(x=>x[0]):['No jobs yet'],datasets:[{label:'Jobs',data:tt.map(x=>x[1]),backgroundColor:OV.green}]}});}
 /* ===== 1 Nov 2026: value by resource (vehicle / crew) and by job type – for buy-vs-hire decisions ===== */
 function finValueByResource(from,to){const R={},nm=id=>finCat(id)?.name||'Not allocated',g=k=>R[k]=R[k]||{rev:0,cost:0,oh:0,months:{}};
