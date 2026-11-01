@@ -4147,7 +4147,7 @@ async function loadOverview(){const p=ensureOverviewPanel();p.innerHTML='<div cl
  let pos=[];if(isFinanceAdmin()){const r=await db.from('purchase_orders').select('id,job_id,status,net_total,supplier_invoice_amount,order_date');pos=r.data||[];}
  try{await loadChartJs();}catch(e){}
  renderOverview({visits:vr.data||[],loads:lr.data||[],pos});}
-function renderOverview(D){const p=ensureOverviewPanel(),J=(jobCentreJobs||[]).concat(jobArchivedJobs||[]).filter(j=>!j.archived_at),now=new Date(),today=localDateKey(now),thisM=today.slice(0,7)+'-01',lastM=ctMonthAdd(thisM,-1),admin=isFinanceAdmin();
+function renderOverview(D){const since=new Date();since.setMonth(since.getMonth()-12);const p=ensureOverviewPanel(),J=(jobCentreJobs||[]).concat(jobArchivedJobs||[]).filter(j=>!j.archived_at),now=new Date(),today=localDateKey(now),thisM=today.slice(0,7)+'-01',lastM=ctMonthAdd(thisM,-1),admin=isFinanceAdmin();
  const mOf=d=>d?String(d).slice(0,7)+'-01':null,inM=(d,m)=>mOf(d)===m;
  const done=D.visits.filter(v=>v.completed_at),visThis=done.filter(v=>inM(localDateKey(new Date(v.completed_at)),thisM)).length,visLast=done.filter(v=>inM(localDateKey(new Date(v.completed_at)),lastM)).length;
  const in14=localDateKey(new Date(now.getTime()+14*864e5)),booked=J.filter(j=>j.job_date&&j.job_date>=today&&j.job_date<=in14&&!['aborted'].includes(j.status)).length;
