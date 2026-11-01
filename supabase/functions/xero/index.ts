@@ -61,6 +61,25 @@ async function xero(path: string, init: RequestInit = {}) {
 }
 
 const q = (s: string) => String(s || "").replace(/"/g, '\\"');
+
+const normName = (n: string) => String(n || "").toLowerCase().replace(/&/g, " and ").replace(/\b(limited|ltd|plc|llp|uk|the|co|company)\b/g, " ").replace(/[^a-z0-9]+/g, "");
+const joinAddress = (a: any) => [a.AddressLine1, a.AddressLine2, a.AddressLine3, a.AddressLine4, a.City, a.Region].filter(Boolean).join(", ");
+// Xero payment terms <-> the app's wording ("30 days EOM", "14 days", "Due on receipt")
+function termsFromXero(t: any): string | null {
+  if (!t || !t.Type) return null;
+  const d = Number(t.Day || 0);
+  if (t.Type === "DAYSAFTERBILLDATE") return d === 0 ? "Due on receipt" : `${d} days`;
+  if (t.Type === "DAYSAFTERBILLMONTH") return `${d} days EOM`;
+  if (t.Type === "OFFOLLOWINGMONTH" && d >= 28) return "30 days EOM";
+  return null;
+}
+function termsToXero(s: string | null): any {
+  const t = String(s || "").trim(); if (!t) return null;
+  if (/receipt/i.test(t)) return { Day: 0, Type: "DAYSAFTERBILLDATE" };
+  const n = parseInt((t.match(/(\d+)/) || [])[1], 10); if (isNaN(n)) return null;
+  if (/eom|end of month/i.test(t)) return { Day: n, Type: "DAYSAFTERBILLMONTH" };
+  return { Day: n, Type: "DAYSAFTERBILLDATE" };
+}
 function dueDate(terms: string | null, d: Date) {
   const t = String(terms || "30 days EOM");
   if (/eom|end of month/i.test(t)) return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 2, 0)).toISOString().slice(0, 10);
@@ -275,48 +294,87 @@ Deno.serve(async (req) => {
       return json({ ok: true, category: catName, changes: report });
     }
 
-    if (action === "list_suppliers" || action === "import_suppliers") {
-      // Bring Xero's supplier contacts into the app, matching ones already here so nothing is duplicated
-      const norm = (n: string) => String(n || "").toLowerCase().replace(/&/g, " and ").replace(/\b(limited|ltd|plc|llp|uk|the|co|company)\b/g, " ").replace(/[^a-z0-9]+/g, "");
+    if (["list_suppliers", "import_suppliers", "list_customers", "import_customers"].includes(action)) {
+      // Bring Xero contacts into the app, matching ones already here so nothing is duplicated
+      const cust = action.endsWith("customers"), table = cust ? "customers" : "suppliers", nameCol = cust ? "company_name" : "name";
+      const where = cust ? (body.all ? "IsSupplier==false OR IsCustomer==true" : "IsCustomer==true") : (body.all ? "IsCustomer==false OR IsSupplier==true" : "IsSupplier==true");
       const contacts: any[] = [];
       for (let page = 1; page <= 20; page++) {
-        const r = await xero(`Contacts?page=${page}&pageSize=200&includeArchived=false&where=${encodeURIComponent(body.all ? "IsCustomer==false OR IsSupplier==true" : "IsSupplier==true")}`);
+        const r = await xero(`Contacts?page=${page}&pageSize=200&includeArchived=false&where=${encodeURIComponent(where)}`);
         const list = r?.Contacts || [];
         contacts.push(...list);
         if (list.length < 200) break;
       }
-      const { data: mine } = await admin.from("suppliers").select("id,name,xero_contact_id,email,phone,contact_name,address,postcode,account_ref");
+      const cols = cust ? "id,company_name,xero_contact_id,email,phone,contact_name,address,postcode,vat_number,payment_terms,accounts_email" : "id,name,xero_contact_id,email,phone,contact_name,address,postcode,account_ref";
+      const { data: mine } = await admin.from(table).select(cols);
       const byXero: Record<string, any> = {}, byName: Record<string, any> = {};
-      (mine || []).forEach((m: any) => { if (m.xero_contact_id) byXero[m.xero_contact_id] = m; byName[norm(m.name)] = byName[norm(m.name)] || m; });
+      (mine || []).forEach((m: any) => { if (m.xero_contact_id) byXero[m.xero_contact_id] = m; const k = normName(m[nameCol]); byName[k] = byName[k] || m; });
       const mapped = contacts.filter((c: any) => c.ContactStatus !== "ARCHIVED" && c.Name).map((c: any) => {
         const ph = (c.Phones || []).find((p: any) => p.PhoneType === "DEFAULT" && p.PhoneNumber) || (c.Phones || []).find((p: any) => p.PhoneNumber);
         const ad = (c.Addresses || []).find((a: any) => a.AddressType === "POBOX" && (a.AddressLine1 || a.PostalCode)) || (c.Addresses || []).find((a: any) => a.AddressLine1 || a.PostalCode);
-        const row = {
-          name: c.Name, email: c.EmailAddress || null,
+        const common = {
+          email: c.EmailAddress || null,
           contact_name: [c.FirstName, c.LastName].filter(Boolean).join(" ") || null,
           phone: ph ? [ph.PhoneAreaCode, ph.PhoneNumber].filter(Boolean).join(" ") : null,
-          address: ad ? [ad.AddressLine1, ad.AddressLine2, ad.AddressLine3, ad.AddressLine4, ad.City, ad.Region].filter(Boolean).join(", ") || null : null,
-          postcode: ad?.PostalCode || null, account_ref: c.AccountNumber || null, xero_contact_id: c.ContactID,
+          address: ad ? joinAddress(ad) || null : null,
+          postcode: ad?.PostalCode || null, xero_contact_id: c.ContactID,
         };
-        const match = byXero[c.ContactID] || byName[norm(c.Name)] || null;
-        return { row, match_id: match?.id || null, match_name: match?.name || null, status: byXero[c.ContactID] ? "linked" : match ? "same_name" : "new", is_supplier: !!c.IsSupplier };
-      }).sort((a: any, b: any) => a.row.name.localeCompare(b.row.name));
-      if (action === "list_suppliers") return json({ ok: true, suppliers: mapped });
+        const row: any = cust ? { company_name: c.Name, ...common, vat_number: c.TaxNumber || null, payment_terms: termsFromXero(c.PaymentTerms?.Sales) } : { name: c.Name, ...common, account_ref: c.AccountNumber || null };
+        const match = byXero[c.ContactID] || byName[normName(c.Name)] || null;
+        return { row, match_id: match?.id || null, match_name: match?.[nameCol] || null, status: byXero[c.ContactID] ? "linked" : match ? "same_name" : "new", is_supplier: cust ? !!c.IsCustomer : !!c.IsSupplier };
+      }).sort((a: any, b: any) => String(a.row[nameCol]).localeCompare(String(b.row[nameCol])));
+      if (action.startsWith("list_")) return json({ ok: true, suppliers: mapped, contacts: mapped });
       const want = new Set((body.ids || []).map(String));
       let added = 0, linked = 0;
       for (const m of mapped) {
         if (!want.has(m.row.xero_contact_id)) continue;
         if (m.match_id) {
-          // link to the supplier already in the app and only fill in details it is missing
+          // link to the record already in the app and only fill in details it is missing
           const cur = (mine || []).find((x: any) => x.id === m.match_id) || {};
           const patch: any = { xero_contact_id: m.row.xero_contact_id };
-          for (const k of ["email", "phone", "contact_name", "address", "postcode", "account_ref"]) if (!cur[k] && (m.row as any)[k]) patch[k] = (m.row as any)[k];
-          await admin.from("suppliers").update(patch).eq("id", m.match_id); linked++;
+          for (const k of Object.keys(m.row)) if (k !== nameCol && k !== "xero_contact_id" && !cur[k] && m.row[k]) patch[k] = m.row[k];
+          await admin.from(table).update(patch).eq("id", m.match_id); linked++;
         } else {
-          const ins = await admin.from("suppliers").insert({ ...m.row, active: true }); if (ins.error) throw new Error(ins.error.message); added++;
+          const ins = await admin.from(table).insert({ ...m.row, active: true, ...(cust ? { account_opened_at: new Date().toISOString() } : {}) });
+          if (ins.error) throw new Error(ins.error.message); added++;
         }
       }
       return json({ ok: true, added, linked });
+    }
+
+    if (action === "push_contact") {
+      // A customer or supplier added or edited in the app is created or updated in Xero
+      const table = body.table === "customers" ? "customers" : "suppliers";
+      const { data: c } = await admin.from(table).select("*").eq("id", body.id).maybeSingle();
+      if (!c) return json({ error: "Contact not found." }, 404);
+      const name = String(c.company_name || c.name || "").trim();
+      if (!name) return json({ error: "The contact has no name." }, 400);
+      let cid = c.xero_contact_id as string | null, existing: any = null;
+      if (cid) { try { existing = (await xero(`Contacts/${cid}`))?.Contacts?.[0] || null; } catch (_) { existing = null; } if (!existing || existing.ContactStatus === "ARCHIVED") cid = null; }
+      if (!cid) { const f = await xero(`Contacts?where=${encodeURIComponent(`Name=="${q(name)}"`)}`); existing = f?.Contacts?.[0] || null; cid = existing?.ContactID || null; }
+      const [first, ...rest] = String(c.contact_name || "").trim().split(/\s+/);
+      const out: any = { Name: name };
+      if (cid) out.ContactID = cid;
+      const email = table === "customers" ? (c.invoice_email || c.accounts_email || c.email) : c.email;
+      if (email) out.EmailAddress = email;
+      if (first) { out.FirstName = first; out.LastName = rest.join(" ") || undefined; }
+      if (c.phone) out.Phones = [{ PhoneType: "DEFAULT", PhoneNumber: c.phone }];
+      const exAd = (existing?.Addresses || []).find((a: any) => a.AddressType === "POBOX");
+      if ((c.address || c.postcode) && (!exAd || joinAddress(exAd) !== (c.address || "") || (exAd.PostalCode || "") !== (c.postcode || ""))) {
+        const parts = String(c.address || "").split(/\s*,\s*/).filter(Boolean);
+        const lines = parts.length > 4 ? [...parts.slice(0, 3), parts.slice(3).join(", ")] : parts;
+        out.Addresses = [{ AddressType: "POBOX", AddressLine1: lines[0] || "", AddressLine2: lines[1] || "", AddressLine3: lines[2] || "", AddressLine4: lines[3] || "", PostalCode: c.postcode || "" }];
+      }
+      if (table === "customers") {
+        if (c.vat_number) out.TaxNumber = String(c.vat_number).slice(0, 50);
+        const pt = termsToXero(c.payment_terms);
+        if (pt) out.PaymentTerms = { Sales: pt };
+      } else if (c.account_ref) out.AccountNumber = String(c.account_ref).slice(0, 50);
+      const r = await xero("Contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Contacts: [out] }) });
+      const x = r?.Contacts?.[0];
+      if (!x?.ContactID) throw new Error("Xero didn't return the contact.");
+      if (x.ContactID !== c.xero_contact_id) await admin.from(table).update({ xero_contact_id: x.ContactID }).eq("id", c.id);
+      return json({ ok: true, created: !cid, xero_contact_id: x.ContactID });
     }
 
     return json({ error: "Unknown action." }, 400);
