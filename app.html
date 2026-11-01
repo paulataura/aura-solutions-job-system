@@ -1187,6 +1187,7 @@ async function loadManagementReview(){
  el('printJobCardBtn').classList.remove('hidden');
  el('printWtnBtn').classList.add('hidden');
  el('managementReviewBody').innerHTML='<div class="muted">Loading submitted operator record…</div>';
+ if(window.__mrSkipBody)return;
  const [vr,fr]=await Promise.all([
   db.from('job_visits').select('*').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1),
   db.from('job_files').select('id,file_type,file_name,storage_path,caption,created_at').eq('job_id',activeJob.id).order('created_at',{ascending:true})
@@ -2294,12 +2295,12 @@ async function printJobCardV2(){
  const j=activeJob,cu=j.customers||{},co=companySettings||{},ds=j.disposal_sites;
  const [vr,fr,sr,st]=await Promise.all([
   window.__jcVisitId?db.from('job_visits').select('*').eq('id',window.__jcVisitId).limit(1):db.from('job_visits').select('*').eq('job_id',j.id).order('created_at',{ascending:false}).limit(1),
-  db.from('job_files').select('id,file_type,file_name,storage_path,caption,created_at,taken_at').eq('job_id',j.id).order('created_at',{ascending:true}),
+  db.from('job_files').select('id,visit_id,file_type,file_name,storage_path,caption,created_at,taken_at').eq('job_id',j.id).order('created_at',{ascending:true}),
   db.from('job_scope_sections').select('id,position,title,details').eq('job_id',j.id).order('position'),
   j.customer_site_id?db.from('customer_sites').select('site_name').eq('id',j.customer_site_id).maybeSingle():Promise.resolve({data:null})
  ]);
  if(vr.error||fr.error||sr.error)throw (vr.error||fr.error||sr.error);
- const jcWin=window.__jcWindow||null;if(jcWin&&fr.data)fr.data=fr.data.filter(f=>(!jcWin[0]||f.created_at>=jcWin[0])&&(!jcWin[1]||f.created_at<jcWin[1]));
+ const jcWin=window.__jcWindow||null;if(jcWin&&fr.data)fr.data=fr.data.filter(f=>f.visit_id&&window.__jcVisitId?f.visit_id===window.__jcVisitId:((!jcWin[0]||f.created_at>=jcWin[0])&&(!jcWin[1]||f.created_at<jcWin[1])));
  const v=(vr.data||[])[0]||{},files=(fr.data||[]).filter(f=>/\.(jpe?g|png|webp|gif|heic)$/i.test(f.storage_path||'')||/photo|evidence|attachment/.test(f.file_type));
  const signed=files.length?await db.storage.from('job-files').createSignedUrls(files.map(f=>f.storage_path),3600):{data:[]};
  const url={};(signed.data||[]).forEach(x=>{if(x.signedUrl)url[x.path]=x.signedUrl;});
@@ -2646,7 +2647,7 @@ async function viewWtnPdf(){
 async function printWasteTransferNote(){
  if(!activeJob)return;const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to create the Waste Transfer Note.');return;}
  w.document.write('<p style="font:16px Arial;padding:20px">Preparing Waste Transfer Note…</p>');
- try{const {data,error}=await db.from('job_visits').select('*').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1);if(error)throw error;const v=data?.[0];
+ try{const {data,error}=await (window.__wtnVisitId?db.from('job_visits').select('*').eq('id',window.__wtnVisitId).limit(1):db.from('job_visits').select('*').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1));if(error)throw error;const v=data?.[0];
   if(!v||!(v.waste_removed||v.waste_transfer_note_number||v.waste_description||v.waste_type)){w.document.body.innerHTML='<p style="font:16px Arial;padding:20px">This job does not have a Waste Transfer Note.</p>';return;}
   const j=activeJob,cu=j.customers||{},ewc=v.waste_ewc_code||v.ewc_code||'',unit=v.waste_quantity_unit||'',needs=unit&&!['tonnes','kg'].includes(String(unit).toLowerCase());
   let opName='';if(v.operative_signed_name)opName=v.operative_signed_name;else{try{const a=await db.from('jobs').select('assigned_to').eq('id',j.id).maybeSingle();if(a.data?.assigned_to){const p=await db.from('profiles').select('full_name').eq('id',a.data.assigned_to).maybeSingle();opName=p.data?.full_name||'';}}catch(_){}}
@@ -3083,11 +3084,11 @@ async function printLoadWtn(loadId){const w=window.open('','_blank');if(!w){aler
  try{const l=(jobLoads.find(x=>x.id===loadId))||(await db.from('job_waste_loads').select('*').eq('id',loadId).single()).data;const d=await loadWtnData(l);const html=wtnDocHtml(d);w.document.open();w.document.write(html);w.document.close();}
  catch(e){w.document.body.innerHTML='<p style="font:16px Arial;padding:20px;color:#b42318">Could not build the WTN: '+esc(e.message||String(e))+'</p>';}}
 /* the final load's WTN says it is one of several */
-(function(){const o=window.printWasteTransferNote;if(typeof o!=='function')return;window.printWasteTransferNote=async function(){let n=0;try{n=(await loadJobLoads()).length;}catch(_){}window.__wtnMultiNote=n?'Load '+(n+1)+' of '+(n+1)+' (final load) on this job. Each load has its own Waste Transfer Note; the producer\'s signature covers all loads on this job and is given at completion.':'';try{return await o.apply(this,arguments);}finally{window.__wtnMultiNote='';}};})();
+(function(){const o=window.printWasteTransferNote;if(typeof o!=='function')return;window.printWasteTransferNote=async function(){let n=0;if(!window.__wtnVisitId)try{n=(await loadJobLoads()).length;}catch(_){}window.__wtnMultiNote=n?'Load '+(n+1)+' of '+(n+1)+' (final load) on this job. Each load has its own Waste Transfer Note; the producer\'s signature covers all loads on this job and is given at completion.':'';try{return await o.apply(this,arguments);}finally{window.__wtnMultiNote='';}};})();
 (function(){const o=window.renderSendDocsPanel;if(typeof o==='function')window.renderSendDocsPanel=async function(){try{await loadJobLoads();}catch(_){}return o.apply(this,arguments);};})();
 (function(){const o=window.sendDocsHasWtn;if(typeof o!=='function')return;window.sendDocsHasWtn=function(){return o.apply(this,arguments)||(jobLoads&&jobLoads.length>0);};})();
 /* office review: list of loads with their WTNs */
-(function(){const o=window.loadManagementReview;if(typeof o!=='function')return;window.loadManagementReview=async function(){const r=await o.apply(this,arguments);try{const body=el('managementReviewBody');if(!body||!activeJob)return r;await loadJobLoads();if(!jobLoads.length)return r;
+(function(){const o=window.loadManagementReview;if(typeof o!=='function')return;window.loadManagementReview=async function(){const r=await o.apply(this,arguments);try{const body=el('managementReviewBody');if(!body||!activeJob||window.__mrSkipBody)return r;await loadJobLoads();if(!jobLoads.length)return r;
  const html='<div class="review-section" id="reviewLoads"><div class="row"><h2 style="font-size:17px;margin:0">Waste loads ('+(jobLoads.length+1)+' loads, one WTN each)</h2></div>'+jobLoads.map(l=>'<div class="review-box" style="margin:8px 0"><b>Load '+l.load_number+'</b> · '+esc(loadSummary(l))+'<div class="muted" style="font-size:13px">Left site '+esc(fmtReview(l.collected_at))+' · '+(l.disposal_status==='confirmed'?'Tipped at '+esc(l.disposal_site_text||'')+(l.disposed_at?' on '+esc(new Date(l.disposed_at).toLocaleDateString('en-GB')):'')+(l.ticket_number?' · ticket '+esc(l.ticket_number):''):'Awaiting tipping')+'</div><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="mini-btn" type="button" onclick="printLoadWtn(\''+l.id+'\')">View WTN</button><button class="mini-btn" type="button" onclick="editLoadOffice(\''+l.id+'\')">Edit load</button>'+(l.disposal_status==='confirmed'?'':'<button class="mini-btn" type="button" onclick="showLoadTipping(\''+l.id+'\')">Record tipping</button>')+'</div><div id="ldTip_'+l.id+'"></div><div id="ldEdit_'+l.id+'"></div></div>').join('')+'<div class="muted" style="font-size:13px">The final load (Load '+(jobLoads.length+1)+') is shown in the Waste / WTN section.</div></div>';
  const wtnSec=[...body.querySelectorAll('.review-section')].find(x=>/Waste \/ WTN/.test(x.querySelector('h2')?.textContent||''));if(wtnSec)wtnSec.insertAdjacentHTML('beforebegin',html);else body.insertAdjacentHTML('beforeend',html);}catch(_){}return r;};})();
 function editLoadOffice(id){const box=el('ldEdit_'+id),l=jobLoads.find(x=>x.id===id);if(!box||!l)return;if(box.innerHTML){box.innerHTML='';return;}const f=(k,label,val,type)=>'<div class="field"><label>'+label+'</label><input data-ld="'+k+'" type="'+(type||'text')+'" value="'+esc(val??'')+'"></div>';
@@ -3142,14 +3143,14 @@ async function moreVisitsPlanned(){try{if(!activeJob)return false;const r=await 
   if(['admin','manager'].includes(activeProfile?.role))renderVisitPanel();}catch(_){}return r;};})();
 /* one job card for all visits, with a section per visit */
 (function(){const o=window.printJobCardV2;if(typeof o!=='function')return;window.printJobCardV2=async function(){if(!activeJob)return o.apply(this,arguments);
- let vs=[];try{vs=(await db.from('job_visits').select('id,created_at,arrived_at,completed_at,visit_operator_id,office_notes').eq('job_id',activeJob.id).order('created_at')).data||[];}catch(_){}
+ let vs=[];try{vs=await mvLoadVisits(activeJob.id);}catch(_){}
  vs=vs.filter(v=>v.arrived_at||v.completed_at);if(vs.length<2)return o.apply(this,arguments);
  const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to create the job card.');return;}w.document.write('<p style="font:16px Arial;padding:20px">Preparing job card…</p>');
- try{const parts=[];for(let i=0;i<vs.length;i++){window.__jcVisitId=vs[i].id;window.__jcWindow=[i?vs[i].created_at:null,vs[i+1]?vs[i+1].created_at:null];window.__jcCollect=parts;await auraCaptureDoc(()=>o.call(this));}
+ try{const parts=[],byT=[...vs].sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));for(let i=0;i<vs.length;i++){const ti=byT.indexOf(vs[i]);window.__jcVisitId=vs[i].id;window.__jcWindow=[ti?vs[i].created_at:null,byT[ti+1]?byT[ti+1].created_at:null];window.__jcCollect=parts;await auraCaptureDoc(()=>o.call(this));}
   window.__jcVisitId=null;window.__jcWindow=null;window.__jcCollect=null;
   const j=activeJob,cu=j.customers||{},E=auraDocEsc,last=parts[parts.length-1]||{},ops=[...new Set(parts.map(p=>p.operative).filter(Boolean))];
-  const sec=(n,t,inner,cls)=>auraDocSection(n,t,inner,cls);const day=d=>d?new Date(d).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
-  const sumRows=[['Customer',cu.company_name],['Your reference',j.reference],...(j.customer_po?[['Customer PO',j.customer_po]]:[]),['Visits',String(parts.length)],['First visit',day(parts[0]?.v?.arrived_at)],['Last visit',day(last.v?.arrived_at)],['Operative'+(ops.length>1?'s':''),ops.join(', ')]].filter(r=>r[1]);
+  const sec=(n,t,inner,cls)=>auraDocSection(n,t,inner,cls);const jcDates=vs.map(v=>v.arrived_at||v.completed_at).filter(Boolean).sort();let jcWt={text:'',wtns:[]};try{jcWt=mvWasteTotals(vs,(await db.from('job_waste_loads').select('*').eq('job_id',j.id).order('load_number')).data||[]);}catch(_){}const day=d=>d?new Date(d).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
+  const sumRows=[['Customer',cu.company_name],['Your reference',j.reference],...(j.customer_po?[['Customer PO',j.customer_po]]:[]),['Visits',String(parts.length)],['First visit',day(jcDates[0])],['Last visit',day(jcDates[jcDates.length-1])],['Total waste',jcWt.text],['Waste Transfer Notes',jcWt.wtns.join(', ')],['Operative'+(ops.length>1?'s':''),ops.join(', ')]].filter(r=>r[1]);
   const head='<div class="summary" style="grid-template-columns:repeat(4,1fr)">'+sumRows.map(r=>'<div><span>'+E(r[0])+'</span><b>'+E(r[1])+'</b></div>').join('')+'</div>';
   let n=0,body=head+sec(++n,'The job as issued',last.s1||parts[0].s1);
   parts.forEach((p,i)=>{body+='<div class="dayhead">Visit '+(i+1)+' · '+E(day(p.v.arrived_at))+(p.operative?' · '+E(p.operative):'')+'</div>'+(vs[i].office_notes?'<div class="note">Office note for this visit: '+E(vs[i].office_notes)+'</div>':'')
@@ -3688,6 +3689,81 @@ document.addEventListener('change',e=>{const t=e.target;if(!t||t.type!=='file'||
 /* after each step that stamps a time, put the real times on instead */
 ['confirmArrival','cleanCompleteWork','leaveCustomerSite','completeDisposal','holdDisposal','confirmWasteDetails'].forEach(n=>{const o=window[n];if(typeof o!=='function')return;window[n]=async function(){const r=await o.apply(this,arguments);try{if(window.__officeTimes&&window.__officeTimes.job===activeJob?.id)await applyOfficeTimes(true);}catch(_){}return r;};});
 (function(){const o=window.renderWorkflow;if(typeof o!=='function')return;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{renderOfficeTimes();}catch(_){}return r;};})();
+/* ===== 1 Nov 2026: management review grouped by visit (Visit 1, Visit 2, …) ===== */
+(function(){const st=document.createElement('style');st.textContent='.mv-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0 6px}.mv-sum div{background:#f4f8f4;border:1px solid #d9e8db;border-radius:8px;padding:8px 10px}.mv-sum span{display:block;font-size:12px;color:#5b6b5e}.mv-sum b{font-size:14.5px}'
+ +'.mv-card{border:1px solid #cfe5d3;border-left:5px solid #2f6b3a;border-radius:12px;margin:12px 0;background:#fff;overflow:hidden}.mv-card.mv-bad{border-left-color:#c62828}'
+ +'.mv-head{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#eef7ef;cursor:pointer;user-select:none}.mv-head h3{margin:0;font-size:16.5px}.mv-meta{color:#3d4f41;font-size:13.5px}.mv-tog{margin-left:auto;font-size:13px;color:#2f6b3a;font-weight:700}'
+ +'.mv-body{padding:12px 14px}.mv-card.collapsed .mv-body{display:none}.mv-blk{margin:0 0 12px;padding-bottom:12px;border-bottom:1px dashed #dfe7e0}.mv-blk:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}'
+ +'.mv-blk h4{margin:0 0 6px;font-size:13px;color:#0c3e17;text-transform:uppercase;letter-spacing:.5px}.mv-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 14px;margin-bottom:6px}.mv-kv span{display:block;font-size:12px;color:#5b6b5e}.mv-txt{white-space:pre-wrap;margin:4px 0 6px}'
+ +'.mv-chip{font-size:12px;padding:2px 9px;border-radius:999px;font-weight:700;white-space:nowrap}.mv-ok{background:#dff3e2;color:#1d5a2a}.mv-prog{background:#fff3d6;color:#7a5200}.mv-warn{background:#fde7e5;color:#9b1c13}'
+ +'.mv-pics{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.mv-pic{width:150px}.mv-pic img{width:150px;height:105px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block}.mv-pic div{font-size:12.5px;white-space:pre-wrap;margin-top:3px}'
+ +'.mv-load{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:#fafcfa}.mv-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}';document.head.appendChild(st);})();
+async function mvLoadVisits(jobId){const r=await db.from('job_visits').select('*').eq('job_id',jobId);if(r.error)throw r.error;return (r.data||[]).sort((a,b)=>(a.visit_number||0)-(b.visit_number||0)||String(a.created_at).localeCompare(String(b.created_at)));}
+const mvDay=d=>d?new Date(d).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}):'';
+const mvTime=d=>d?new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+/* which loads belong to which visit (the visit's own WTN is not counted twice) */
+function mvLoadsFor(v,vs,loads){const ids=new Set(vs.map(x=>x.id)),last=vs[vs.length-1];return loads.filter(l=>((l.visit_id&&ids.has(l.visit_id))?l.visit_id:last.id)===v.id&&!(l.wtn_number&&l.wtn_number===v.waste_transfer_note_number));}
+function mvVisitHasWaste(v){return !!(v.waste_removed||v.waste_transfer_note_number);}
+/* total waste across the visits, by unit, and every WTN number */
+function mvWasteTotals(vs,loads){const tot={},wtns=[];const add=(q,u)=>{if(q==null||q==='')return;const k=u||'';tot[k]=(tot[k]||0)+Number(q);};
+ vs.forEach(v=>{if(mvVisitHasWaste(v)){add(v.waste_quantity_value,v.waste_quantity_unit);if(v.waste_transfer_note_number)wtns.push(v.waste_transfer_note_number);}mvLoadsFor(v,vs,loads).forEach(l=>{add(l.quantity_value,l.quantity_unit);if(l.wtn_number)wtns.push(l.wtn_number);});});
+ return {text:Object.entries(tot).map(([u,q])=>fmtQty(q)+(u?' '+unitLabel(u):'')).join(' + '),wtns:[...new Set(wtns)]};}
+/* problems worth flagging on a visit */
+function mvVisitFlags(v,prev,files){const f=[];if(v.arrived_at&&prev?.arrived_at&&new Date(v.arrived_at)<new Date(prev.arrived_at))f.push('Arrival is before visit '+(prev.visit_number||'')+' – check the date');
+ if(v.arrived_at&&v.completed_at&&new Date(v.completed_at)<new Date(v.arrived_at))f.push('Finish time is before arrival');
+ if(v.arrived_at&&!files.some(x=>x.file_type==='arrival_photo'))f.push('No arrival picture');
+ if(v.waste_removed&&!v.waste_transfer_note_number)f.push('Waste removed but no WTN number');return f;}
+function mvEdit(id,fn){window.__reviewVisitId=id;return window[fn]();}
+async function printVisitWtn(id){window.__wtnVisitId=id;try{return await printWasteTransferNote();}finally{window.__wtnVisitId=null;}}
+async function renderVisitReview(vs){const body=el('managementReviewBody'),j=activeJob;if(!body||!j)return;
+ const [fr,sr]=await Promise.all([db.from('job_files').select('id,visit_id,file_type,file_name,storage_path,caption,created_at').eq('job_id',j.id).order('created_at'),db.from('job_scope_sections').select('id,title,details,position').eq('job_id',j.id).order('position')]);
+ const loads=await loadJobLoads();const files=(fr.data||[]).filter(f=>f.file_type!=='office_document');
+ const urls={};const paths=files.map(f=>f.storage_path).filter(Boolean);if(paths.length){const sg=await db.storage.from('job-files').createSignedUrls(paths,1800);(sg.data||[]).forEach(x=>{if(x.signedUrl)urls[x.path]=x.signedUrl;});}
+ /* pictures go to their visit; older ones without a visit go by when they were uploaded */
+ const byVisit={},byTime=[...vs].sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));vs.forEach(v=>byVisit[v.id]=[]);
+ files.forEach(f=>{let vid=f.visit_id&&byVisit[f.visit_id]?f.visit_id:null;if(!vid){vid=byTime[0].id;byTime.forEach(v=>{if(String(f.created_at)>=String(v.created_at))vid=v.id;});}byVisit[vid].push(f);});
+ const opIds=[...new Set(vs.map(v=>v.visit_operator_id||j.assigned_to).filter(Boolean))],names={};if(opIds.length){try{const p=await db.from('profiles').select('id,full_name').in('id',opIds);(p.data||[]).forEach(x=>names[x.id]=x.full_name);}catch(_){}}
+ const opName=v=>v.operative_signed_name||names[v.visit_operator_id||j.assigned_to]||'';
+ const scopeTitle={main:'Main scope'};(sr.data||[]).forEach(x=>scopeTitle[String(x.id)]=String(x.title||x.details||'').split(/\n/)[0].trim());
+ const pic=f=>{const u=urls[f.storage_path];return '<div class="mv-pic">'+(u?'<a href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" alt="'+esc(f.file_name||'Picture')+'"></a>':'<div class="muted">Picture unavailable</div>')+(f.caption?'<div>'+esc(f.caption)+'</div>':'')+'</div>';};
+ const pics=list=>list.length?'<div class="mv-pics">'+list.map(pic).join('')+'</div>':'';
+ const kv=rows=>'<div class="mv-kv">'+rows.filter(r=>r[1]!=null&&r[1]!=='').map(r=>'<div><span>'+esc(r[0])+'</span>'+esc(String(r[1]))+'</div>').join('')+'</div>';
+ const txt=(label,t)=>t&&String(t).trim()?'<div class="mv-txt"><b>'+esc(label)+':</b> '+esc(String(t).trim())+'</div>':'';
+ /* job summary */
+ const dates=vs.map(v=>v.arrived_at||v.completed_at).filter(Boolean).sort(),wt=mvWasteTotals(vs,loads),ops=[...new Set(vs.map(opName).filter(Boolean))];
+ const site=[j.site_address,j.postcode].filter(Boolean).join(', ');
+ const sum='<div class="mv-sum">'+[['Customer',j.customers?.company_name],['Site',site],['Visits',String(vs.length)],['Dates worked',dates.length?(mvDay(dates[0])+(dates.length>1&&mvDay(dates[0])!==mvDay(dates[dates.length-1])?' – '+mvDay(dates[dates.length-1]):'')):'Not started'],['Operative'+(ops.length>1?'s':''),ops.join(', ')],['Total waste',wt.text||'None'],['WTNs',wt.wtns.length?String(wt.wtns.length):'None']].filter(r=>r[1]).map(r=>'<div><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>').join('')+'</div>';
+ let anyFlag=false;
+ const cards=vs.map((v,i)=>{const fs=byVisit[v.id]||[],ofT=t=>fs.filter(f=>f.file_type===t),flags=mvVisitFlags(v,vs[i-1],fs);if(flags.length)anyFlag=true;
+  const status=v.completed_at?'<span class="mv-chip mv-ok">✓ Complete</span>':v.arrived_at?'<span class="mv-chip mv-prog">In progress</span>':'<span class="mv-chip mv-prog">Not started</span>';
+  const when=v.arrived_at||v.completed_at,times=[mvTime(v.arrived_at),mvTime(v.completed_at||v.left_site_at)].filter(Boolean).join('–');
+  const head='<div class="mv-head" onclick="this.parentElement.classList.toggle(\'collapsed\')"><h3>Visit '+esc(String(v.visit_number||i+1))+'</h3><span class="mv-meta">'+esc([when?mvDay(when):(v.planned_date?'Planned '+mvDay(v.planned_date+'T12:00:00'):''),times,opName(v)].filter(Boolean).join(' · '))+'</span>'+status+flags.map(x=>'<span class="mv-chip mv-warn">⚠ '+esc(x)+'</span>').join('')+'<span class="mv-tog">▾</span></div>';
+  /* arrival */
+  const arr='<div class="mv-blk"><h4>Arrival</h4>'+kv([['Arrived',v.arrived_at?mvDay(v.arrived_at)+' '+mvTime(v.arrived_at):'—']])+txt('Arrival notes',v.arrival_notes)+(pics(ofT('arrival_photo'))||'<div class="muted">No arrival picture.</div>')+'</div>';
+  /* work */
+  const secs=(Array.isArray(v.completion_sections)?v.completion_sections:[]).filter(x=>x&&x.id!=='__wtn_meta');
+  const scopes=secs.map((x,k)=>{const t=scopeTitle[String(x.scope_id||x.id)]||x.title||'';const inner=txt('On-site feedback',x.progress_notes||x.progress_note)+txt('Completed work',x.work||x.completed_work);return inner?'<div style="margin:4px 0 8px"><b>Scope '+(k+1)+(t?': '+esc(t):'')+'</b>'+inner+'</div>':'';}).join('');
+  const issues=String(v.issues||'').trim();
+  const work='<div class="mv-blk"><h4>Work carried out</h4>'+kv([['Finished',v.completed_at?mvDay(v.completed_at)+' '+mvTime(v.completed_at):'—'],['Left site',v.left_site_at?mvDay(v.left_site_at)+' '+mvTime(v.left_site_at):'']])+scopes+txt('Completion notes',v.completion_notes)+(scopes||v.completion_notes||ofT('progress_photo').length||ofT('completion_photo').length?'':'<div class="muted">No work notes or pictures recorded.</div>')+pics([...ofT('progress_photo'),...ofT('completion_photo')])+(issues?'<div class="mv-txt"'+(/^no issues\b/i.test(issues)?'':' style="background:#fff6e5;border:1px solid #edd3a1;border-radius:8px;padding:6px 8px"')+'><b>Issues / notes:</b> '+esc(issues)+'</div>':'')
+   +'<div class="mv-actions"><button class="mini-btn" type="button" onclick="mvEdit(\''+v.id+'\',\'toggleOperatorReportEdit\')">✏️ Edit visit '+esc(String(v.visit_number||i+1))+' report, times &amp; pictures</button></div></div>';
+  /* waste */
+  const extra=mvLoadsFor(v,vs,loads);let waste='';
+  if(mvVisitHasWaste(v))waste+='<div class="mv-load"><b>'+esc(v.waste_transfer_note_number||'WTN not numbered')+'</b>'+kv([['Waste',v.waste_description||v.waste_type],['EWC code',v.waste_ewc_code||v.ewc_code],['Quantity',[fmtQty(v.waste_quantity_value),unitLabel(v.waste_quantity_unit)].filter(Boolean).join(' ')+(v.waste_estimated_weight_kg?' (est. '+fmtQty(v.waste_estimated_weight_kg)+' kg)':'')],['Disposal site',v.disposal_site||j.disposal_sites?.site_name],['Date tipped',v.disposal_date?mvDay(v.disposal_date+'T12:00:00'):'']])+'<div class="mv-actions"><button class="mini-btn" type="button" onclick="printVisitWtn(\''+v.id+'\')">View WTN</button><button class="mini-btn" type="button" onclick="mvEdit(\''+v.id+'\',\'toggleWtnEdit\')">Edit WTN</button></div></div>';
+  waste+=extra.map(l=>'<div class="mv-load"><b>'+esc(l.wtn_number||'Load '+l.load_number)+'</b> <span class="muted">(load '+esc(String(l.load_number))+')</span>'+kv([['Waste',l.description],['EWC code',l.ewc_code],['Quantity',[fmtQty(l.quantity_value),unitLabel(l.quantity_unit)].filter(Boolean).join(' ')+(l.estimated_weight_kg?' (est. '+fmtQty(l.estimated_weight_kg)+' kg)':'')],['Left site',l.collected_at?mvDay(l.collected_at)+' '+mvTime(l.collected_at):''],['Tipped',l.disposal_status==='confirmed'?[l.disposal_site_text,l.disposed_at?mvDay(l.disposed_at):'',l.ticket_number?'ticket '+l.ticket_number:''].filter(Boolean).join(' · '):'Awaiting tipping']])+'<div class="mv-actions"><button class="mini-btn" type="button" onclick="printLoadWtn(\''+l.id+'\')">View WTN</button><button class="mini-btn" type="button" onclick="editLoadOffice(\''+l.id+'\')">Edit load</button>'+(l.disposal_status==='confirmed'?'':'<button class="mini-btn" type="button" onclick="showLoadTipping(\''+l.id+'\')">Record tipping</button>')+'</div><div id="ldTip_'+l.id+'"></div><div id="ldEdit_'+l.id+'"></div></div>').join('');
+  const wastePics=ofT('waste_evidence');
+  const wasteBlk='<div class="mv-blk"><h4>Waste &amp; disposal'+(extra.length+(mvVisitHasWaste(v)?1:0)>1?' ('+(extra.length+(mvVisitHasWaste(v)?1:0))+' loads, one WTN each)':'')+'</h4>'+(waste||'<div class="muted">No waste removed on this visit.</div>')+(wastePics.length?'<div style="margin-top:6px"><b>Tipping tickets / disposal evidence</b>'+pics(wastePics)+'</div>':'')+'</div>';
+  const other=fs.filter(f=>!['arrival_photo','progress_photo','completion_photo','waste_evidence'].includes(f.file_type));
+  const otherBlk=other.length?'<div class="mv-blk"><h4>Other pictures &amp; evidence</h4>'+pics(other)+'</div>':'';
+  return '<div class="mv-card'+(flags.length?' mv-bad':'')+'" id="mvVisit_'+v.id+'">'+head+'<div class="mv-body">'+arr+work+wasteBlk+otherBlk+'</div></div>';}).join('');
+ body.innerHTML='<div class="review-section"><div class="row"><h2 style="font-size:17px;margin:0">Job summary</h2><span class="muted" style="font-size:13px">Tap a visit to fold it away once checked</span></div>'+sum+(anyFlag?'<div class="flag" style="margin:8px 0">⚠ Some visits need checking – see the red notes below.</div>':'')+'</div>'+cards;}
+/* jobs with two or more visits show the review visit by visit */
+(function(){const o=window.loadManagementReview;if(typeof o!=='function')return;window.loadManagementReview=async function(){
+ let vs=[];try{if(activeJob&&['admin','manager'].includes(activeProfile?.role))vs=await mvLoadVisits(activeJob.id);}catch(_){}
+ if(vs.length<2)return o.apply(this,arguments);
+ window.__mrSkipBody=true;let r;try{r=await o.apply(this,arguments);}finally{window.__mrSkipBody=false;}
+ if(el('managementReviewSection')?.classList.contains('hidden'))return r;el('printWtnBtn')?.classList.add('hidden');
+ try{await renderVisitReview(vs);}catch(e){el('managementReviewBody').innerHTML='<div class="err">Could not load the visits: '+esc(e.message||String(e))+'</div>';}
+ return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
