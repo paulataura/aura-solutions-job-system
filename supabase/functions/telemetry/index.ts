@@ -46,8 +46,9 @@ async function allPages(path: string) {
   return r?.Items || [];
 }
 
-// alarms left out of reports by default: level alarms (the level graph shows these) and the alarm-transmit / status relays
-const DEFAULT_EXCLUDE = ["float", "high water", "high level", "low level", "critical alarm transmit", "critial alarm transmit", "station status", "common alarm"];
+// alarms left out of reports by default: level alarms (the level graph shows these), the alarm-transmit / status relays,
+// and flowmeter failed (it triggers whenever the pumps stop)
+const DEFAULT_EXCLUDE = ["float", "high water", "high level", "low level", "critical alarm transmit", "critial alarm transmit", "station status", "common alarm", "flowmeter failed", "flow meter failed"];
 async function monthFor(unit: string, monthStart: string, excludeText?: string | null) {
   const exclude = (excludeText && excludeText.trim() ? excludeText.split(",") : DEFAULT_EXCLUDE).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const leftOut = (p: any) => { const t = [p.Name, p.Name2, p.AlarmText].filter(Boolean).join(" ").toLowerCase(); return exclude.some((x) => t.includes(x)); };
