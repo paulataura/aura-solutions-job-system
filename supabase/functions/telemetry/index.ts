@@ -41,14 +41,9 @@ async function series(unit: string, io: number, from: Date, to: Date) {
   return (r?.Values || []).filter((v: any) => v && v.Value != null) as { Timestamp: string; Value: number }[];
 }
 async function allPages(path: string) {
-  const out: any[] = [];
-  for (let page = 0; page < 40; page++) {
-    const r = await ih(path + (path.includes("?") ? "&" : "?") + `page=${page}&pageSize=500`);
-    const items = r?.Items || [];
-    out.push(...items);
-    if (items.length < 500) break;
-  }
-  return out;
+  // archived event lists only allow page 0, so ask for the maximum in one go
+  const r = await ih(path + (path.includes("?") ? "&" : "?") + "page=0&pageSize=50000");
+  return r?.Items || [];
 }
 
 async function monthFor(unit: string, monthStart: string) {
@@ -59,15 +54,23 @@ async function monthFor(unit: string, monthStart: string) {
   const biItems: any[] = bi?.Items || [], aiItems: any[] = ai?.Items || [], ciItems: any[] = ci?.Items || [];
   const nameOf: Record<number, any> = {}; biItems.forEach((p) => (nameOf[p.IOReference] = p));
 
-  // alarms: each time a binary input went into alarm, and when it cleared
-  const ev = (await allPages(`/rtus/${unit}/bi/events?from=${iso(from)}&to=${iso(end)}&sortOrder=Ascending`)).sort((a, b) => String(a.Timestamp).localeCompare(String(b.Timestamp)));
+  // alarms: from the archived event log. Binary inputs log 17 = contact closed, 18 = contact open;
+  // a point is in alarm when its contact is away from its normal state. Pump run status and engineer-on-site aren't alarms.
+  const watch = biItems.filter((p) => p.Enabled !== false && !p.Hidden && p.Name && !/^binary input|^spare/i.test(p.Name) && !/^pump\s*\d+$/i.test(p.Name) && !/engineer/i.test(p.Name) && !/running/i.test(p.AlarmText || ""));
+  const ev = watch.length ? (await allPages(`/rtus/${unit}/events?from=${iso(from)}&to=${iso(end)}&` + watch.map((p) => "ioReferences=" + p.IOReference).join("&"))).filter((e) => e.EventTypeId === 17 || e.EventTypeId === 18).sort((a, b) => String(a.Timestamp).localeCompare(String(b.Timestamp))) : [];
   const open: Record<number, any> = {}, alarms: any[] = [];
   for (const e of ev) {
     const p = nameOf[e.IOReference] || {}, name = [p.Name, p.Name2].filter(Boolean).join(" ") || "Input " + e.IOReference;
-    if (e.Alarmed && !open[e.IOReference]) { open[e.IOReference] = { point: name, alarm_text: p.AlarmText || "Alarm", start: e.Timestamp, end: null }; alarms.push(open[e.IOReference]); }
-    else if (!e.Alarmed && open[e.IOReference]) { open[e.IOReference].end = e.Timestamp; delete open[e.IOReference]; }
+    const closed = e.EventTypeId === 17, alarmed = p.NormallyOpen ? closed : !closed;
+    if (alarmed && !open[e.IOReference]) { open[e.IOReference] = { point: name, alarm_text: p.AlarmText || "Alarm", start: e.Timestamp, end: null }; alarms.push(open[e.IOReference]); }
+    else if (!alarmed && open[e.IOReference]) { open[e.IOReference].end = e.Timestamp; delete open[e.IOReference]; }
   }
-  const stillAlarmed = biItems.filter((p) => p.Alarmed).map((p) => [p.Name, p.Name2].filter(Boolean).join(" ") + ": " + (p.StatusText || p.AlarmText || "Alarm"));
+  const stillAlarmed = watch.filter((p) => p.Alarmed).map((p) => [p.Name, p.Name2].filter(Boolean).join(" ") + ": " + (p.StatusText || p.AlarmText || "Alarm"));
+  // one line per alarm type: how many times, and how long in total
+  const sumBy: Record<string, any> = {};
+  alarms.forEach((a) => { const x = sumBy[a.point] = sumBy[a.point] || { point: a.point, alarm_text: a.alarm_text, count: 0, minutes: 0, first: a.start, last: a.start, open: false };
+    x.count++; x.last = a.start; if (a.end) x.minutes += (new Date(a.end).getTime() - new Date(a.start).getTime()) / 6e4; else { x.open = true; x.minutes += (end.getTime() - new Date(a.start).getTime()) / 6e4; } });
+  const alarm_summary = Object.values(sumBy).map((x: any) => ({ ...x, minutes: Math.round(x.minutes) })).sort((a: any, b: any) => b.count - a.count);
 
   // levels and flow: daily low / average / high
   const daily = (vals: { Timestamp: string; Value: number }[]) => {
@@ -99,10 +102,10 @@ async function monthFor(unit: string, monthStart: string) {
   }
   return {
     unit, from: from.toISOString(), to: end.toISOString(), pulled_at: new Date().toISOString(),
-    alarms, still_alarmed: stillAlarmed,
+    alarms: alarms.slice(0, 300), alarm_count: alarms.length, alarm_summary, still_alarmed: stillAlarmed,
     level: lvlP ? { name: lvlP.Name, unit: unitOf(lvlP) || "m", days: daily(lvlVals) } : null,
     flow: flowP ? { name: flowP.Name, unit: unitOf(flowP) || "L/s", days: daily(flowVals) } : null,
-    pumps, gaps, worst_gap_hours: Math.round(worst * 10) / 10, readings: lvlVals.length,
+    pumps, gaps, worst_gap_hours: Math.round(worst * 10) / 10, readings: lvlVals.length, events_seen: ev.length,
   };
 }
 
@@ -113,6 +116,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     if (body.action === "status") return json({ configured: !!TOKEN });
     if (!TOKEN) return json({ error: "The iHost access token hasn't been added yet. Add it in Supabase → Edge Functions → Secrets as NORTECH_TOKEN." }, 400);
+    if (body.action === "raw") {
+      // read-only look at an iHost reading/event list (office users), used when checking the link
+      const path = String(body.path || "");
+      if (!/^\/rtus\/\d+\/[a-z\/]+(\?[^#]*)?$/i.test(path)) return json({ error: "Not allowed." }, 400);
+      return json({ ok: true, data: await ih(path) });
+    }
     if (body.action === "month") {
       const { data: a } = await admin.from("site_assets").select("id,name,telemetry_provider,telemetry_unit_id").eq("id", body.asset_id).maybeSingle();
       if (!a?.telemetry_unit_id || a.telemetry_provider !== "nortech") return json({ error: "That station isn't linked to an iHost unit." }, 400);
