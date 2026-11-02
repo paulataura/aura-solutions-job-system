@@ -49,12 +49,11 @@ async function allPages(path: string) {
 // alarms left out of reports by default: level alarms (the level graph shows these), the alarm-transmit / status relays,
 // and flowmeter failed (it triggers whenever the pumps stop)
 const DEFAULT_EXCLUDE = ["float", "high water", "high level", "low level", "critical alarm transmit", "critial alarm transmit", "station status", "common alarm", "flowmeter failed", "flow meter failed"];
-async function monthFor(unit: string, monthStart: string, excludeText?: string | null) {
+async function rangeFor(unit: string, from: Date, to: Date, excludeText?: string | null) {
   const exclude = (excludeText && excludeText.trim() ? excludeText.split(",") : DEFAULT_EXCLUDE).map((x) => x.trim().toLowerCase()).filter(Boolean);
   const leftOut = (p: any) => { const t = [p.Name, p.Name2, p.AlarmText].filter(Boolean).join(" ").toLowerCase(); return exclude.some((x) => t.includes(x)); };
-  const from = new Date(monthStart + "T00:00:00Z");
-  const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
   const end = to > new Date() ? new Date() : to;
+  const short = end.getTime() - from.getTime() <= 8 * 864e5;
   const [bi, ai, ci] = await Promise.all([ih(`/rtus/${unit}/bi`), ih(`/rtus/${unit}/ai`), ih(`/rtus/${unit}/ci`)]);
   const biItems: any[] = bi?.Items || [], aiItems: any[] = ai?.Items || [], ciItems: any[] = ci?.Items || [];
   const nameOf: Record<number, any> = {}; biItems.forEach((p) => (nameOf[p.IOReference] = p));
@@ -108,10 +107,24 @@ async function monthFor(unit: string, monthStart: string, excludeText?: string |
   return {
     unit, from: from.toISOString(), to: end.toISOString(), pulled_at: new Date().toISOString(),
     alarms: alarms.slice(0, 300), alarm_count: alarms.length, alarm_summary, still_alarmed: stillAlarmed,
-    level: lvlP ? { name: lvlP.Name, unit: unitOf(lvlP) || "m", days: daily(lvlVals) } : null,
-    flow: flowP ? { name: flowP.Name, unit: unitOf(flowP) || "L/s", days: daily(flowVals) } : null,
+    level: lvlP ? { name: lvlP.Name, unit: unitOf(lvlP) || "m", days: daily(lvlVals), points: short ? lvlVals.map((v) => ({ t: v.Timestamp, v: v.Value })) : undefined } : null,
+    flow: flowP ? { name: flowP.Name, unit: unitOf(flowP) || "L/s", days: daily(flowVals), points: short ? flowVals.map((v) => ({ t: v.Timestamp, v: v.Value })) : undefined } : null,
     left_out: exclude, pumps, gaps, worst_gap_hours: Math.round(worst * 10) / 10, readings: lvlVals.length, events_seen: ev.length,
   };
+}
+
+// right now: every input's state, the latest readings and when the unit last called in
+async function liveFor(unit: string, excludeText?: string | null) {
+  const exclude = (excludeText && excludeText.trim() ? excludeText.split(",") : DEFAULT_EXCLUDE).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const [rtu, bi, ai, ci] = await Promise.all([ih(`/rtus/${unit}`).catch(() => null), ih(`/rtus/${unit}/bi`), ih(`/rtus/${unit}/ai`), ih(`/rtus/${unit}/ci`)]);
+  const named = (p: any) => p.Name && p.Enabled !== false && !p.Hidden && !/^binary input|^spare|^analogue input|^counter input/i.test(p.Name);
+  const pick: any = {};
+  if (rtu && typeof rtu === "object") for (const [k, v] of Object.entries(rtu)) if (/comm|call|signal|status|power|online|name|serial|type|maintenance|parked/i.test(k) && (typeof v !== "object" || v === null)) pick[k] = v;
+  const biL = (bi?.Items || []).filter(named).map((p: any) => ({ name: [p.Name, p.Name2].filter(Boolean).join(" "), status: p.StatusText, alarmed: !!p.Alarmed, since: p.LastChanged, fault: p.Alarmed && !/^pump\s*\d+$/i.test(p.Name) && !/engineer/i.test(p.Name) && !/running/i.test(p.AlarmText || "") && !exclude.some((x) => [p.Name, p.Name2, p.AlarmText].join(" ").toLowerCase().includes(x)) }));
+  const val = (p: any) => p.DisplayValue ?? p.ScaledValue ?? p.EngineeringValue ?? p.Value ?? p.CurrentValue ?? p.LastValue ?? null;
+  const aiL = (ai?.Items || []).filter(named).map((p: any) => ({ name: p.Name, value: val(p), unit: p.Units || p.Unit || p.EngineeringUnits || "", at: p.Timestamp, alarmed: !!p.Alarmed, status: p.StatusText }));
+  const ciL = (ci?.Items || []).filter(named).map((p: any) => ({ name: p.Name, value: val(p), unit: p.Units || p.Unit || "", at: p.Timestamp }));
+  return { unit, rtu: pick, binary: biL, analogue: aiL, counters: ciL, faults: biL.filter((x: any) => x.fault).map((x: any) => x.name + ": " + x.status), last_comms: (ai?.Items || []).map((p: any) => p.Timestamp).filter(Boolean).sort().pop() || null, read_at: new Date().toISOString() };
 }
 
 Deno.serve(async (req) => {
@@ -127,12 +140,20 @@ Deno.serve(async (req) => {
       if (!/^\/rtus\/\d+\/[a-z\/]+(\?[^#]*)?$/i.test(path)) return json({ error: "Not allowed." }, 400);
       return json({ ok: true, data: await ih(path) });
     }
-    if (body.action === "month") {
+    if (["month", "range", "live"].includes(body.action)) {
       const { data: a } = await admin.from("site_assets").select("id,name,telemetry_provider,telemetry_unit_id,alarm_exclude").eq("id", body.asset_id).maybeSingle();
       if (!a?.telemetry_unit_id || a.telemetry_provider !== "nortech") return json({ error: "That station isn't linked to an iHost unit." }, 400);
-      const m = String(body.month || "").slice(0, 7);
-      if (!/^\d{4}-\d{2}$/.test(m)) return json({ error: "Month needed." }, 400);
-      return json({ ok: true, asset: a.name, data: await monthFor(a.telemetry_unit_id, m + "-01", a.alarm_exclude) });
+      if (body.action === "live") return json({ ok: true, asset: a.name, data: await liveFor(a.telemetry_unit_id, a.alarm_exclude) });
+      let from: Date, to: Date;
+      if (body.action === "month") {
+        const m = String(body.month || "").slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(m)) return json({ error: "Month needed." }, 400);
+        from = new Date(m + "-01T00:00:00Z"); to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
+      } else {
+        from = new Date(body.from); to = new Date(body.to);
+        if (isNaN(from.getTime()) || isNaN(to.getTime()) || to <= from || to.getTime() - from.getTime() > 93 * 864e5) return json({ error: "Choose a period of up to three months." }, 400);
+      }
+      return json({ ok: true, asset: a.name, data: await rangeFor(a.telemetry_unit_id, from, to, a.alarm_exclude) });
     }
     return json({ error: "Unknown action." }, 400);
   } catch (e) {
