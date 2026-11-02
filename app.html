@@ -5077,6 +5077,33 @@ async function renderSalesOverview(){const p=ensureSalesPanel(),today=localDateK
 (function(){const o=window.attentionGo;if(typeof o!=='function')return;window.attentionGo=async function(k){if(k==='follow'){crmView.tab='follow';return navGo('crm');}if(k==='chase'){quotesView.filter='sent';return navGo('quotes');}return o.apply(this,arguments);};})();
 (function(){const o=window.loadJobs;if(typeof o!=='function')return;window.loadJobs=async function(){const r=await o.apply(this,arguments);try{if(isMgmt()&&!window.__salesBoot){window.__salesBoot=true;salesLoad().then(()=>renderAttention()).catch(()=>{});}}catch(_){}return r;};})();
 
+
+/* ===== 2 Nov 2026: PO lines lead with the resource (what the money is spent on); the job-cost category and GL code follow from it.
+   Overhead POs (no job) pick the overhead category instead. ===== */
+(function(){const o=window.poLineRow;if(typeof o!=='function')return;window.poLineRow=function(l){let h=o.apply(this,arguments);
+ const m=h.match(/<select class="poRes"[\s\S]*?<\/select>/);if(!m)return h;h=h.replace(m[0],'');
+ const res=m[0].replace('<select class="poRes"','<select class="poRes" onchange="poResChanged(this)"').replace('<option value="">Resource…</option>','<option value="">Resource – what is it for? *</option>');
+ return h.replace('<div class="po-meta">','<div class="po-meta">'+res);};})();
+function poIsJob(){return !!el('poJob')?.value;}
+function poResChanged(sel){const tr=sel.closest('tr'),r=finCat(sel.value);if(r?.default_category_id&&poIsJob()){const c=tr.querySelector('.poCat');c.value=r.default_category_id;poCatChanged(c);}}
+function poModeUpdate(){const job=poIsJob();document.querySelectorAll('#poLines tr').forEach(tr=>{const c=tr.querySelector('.poCat'),r=tr.querySelector('.poRes');if(!c||!r)return;
+  c.style.display=job?'none':'';r.style.display=job?'':'none';
+  if(job){if(r.value)poResChanged(r);}else{const off=(finCats||[]).find(x=>x.kind==='resource'&&/office/i.test(x.name));if(off)r.value=off.id;if(c.value&&!finCat(c.value)?.is_overhead)c.value='';}});
+ const th=document.querySelector('.po-lines thead th');if(th)th.textContent=job?'Description · resource · GL code · VAT':'Description · overhead category · GL code · VAT';}
+(function(){const o=window.showPOForm;if(typeof o!=='function')return;window.showPOForm=async function(){const r=await o.apply(this,arguments);try{const j=el('poJob');if(j&&!j.dataset.m){j.dataset.m='1';j.addEventListener('change',poModeUpdate);}
+  const t=el('poLines');if(t&&!t.dataset.m){t.dataset.m='1';new MutationObserver(poModeUpdate).observe(t,{childList:true});}
+  /* a new PO on a job starts with the job's likely resource */
+  if(poIsJob()&&typeof guessResource==='function'&&activeJob){const g=guessResource(activeJob);document.querySelectorAll('#poLines .poRes').forEach(s=>{if(!s.value&&g)s.value=g;});}
+  poModeUpdate();}catch(_){}return r;};})();
+(function(){const o=window.savePO;if(typeof o!=='function')return;window.savePO=async function(){const msg=el('poFormMsg');
+ if(poIsJob()){const rows=[...document.querySelectorAll('#poLines tr')].filter(tr=>tr.querySelector('.poDesc')?.value.trim()||tr.querySelector('.poPrice')?.value.trim());
+  if(rows.some(tr=>!tr.querySelector('.poRes').value)){if(msg)msg.innerHTML='<div class="err">Choose the resource for every line (tanker, jetvac, disposal…) – it\'s how job costs are reported.</div>';return;}
+  rows.forEach(tr=>{const c=tr.querySelector('.poCat');if(!c.value){const r=finCat(tr.querySelector('.poRes').value),dc=r?.default_category_id||(finCats||[]).find(x=>x.kind==='cost'&&/other direct/i.test(x.name))?.id;if(dc){c.value=dc;poCatChanged(c);}}});}
+ else{const rows=[...document.querySelectorAll('#poLines tr')].filter(tr=>tr.querySelector('.poDesc')?.value.trim()||tr.querySelector('.poPrice')?.value.trim());if(rows.some(tr=>!tr.querySelector('.poCat').value)){if(msg)msg.innerHTML='<div class="err">Choose the overhead category for every line (insurance, fuel, software…).</div>';return;}}
+ return o.apply(this,arguments);};})();
+/* the costs panel: a Raise PO button without having to expand it first */
+(function(){const o=window.renderJobFinancePanel;if(typeof o!=='function')return;window.renderJobFinancePanel=async function(){const r=await o.apply(this,arguments);try{const box=el('jobFinancePanel');if(box&&box.dataset.open!=='1'){const sp=box.querySelector('.row > span.muted');if(sp&&!box.querySelector('.po-quick'))sp.insertAdjacentHTML('beforebegin','<button class="btn primary po-quick" type="button" style="margin-left:auto;margin-right:10px" onclick="event.stopPropagation();const b=el(\'jobFinancePanel\');b.dataset.open=\'1\';renderJobFinancePanel().then(()=>showPOForm())">+ Add a cost (PO)</button>');}}catch(_){}return r;};})();
+
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
