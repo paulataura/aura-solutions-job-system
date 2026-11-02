@@ -4561,13 +4561,13 @@ async function telInvoke(body){const {data,error}=await db.functions.invoke('tel
 async function loadTelemetryPage(){const p=ensureTelemetryPanel();if(!TEL.assets.length)p.innerHTML='<div class="card"><h2 style="margin:0">📡 Telemetry</h2><div class="muted">Loading stations…</div></div>';
  const r=await db.from('site_assets').select('*').eq('active',true).not('telemetry_unit_id','is',null).order('sort').order('name');TEL.assets=r.data||[];
  const ids=[...new Set(TEL.assets.map(a=>a.customer_site_id).filter(Boolean))];if(ids.length){const s=await db.from('customer_sites').select('id,site_name,customer_id').in('id',ids);TEL.sites={};(s.data||[]).forEach(x=>TEL.sites[x.id]=x);}
- if(!TEL.sel&&TEL.assets.length)TEL.sel=TEL.assets[0].id;renderTelemetryPage();await telRefreshAll();
+ if(!(contractsCache||[]).length&&typeof loadContracts==='function'){try{await loadContracts();}catch(_){}}if(!TEL.sel&&TEL.assets.length)TEL.sel=TEL.assets[0].id;renderTelemetryPage();await telRefreshAll();
  telStopTimer();if(TEL.auto)TEL.timer=setInterval(()=>{if(centreMode!=='telemetry'||document.hidden)return;telRefreshAll();},5*6e4);
  if(TEL.sel&&!TEL.hist)telLoadHistory();}
 async function telRefreshAll(){if(TEL.loading)return;TEL.loading=true;const b=el('telRefBtn');if(b)b.textContent='Refreshing…';
  await Promise.all(TEL.assets.map(async a=>{try{TEL.live[a.id]={ok:true,d:await telInvoke({action:'live',asset_id:a.id})};}catch(e){TEL.live[a.id]={ok:false,err:e.message};}}));
- TEL.loading=false;TEL.lastRefresh=new Date();renderTelemetryCards();}
-function telReportJob(siteId){const J=(jobCentreJobs||[]).filter(j=>j.customer_site_id===siteId&&j.job_types?.code==='monthly_site_report'&&j.status!=='aborted');if(!J.length)return null;const thisM=localDateKey(new Date()).slice(0,7)+'-01';
+ TEL.loading=false;TEL.lastRefresh=new Date();const b2=el('telRefBtn');if(b2)b2.textContent='⟳ Refresh now';renderTelemetryCards();}
+function telReportJob(siteId){const siteOf=j=>j.customer_site_id||(contractsCache||[]).find(c=>c.id===j.contract_id)?.customer_site_id;const J=(jobCentreJobs||[]).filter(j=>siteOf(j)===siteId&&j.job_types?.code==='monthly_site_report'&&j.status!=='aborted');if(!J.length)return null;const thisM=localDateKey(new Date()).slice(0,7)+'-01';
  const open=J.filter(j=>!['closed','reviewed','completed'].includes(j.status)&&(j.contract_due_month||'')<=thisM).sort((a,b)=>String(a.contract_due_month).localeCompare(String(b.contract_due_month)));if(open.length)return open[0];
  return J.filter(j=>(j.contract_due_month||'')<=thisM).sort((a,b)=>String(b.contract_due_month).localeCompare(String(a.contract_due_month)))[0]||null;}
 function telMonthName(m){return m?new Date(m.slice(0,7)+'-15T12:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}):'';}
@@ -4624,7 +4624,7 @@ function tpSetInc(key,k,on){const A=tpCtx.rep.answers=tpCtx.rep.answers||{},a=A[
  let h;try{h=o.apply(this,arguments);}finally{Object.values(saved).forEach(s=>{s.a.auto=s.auto;s.a.rows=s.rows;});}return h;};})();
 /* monthly reports open at the top of the job for the office, and pull telemetry on first open */
 (function(){const o=window.renderTplPanel;if(typeof o!=='function')return;window.renderTplPanel=async function(){const r=await o.apply(this,arguments);try{const p=el('tplPanel');if(p&&tpCtx&&tpIsMonthly(tpCtx.rep.template)&&isMgmt()){const top=el('operatorJobBrief');if(top&&p.nextSibling!==top)top.parentNode.insertBefore(p,top);
-  const need=tpAllItems(tpCtx.rep.template).filter(i=>i.type==='telemetry'&&i.asset_id&&!tpCtx.rep.answers?.[i.id]?.auto);const j=tpCtx.job,mStart=(tpCtx.month?.m)||j.contract_due_month||'';if(need.length&&!tpCtx.autoTried&&mStart&&mStart.slice(0,10)<=localDateKey(new Date())){tpCtx.autoTried=true;for(const i of need){if(activeJob!==j)break;await tpPullTelemetry(i.id);}}}}catch(_){}return r;};})();
+  const mEnd=(()=>{const m=((tpCtx.month?.m)||tpCtx.job.contract_due_month||'').slice(0,7);if(!m)return null;const d=new Date(m+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);return d;})();const stale=x=>!x||(mEnd&&new Date(x.to)<new Date(mEnd.getTime()-36e5)&&Date.now()-new Date(x.pulled_at).getTime()>36e5);const need=tpAllItems(tpCtx.rep.template).filter(i=>i.type==='telemetry'&&i.asset_id&&stale(tpCtx.rep.answers?.[i.id]?.auto));const j=tpCtx.job,mStart=(tpCtx.month?.m)||j.contract_due_month||'';if(need.length&&!tpCtx.autoTried&&mStart&&mStart.slice(0,10)<=localDateKey(new Date())){tpCtx.autoTried=true;for(const i of need){if(activeJob!==j)break;await tpPullTelemetry(i.id);}}}}catch(_){}return r;};})();
 
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
