@@ -46,7 +46,11 @@ async function allPages(path: string) {
   return r?.Items || [];
 }
 
-async function monthFor(unit: string, monthStart: string) {
+// alarms left out of reports by default: level alarms (the level graph shows these) and the alarm-transmit / status relays
+const DEFAULT_EXCLUDE = ["float", "high water", "high level", "low level", "critical alarm transmit", "critial alarm transmit", "station status", "common alarm"];
+async function monthFor(unit: string, monthStart: string, excludeText?: string | null) {
+  const exclude = (excludeText && excludeText.trim() ? excludeText.split(",") : DEFAULT_EXCLUDE).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const leftOut = (p: any) => { const t = [p.Name, p.Name2, p.AlarmText].filter(Boolean).join(" ").toLowerCase(); return exclude.some((x) => t.includes(x)); };
   const from = new Date(monthStart + "T00:00:00Z");
   const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
   const end = to > new Date() ? new Date() : to;
@@ -56,7 +60,7 @@ async function monthFor(unit: string, monthStart: string) {
 
   // alarms: from the archived event log. Binary inputs log 17 = contact closed, 18 = contact open;
   // a point is in alarm when its contact is away from its normal state. Pump run status and engineer-on-site aren't alarms.
-  const watch = biItems.filter((p) => p.Enabled !== false && !p.Hidden && p.Name && !/^binary input|^spare/i.test(p.Name) && !/^pump\s*\d+$/i.test(p.Name) && !/engineer/i.test(p.Name) && !/running/i.test(p.AlarmText || ""));
+  const watch = biItems.filter((p) => p.Enabled !== false && !p.Hidden && p.Name && !/^binary input|^spare/i.test(p.Name) && !/^pump\s*\d+$/i.test(p.Name) && !/engineer/i.test(p.Name) && !/running/i.test(p.AlarmText || "") && !leftOut(p));
   const ev = watch.length ? (await allPages(`/rtus/${unit}/events?from=${iso(from)}&to=${iso(end)}&` + watch.map((p) => "ioReferences=" + p.IOReference).join("&"))).filter((e) => e.EventTypeId === 17 || e.EventTypeId === 18).sort((a, b) => String(a.Timestamp).localeCompare(String(b.Timestamp))) : [];
   const open: Record<number, any> = {}, alarms: any[] = [];
   for (const e of ev) {
@@ -105,7 +109,7 @@ async function monthFor(unit: string, monthStart: string) {
     alarms: alarms.slice(0, 300), alarm_count: alarms.length, alarm_summary, still_alarmed: stillAlarmed,
     level: lvlP ? { name: lvlP.Name, unit: unitOf(lvlP) || "m", days: daily(lvlVals) } : null,
     flow: flowP ? { name: flowP.Name, unit: unitOf(flowP) || "L/s", days: daily(flowVals) } : null,
-    pumps, gaps, worst_gap_hours: Math.round(worst * 10) / 10, readings: lvlVals.length, events_seen: ev.length,
+    left_out: exclude, pumps, gaps, worst_gap_hours: Math.round(worst * 10) / 10, readings: lvlVals.length, events_seen: ev.length,
   };
 }
 
@@ -123,11 +127,11 @@ Deno.serve(async (req) => {
       return json({ ok: true, data: await ih(path) });
     }
     if (body.action === "month") {
-      const { data: a } = await admin.from("site_assets").select("id,name,telemetry_provider,telemetry_unit_id").eq("id", body.asset_id).maybeSingle();
+      const { data: a } = await admin.from("site_assets").select("id,name,telemetry_provider,telemetry_unit_id,alarm_exclude").eq("id", body.asset_id).maybeSingle();
       if (!a?.telemetry_unit_id || a.telemetry_provider !== "nortech") return json({ error: "That station isn't linked to an iHost unit." }, 400);
       const m = String(body.month || "").slice(0, 7);
       if (!/^\d{4}-\d{2}$/.test(m)) return json({ error: "Month needed." }, 400);
-      return json({ ok: true, asset: a.name, data: await monthFor(a.telemetry_unit_id, m + "-01") });
+      return json({ ok: true, asset: a.name, data: await monthFor(a.telemetry_unit_id, m + "-01", a.alarm_exclude) });
     }
     return json({ error: "Unknown action." }, 400);
   } catch (e) {
