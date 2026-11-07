@@ -5162,13 +5162,15 @@ function telNums(o,out,label){if(o==null)return out;if(Array.isArray(o)){o.forEa
 function telLevelInfo(d){const A=d.analogue||[],lv=A.find(x=>/well|level|depth|ultrasonic/i.test(x.name));if(!lv)return null;const v=Number(lv.value);
  let max=null;const sc=lv.scale;if(sc&&typeof sc==='object'){const c=Object.entries(sc).filter(([k,x])=>typeof x==='number'&&/max|high|span|full|top/i.test(k)&&x>0).map(([,x])=>x);if(c.length)max=Math.max(...c);}
  if(!max&&lv.pct>0&&v>0)max=v/(lv.pct/100);
- const th=telNums(lv.thresholds,[]).filter(t=>t.v>0&&t.v<1000);const trend=(d.level_trend||[]).map(p=>Number(p.v)).filter(x=>!isNaN(x));
+ const TH_NAMES={HH:'Critical high',H:'High',HI:'High',HIHI:'Critical high',L:'Low',LO:'Low',LL:'Low-low',LOLO:'Low-low'};
+ const th=telNums(lv.thresholds,[]).filter(t=>t.v>0&&t.v<1000).map(t=>{const k=String(t.label).trim().toUpperCase().replace(/[^A-Z]/g,'');const nice=TH_NAMES[k];return {...t,code:k,label:nice||t.label,isHigh:/^(HH|H|HI|HIHI)$/.test(k)||/high|overflow/i.test(t.label),isCrit:/^(HH|HIHI)$/.test(k)||/critical|overflow/i.test(t.label)};});const trend=(d.level_trend||[]).map(p=>Number(p.v)).filter(x=>!isNaN(x));
  if(!max){const hi=Math.max(v||0,...th.map(t=>t.v),...trend);max=hi>0?Math.ceil(hi*1.25*10)/10:3;}
  max=Math.max(max,...th.map(t=>t.v*1.05));
- const hiTh=th.filter(t=>/high|hi\b|overflow|alarm/i.test(t.label+' '+t.key)).sort((a,b)=>a.v-b.v)[0]||null;
+ const hiTh=th.filter(t=>t.isHigh).sort((a,b)=>a.v-b.v)[0]||null,critTh=th.filter(t=>t.isCrit).sort((a,b)=>a.v-b.v)[0]||null;
  const floatHi=(d.binary||[]).some(b=>/float|high level|high water/i.test(b.name)&&b.alarmed);
  const high=!!(lv.alarmed||(hiTh&&v>=hiTh.v)||floatHi||/high/i.test(String(lv.zone||'')+' '+String(lv.status||'')));
- return {name:lv.name,v,unit:lv.unit||'m',max,pct:Math.max(0,Math.min(100,v/max*100)),th,high,floatHi,trend,at:lv.at};}
+ const crit=!!(critTh&&v>=critTh.v);
+ return {name:lv.name,v,unit:lv.unit||'m',max,pct:Math.max(0,Math.min(100,v/max*100)),th,high,crit,floatHi,trend,at:lv.at};}
 function telPumps(d){const B=d.binary||[];return B.filter(b=>/^pump\s*\d+$/i.test(b.name)).map(p=>{const n=(p.name.match(/\d+/)||[''])[0];const f=B.find(b=>new RegExp('pump\\s*'+n+'\\b.*(fault|trip|fail)','i').test(b.name));
  return {name:p.name,run:/run/i.test(p.status||''),fault:!!(f&&f.alarmed),faultTxt:f&&f.alarmed?f.status:'',since:p.since};});}
 function telStationSvg(a,L){const W=360,H=262,id='s'+String(a.id).replace(/\W/g,'').slice(0,8);
@@ -5208,7 +5210,7 @@ function telStationSvg(a,L){const W=360,H=262,id='s'+String(a.id).replace(/\W/g,
  const mast='<path d="M316-6a11 11 0 0 1 16 0M311-12a18 18 0 0 1 26 0" fill="none" stroke="'+(off?'#9aa9a0':LIME)+'" stroke-width="2.4" stroke-linecap="round"/>';
  s+=kiosk(lights,scr,mast);
  /* level reading and 24h trend in the sky */
- if(lv){s+='<text x="8" y="16" font-size="9" fill="#52695b">'+esc(lv.name)+'</text><text x="8" y="40" font-size="23" font-weight="800" fill="'+(lv.high?'#b4401f':G)+'">'+(isNaN(lv.v)?'—':lv.v.toFixed(2))+'<tspan font-size="12" font-weight="600" fill="#52695b"> '+esc(lv.unit)+'</tspan></text>'+(lv.high?'<text x="8" y="56" font-size="9.5" font-weight="800" fill="#b4401f" class="tel-pulse">HIGH LEVEL</text>':'');
+ if(lv){s+='<text x="8" y="16" font-size="9" fill="#52695b">'+esc(lv.name)+'</text><text x="8" y="40" font-size="23" font-weight="800" fill="'+(lv.high?'#b4401f':G)+'">'+(isNaN(lv.v)?'—':lv.v.toFixed(2))+'<tspan font-size="12" font-weight="600" fill="#52695b"> '+esc(lv.unit)+'</tspan></text>'+(lv.high?'<text x="8" y="56" font-size="9.5" font-weight="800" fill="#b4401f" class="tel-pulse">'+(lv.crit?'CRITICAL HIGH LEVEL':'HIGH LEVEL')+'</text>':'');
   if(lv.trend.length>2){const tx=108,ty=12,tw=120,th=34,mx=Math.max(lv.max,...lv.trend);const pts=lv.trend.map((v,i)=>(tx+tw*i/(lv.trend.length-1)).toFixed(1)+','+(ty+th-th*v/mx).toFixed(1)).join(' ');
    s+='<rect x="'+tx+'" y="'+ty+'" width="'+tw+'" height="'+th+'" rx="4" fill="#fff" stroke="#dbe7dd"/><polyline points="'+pts+'" fill="none" stroke="#5fa3b8" stroke-width="1.6"/><text x="'+(tx+tw-3)+'" y="'+(ty+th+9)+'" text-anchor="end" font-size="8" fill="#7a8f81">last 24 h</text>';}}
  /* no contact */
