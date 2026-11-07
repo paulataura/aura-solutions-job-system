@@ -1,6 +1,8 @@
 // Aura Solutions – telemetry alarm checker. Runs every 5 minutes (pg_cron) and on demand from the app.
 // Looks at every linked station, opens/clears alerts (high level, pump trip, other faults, no contact)
 // and sends a phone notification to office users who turned alerts on.
+// verify_jwt is off because the scheduled run has no user: it proves itself with the cron key kept in app_secrets;
+// every other call must come from a signed-in office user.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
