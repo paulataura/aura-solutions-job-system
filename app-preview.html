@@ -5192,8 +5192,10 @@ function telStationSvg(a,L){const W=360,H=262,id='s'+String(a.id).replace(/\W/g,
  /* water */
  if(lv)s+='<g clip-path="url(#'+id+'c)"><rect x="40" y="'+lvlY+'" width="180" height="'+(floor-lvlY+10)+'" fill="'+water+'"/><path class="tel-wave" d="M20 '+lvlY+' q 10 -4 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0" fill="none" stroke="'+wave+'" stroke-width="2.5"/></g>';
  /* alarm levels */
- /* alarm levels: labels never sit on top of each other or on the pumps */
- if(lv){let lastY=-99;lv.th.slice().sort((x,y)=>y.v-x.v).slice(0,4).forEach(t=>{const y=yOf(t.v);s+='<line x1="50" x2="200" y1="'+y+'" y2="'+y+'" stroke="'+RED+'" stroke-dasharray="5 4" stroke-width="1.4"/>';let ty=Math.min(y-3,190);if(ty-lastY<11)ty=lastY+11;if(ty>192)return;lastY=ty;s+='<text x="84" y="'+ty+'" font-size="8.5" font-weight="700" fill="#b4401f" paint-order="stroke" stroke="#f3f6f4" stroke-width="3">'+esc(String(t.label).slice(0,16))+' '+t.v+'m</text>';});}
+ /* alarm levels: dashed line across the well, carried out through the wall to a label in the space on the right */
+ if(lv){let lastY=106;lv.th.slice().sort((x,y)=>y.v-x.v).slice(0,5).forEach(t=>{const y=yOf(t.v);let ty=Math.max(y+3,lastY+13);if(ty>H-10)return;lastY=ty;
+  s+='<line x1="50" x2="200" y1="'+y+'" y2="'+y+'" stroke="'+RED+'" stroke-dasharray="5 4" stroke-width="1.4"/><path d="M200 '+y+' H 214 L 222 '+(ty-3)+' H 228" fill="none" stroke="'+RED+'" stroke-width="1" stroke-dasharray="2 2"/>'
+   +'<text x="231" y="'+ty+'" font-size="9.5" font-weight="700" fill="#b4401f">'+esc(String(t.label).slice(0,18))+' <tspan font-weight="400" fill="#52695b">'+t.v+' m</tspan></text>';});}
  /* level floats on their cables */
  const fl=(d.binary||[]).filter(b=>/float/i.test(b.name)).slice(0,3);(fl.length?fl:[{name:'',alarmed:false},{name:'',alarmed:false}]).forEach((f,i)=>{const x=188-i*10,fy=[118,140,160][i]||150;s+='<line x1="'+x+'" y1="72" x2="'+x+'" y2="'+fy+'" stroke="'+G+'" stroke-width="1.2"/><ellipse cx="'+x+'" cy="'+(fy+5)+'" rx="6" ry="4" fill="'+(f.alarmed?RED:[LIME,AMBER,LIME][i])+'" '+(f.alarmed?'class="tel-pulse"':'')+'><title>'+esc(f.name||'Float')+(f.alarmed?' – in alarm':'')+'</title></ellipse>';});
  /* pumps and pipework */
