@@ -5177,7 +5177,9 @@ function telLevelInfo(d,asset){const A=d.analogue||[],lv=A.find(x=>/well|level|d
  const floatHi=(d.binary||[]).some(b=>/float|high level|high water/i.test(b.name)&&b.alarmed);
  const high=hS>0||cS>0?(v>=(hS>0?hS:cS)):!!(lv.alarmed||(hiTh&&v>=hiTh.v)||floatHi||/high/i.test(String(lv.zone||'')+' '+String(lv.status||'')));
  const crit=!!(critTh&&v>=critTh.v);
- return {name:lv.name,v,unit:lv.unit||'m',max,pct:Math.max(0,Math.min(100,v/max*100)),th,high,crit,floatHi,trend,at:lv.at};}
+ /* the % shown is measured against a real level: Critical high (or High) when the station has them, else iHost's own % of the sensor range */
+ const ref=cS>0?cS:hS>0?hS:null;const refPct=ref?Math.round(v/ref*100):(lv.pct!=null&&!isNaN(Number(lv.pct))?Math.round(Number(lv.pct)):null);const refLabel=ref?(cS>0?'OF CRITICAL HIGH':'OF HIGH'):'OF SENSOR RANGE';
+ return {name:lv.name,v,unit:lv.unit||'m',max,pct:Math.max(0,Math.min(100,v/max*100)),refPct,refLabel,th,high,crit,floatHi,trend,at:lv.at};}
 function telPumps(d){const B=d.binary||[];return B.filter(b=>/^pump\s*\d+$/i.test(b.name)).map(p=>{const n=(p.name.match(/\d+/)||[''])[0];const f=B.find(b=>new RegExp('pump\\s*'+n+'\\b.*(fault|trip|fail)','i').test(b.name));
  return {name:p.name,run:/run/i.test(p.status||''),fault:!!(f&&f.alarmed),faultTxt:f&&f.alarmed?f.status:'',since:p.since};});}
 function telStationSvg(a,L){const W=360,H=262,id='s'+String(a.id).replace(/\W/g,'').slice(0,8);
@@ -5214,7 +5216,7 @@ function telStationSvg(a,L){const W=360,H=262,id='s'+String(a.id).replace(/\W/g,
    +(p.fault?'<g class="tel-pulse"><circle cx="27" cy="0" r="8" fill="'+RED+'" stroke="#fff" stroke-width="1.5"/><text x="27" y="4" text-anchor="middle" font-size="11" font-weight="800" fill="#fff">!</text></g>':'')
    +'</g><text x="'+(x+14)+'" y="'+(H-7)+'" text-anchor="middle" font-size="'+(n>2?8:9.5)+'" font-weight="800"  fill="'+(p.fault?'#b4401f':p.run&&!off?'#3f7f1f':'#52695b')+'">'+esc(p.name.replace(/pump\s*/i,'P'))+' '+(p.fault?'TRIP':p.run?'RUN':'OFF')+'</text>';});
  /* kiosk: level on the screen, status lights, telemetry mast */
- const scr=lv?'<text x="285" y="37" text-anchor="middle" font-size="12" font-weight="800" fill="'+(lv.high?'#ff8a6b':LIME)+'">'+(isNaN(lv.v)?'—':lv.v.toFixed(2))+' '+esc(lv.unit)+'</text><text x="285" y="48" text-anchor="middle" font-size="6.5" fill="#9fc1ad">'+Math.round(lv.pct)+'% FULL</text>':'';
+ const scr=lv?'<text x="285" y="37" text-anchor="middle" font-size="12" font-weight="800" fill="'+(lv.high?'#ff8a6b':LIME)+'">'+(isNaN(lv.v)?'—':lv.v.toFixed(2))+' '+esc(lv.unit)+'</text><text x="285" y="48" text-anchor="middle" font-size="5.8" fill="#9fc1ad">'+(lv.refPct!=null&&!isNaN(lv.v)?lv.refPct+'% '+lv.refLabel:'')+'</text>':'';
  const lights='<circle cx="263" cy="60" r="3.5" fill="'+(off?'#4c6b5a':LIME)+'"/><circle cx="274" cy="60" r="3.5" fill="'+(running?LIME:'#4c6b5a')+'"/><circle cx="285" cy="60" r="3.5" fill="'+(faults||lv&&lv.high?RED:'#4c6b5a')+'" '+(faults||lv&&lv.high?'class="tel-pulse"':'')+'/>';
  const mast='<path d="M316-6a11 11 0 0 1 16 0M311-12a18 18 0 0 1 26 0" fill="none" stroke="'+(off?'#9aa9a0':LIME)+'" stroke-width="2.4" stroke-linecap="round"/>';
  s+=kiosk(lights,scr,mast);
