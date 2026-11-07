@@ -122,9 +122,13 @@ async function liveFor(unit: string, excludeText?: string | null) {
   if (rtu && typeof rtu === "object") for (const [k, v] of Object.entries(rtu)) if (/comm|call|signal|status|power|online|name|serial|type|maintenance|parked/i.test(k) && (typeof v !== "object" || v === null)) pick[k] = v;
   const biL = (bi?.Items || []).filter(named).map((p: any) => ({ name: [p.Name, p.Name2].filter(Boolean).join(" "), status: p.StatusText, alarmed: !!p.Alarmed, since: p.LastChanged, fault: p.Alarmed && !/^pump\s*\d+$/i.test(p.Name) && !/engineer/i.test(p.Name) && !/running/i.test(p.AlarmText || "") && !exclude.some((x) => [p.Name, p.Name2, p.AlarmText].join(" ").toLowerCase().includes(x)) }));
   const val = (p: any) => p.DisplayValue ?? p.ScaledValue ?? p.EngineeringValue ?? p.Value ?? p.CurrentValue ?? p.LastValue ?? null;
-  const aiL = (ai?.Items || []).filter(named).map((p: any) => ({ name: p.Name, value: val(p), unit: p.Units || p.Unit || p.EngineeringUnits || "", at: p.Timestamp, alarmed: !!p.Alarmed, status: p.StatusText }));
+  const aiL = (ai?.Items || []).filter(named).map((p: any) => ({ name: p.Name, io: p.IOReference, value: val(p), unit: p.Units || p.Unit || p.EngineeringUnits || "", at: p.Timestamp, alarmed: !!p.Alarmed, status: p.StatusText, pct: p.PercentValue ?? null, zone: p.ThresholdZone ?? null, scale: p.Scale ?? null, thresholds: p.Thresholds ?? null }));
+  // the wet well level over the last 24 hours, for the trend line on the station picture
+  const lvl = aiL.find((x: any) => /well|level|depth|ultrasonic/i.test(x.name));
+  let trend: any[] = [];
+  if (lvl) { try { const now = new Date(); trend = (await series(unit, lvl.io, new Date(now.getTime() - 864e5), now)).map((v) => ({ t: v.Timestamp, v: v.Value })); } catch (_) { /* trend is optional */ } }
   const ciL = (ci?.Items || []).filter(named).map((p: any) => ({ name: p.Name, value: val(p), unit: p.Units || p.Unit || "", at: p.Timestamp }));
-  return { unit, rtu: pick, binary: biL, analogue: aiL, counters: ciL, faults: biL.filter((x: any) => x.fault).map((x: any) => x.name + ": " + x.status), last_comms: (ai?.Items || []).map((p: any) => p.Timestamp).filter(Boolean).sort().pop() || null, read_at: new Date().toISOString() };
+  return { unit, rtu: pick, binary: biL, analogue: aiL, counters: ciL, faults: biL.filter((x: any) => x.fault).map((x: any) => x.name + ": " + x.status), level_trend: trend, last_comms: (ai?.Items || []).map((p: any) => p.Timestamp).filter(Boolean).sort().pop() || null, read_at: new Date().toISOString() };
 }
 
 Deno.serve(async (req) => {

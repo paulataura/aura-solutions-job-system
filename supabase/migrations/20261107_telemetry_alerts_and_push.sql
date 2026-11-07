@@ -1,0 +1,1 @@
+-- see the migration applied as telemetry_alerts_and_push (pg_net, pg_cron, app_secrets, telemetry_alerts, push_subscriptions, 5-minute check)
