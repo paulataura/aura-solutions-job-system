@@ -92,7 +92,13 @@ async function runCheck() {
     const openBy = new Map((open || []).map((x: any) => [key(x), x]));
     for (const p of probs) {
       const ex = openBy.get(key(p));
-      if (ex) { await admin.from("telemetry_alerts").update({ last_seen_at: now, message: p.message }).eq("id", ex.id); openBy.delete(key(p)); continue; }
+      if (ex) {
+        // still active and nobody has acknowledged it: send it again every hour so it can't be missed
+        const due = !ex.acknowledged_at && (!ex.notified_at || Date.now() - new Date(ex.notified_at).getTime() >= 55 * 6e4);
+        let notified = ex.notified_at;
+        if (due) { const sent = await notify(`🔁 ${a.name} – still active`, `${p.message} (since ${new Date(ex.started_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}). Open the app to acknowledge.`, "tel-" + a.id + "-" + p.kind); if (sent) { notified = now; report.push({ asset: a.name, resent: p.message, sent }); } }
+        await admin.from("telemetry_alerts").update({ last_seen_at: now, message: p.message, notified_at: notified }).eq("id", ex.id); openBy.delete(key(p)); continue;
+      }
       // the same alarm came back within 30 minutes of clearing: reopen it rather than raising (and notifying) a new one
       const since = new Date(Date.now() - 30 * 6e4).toISOString();
       const { data: recent } = await admin.from("telemetry_alerts").select("id").eq("asset_id", a.id).eq("kind", p.kind).eq("point", p.point || "").gte("cleared_at", since).order("cleared_at", { ascending: false }).limit(1);
