@@ -50,9 +50,14 @@ async function problemsFor(a: any) {
   // high level: the level reading is in alarm, or a high-level / float switch is
   const lvl = A.find((p) => /well|level|depth|ultrasonic/i.test(p.Name));
   const highFloat = B.find((p) => p.Alarmed && /float|high level|high water|overflow/i.test(nm(p)));
-  if ((lvl && (lvl.Alarmed && !/low/i.test(String(lvl.ThresholdZone || lvl.StatusText || "")))) || highFloat) {
-    const v = lvl ? (lvl.DisplayValue ?? lvl.Value) : null;
-    out.push({ kind: "high_level", point: "", message: `High level${v != null ? " – " + v + " " + (lvl.Units || "m") : ""}${highFloat ? " (" + nm(highFloat) + ")" : ""}` });
+  const v = lvl ? Number(lvl.DisplayValue ?? lvl.Value) : NaN, u = lvl?.Units || "m";
+  const hi = Number(a.high_level_m), crit = Number(a.critical_level_m);
+  if (hi > 0 || crit > 0) {
+    // the station's own levels (set in the app): High and Critical high are separate alerts, so reaching critical notifies again
+    if (crit > 0 && v >= crit) out.push({ kind: "critical_level", point: "", message: `CRITICAL high level – ${v} ${u} (critical is ${crit} ${u})` });
+    if ((hi > 0 && v >= hi) || (crit > 0 && v >= crit)) out.push({ kind: "high_level", point: "", message: `High level – ${v} ${u} (high is ${hi > 0 ? hi : crit} ${u})` });
+  } else if ((lvl && (lvl.Alarmed && !/low/i.test(String(lvl.ThresholdZone || lvl.StatusText || "")))) || highFloat) {
+    out.push({ kind: "high_level", point: "", message: `High level${!isNaN(v) ? " – " + v + " " + u : ""}${highFloat ? " (" + nm(highFloat) + ")" : ""}` });
   }
   // pump trips, then any other fault that isn't on the station's leave-out list
   for (const p of B.filter((p) => p.Alarmed)) {
@@ -82,7 +87,7 @@ async function notify(title: string, body: string, tag: string) {
 
 async function runCheck() {
   await vapid();
-  const { data: assets } = await admin.from("site_assets").select("id,name,telemetry_provider,telemetry_unit_id,alarm_exclude,active").eq("telemetry_provider", "nortech").not("telemetry_unit_id", "is", null);
+  const { data: assets } = await admin.from("site_assets").select("id,name,telemetry_provider,telemetry_unit_id,alarm_exclude,active,high_level_m,critical_level_m").eq("telemetry_provider", "nortech").not("telemetry_unit_id", "is", null);
   const now = new Date().toISOString(), report: any[] = [];
   for (const a of (assets || []).filter((x: any) => x.active !== false)) {
     let probs: any[];
@@ -104,7 +109,7 @@ async function runCheck() {
       const { data: recent } = await admin.from("telemetry_alerts").select("id").eq("asset_id", a.id).eq("kind", p.kind).eq("point", p.point || "").gte("cleared_at", since).order("cleared_at", { ascending: false }).limit(1);
       if (recent?.length) { await admin.from("telemetry_alerts").update({ cleared_at: null, last_seen_at: now, message: p.message }).eq("id", recent[0].id); continue; }
       const { data: ins } = await admin.from("telemetry_alerts").insert({ asset_id: a.id, kind: p.kind, point: p.point || "", message: p.message, started_at: now, last_seen_at: now }).select("id").single();
-      const icon = { high_level: "🌊", pump_trip: "⚠️", offline: "📵", fault: "⚠️" }[p.kind as string] || "⚠️";
+      const icon = { critical_level: "🚨", high_level: "🌊", pump_trip: "⚠️", offline: "📵", fault: "⚠️" }[p.kind as string] || "⚠️";
       const sent = await notify(`${icon} ${a.name}`, p.message, "tel-" + a.id + "-" + p.kind);
       if (ins?.id && sent) await admin.from("telemetry_alerts").update({ notified_at: now }).eq("id", ins.id);
       report.push({ asset: a.name, raised: p.message, sent });
