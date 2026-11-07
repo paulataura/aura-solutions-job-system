@@ -5169,6 +5169,10 @@ function telLevelInfo(d,asset){const A=d.analogue||[],lv=A.find(x=>/well|level|d
  else th=telNums(lv.thresholds,[]).filter(t=>t.v>0&&t.v<1000).map(t=>{const k=String(t.label).trim().toUpperCase().replace(/[^A-Z]/g,'');const nice=TH_NAMES[k];return {...t,code:k,label:nice||t.label,isHigh:/^(HH|H|HI|HIHI)$/.test(k)||/high|overflow/i.test(t.label),isCrit:/^(HH|HIHI)$/.test(k)||/critical|overflow/i.test(t.label)};}).filter(t=>t.isHigh);const trend=(d.level_trend||[]).map(p=>Number(p.v)).filter(x=>!isNaN(x));
  if(!max){const hi=Math.max(v||0,...th.map(t=>t.v),...trend);max=hi>0?Math.ceil(hi*1.25*10)/10:3;}
  max=Math.max(max,...th.map(t=>t.v*1.05));
+ /* the drawing's depth: with the station's own levels set, the top of the well is a little above Critical high,
+    so High / Critical high sit at their true height (iHost's scale can be in raw units, so it isn't trusted for this) */
+ if(hS>0||cS>0){const top=Math.max(cS||0,hS||0);max=Math.max(top*1.2,isNaN(v)?0:v*1.08,...trend.map(x=>x*1.05));}
+ else if(max>20)max=Math.max(...th.map(t=>t.v*1.2),isNaN(v)?0:v*1.5,...trend.map(x=>x*1.2),1);
  const hiTh=th.filter(t=>t.isHigh).sort((a,b)=>a.v-b.v)[0]||null,critTh=th.filter(t=>t.isCrit).sort((a,b)=>a.v-b.v)[0]||null;
  const floatHi=(d.binary||[]).some(b=>/float|high level|high water/i.test(b.name)&&b.alarmed);
  const high=hS>0||cS>0?(v>=(hS>0?hS:cS)):!!(lv.alarmed||(hiTh&&v>=hiTh.v)||floatHi||/high/i.test(String(lv.zone||'')+' '+String(lv.status||'')));
