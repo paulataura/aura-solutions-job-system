@@ -5305,6 +5305,66 @@ function gcDecorate(ctx){const sel=el(ctx==='detail'?'detail_contractor_id':'con
 /* who it's assigned to shows the typed contractor name */
 (function(){const o=window.refreshActiveJobAssignee;if(typeof o!=='function')return;window.refreshActiveJobAssignee=async function(){const r=await o.apply(this,arguments);try{await gcLoad();if(activeJob&&activeJob.contractor_id&&activeJob.contractor_id===GENERIC_CONTRACTOR_ID)activeJob.assigneeLabel=(activeJob.contractor_name||'Third-party contractor')+' — third-party (office fills in)';}catch(_){}return r;};})();
 
+
+/* ===== 9 Nov 2026: emails that look right – a proper signature and a button link instead of a long web address ===== */
+let SIG=null;
+async function sigLoad(force){if(SIG&&!force)return SIG;const r=await db.from('profiles').select('full_name,job_title,phone,signature_mode,email_signature_html').eq('id',activeSession.user.id).maybeSingle();SIG={...(r.data||{}),email:activeSession?.user?.email||'info@aurasolutions.co.uk'};return SIG;}
+function sigStandardHtml(p){const F='font-family:Arial,Helvetica,sans-serif;',G='#2f6b3a',logo=new URL('aura-logo.png',location.href).href;
+ const phone=p.phone?'<a href="tel:'+esc(String(p.phone).replace(/\s/g,''))+'" style="color:#17261c;text-decoration:none">'+esc(p.phone)+'</a> · ':'';
+ return '<table cellpadding="0" cellspacing="0" style="'+F+'border-collapse:collapse;margin-top:6px"><tr>'
+  +'<td style="padding:4px 14px 4px 0;border-right:3px solid #8bd02d;vertical-align:middle"><img src="'+esc(logo)+'" alt="Aura Solutions" width="120" style="width:120px;height:auto;display:block"></td>'
+  +'<td style="padding:4px 0 4px 14px;vertical-align:middle;font-size:13px;line-height:1.45;color:#17261c">'
+  +'<div style="font-size:15px;font-weight:bold;color:'+G+'">'+esc(p.full_name||'')+'</div>'+(p.job_title?'<div style="color:#52695b">'+esc(p.job_title)+'</div>':'')
+  +'<div style="font-weight:bold;margin-top:2px">Aura Solutions Group Limited</div>'
+  +'<div>'+phone+'Office <a href="tel:01386571556" style="color:#17261c;text-decoration:none">01386 571556</a></div>'
+  +'<div><a href="mailto:'+esc(p.email)+'" style="color:'+G+'">'+esc(p.email)+'</a> · <a href="https://aurasolutions.co.uk" style="color:'+G+'">aurasolutions.co.uk</a></div></td></tr>'
+  +'<tr><td colspan="2" style="'+F+'padding-top:8px;font-size:10.5px;color:#7a8a7e;line-height:1.4">Aura Solutions Group Limited · Registered in England No. 15761350 · VAT GB 471 3179 91 · Registered waste carrier CBDU631384<br>Main Street, Sedgeberrow, Evesham, England, WR11 7UH</td></tr></table>';}
+function sigHtml(p){return p.signature_mode==='custom'&&String(p.email_signature_html||'').trim()?'<div>'+p.email_signature_html+'</div>':sigStandardHtml(p);}
+function sigPlain(p){if(p.signature_mode==='custom'&&String(p.email_signature_html||'').trim()){const d=document.createElement('div');d.innerHTML=p.email_signature_html;return d.innerText.trim();}
+ return [p.full_name,p.job_title,'Aura Solutions Group Limited',(p.phone?p.phone+' · ':'')+'Office 01386 571556',p.email+' · aurasolutions.co.uk'].filter(Boolean).join('\n');}
+/* the email body: the typed text, with {LINK} turned into a button, then the signature */
+function docsEmailHtml(body,link,label){const F='font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#17261c;';
+ const btn='<table cellpadding="0" cellspacing="0" style="margin:6px 0 10px"><tr><td style="background:#2f6b3a;border-radius:6px"><a href="'+esc(link)+'" style="'+F+'display:inline-block;padding:11px 20px;color:#ffffff;font-weight:bold;text-decoration:none">📄 '+esc(label)+'</a></td></tr></table>';
+ const parts=String(body).replace(/\r/g,'').split(/\n\s*\n/).map(p=>p.includes('{LINK}')?p.split('{LINK}').map((t,i)=>(i?btn:'')+(t.trim()?'<p style="'+F+'margin:0 0 10px">'+esc(t.trim()).replace(/\n/g,'<br>')+'</p>':'')).join(''):'<p style="'+F+'margin:0 0 12px">'+esc(p).replace(/\n/g,'<br>')+'</p>');
+ return '<div style="'+F+'">'+parts.join('')+sigHtml(SIG||{})+'</div>';}
+async function docsCopyEmail(btn){const s=window.__sendDocs;if(!s)return false;await sigLoad();const label='View your job documents'+(activeJob?.job_number?' – '+activeJob.job_number:'');
+ const html=docsEmailHtml(s.rawBody,s.link,label),text=s.rawBody.replace('{LINK}',label+': '+s.link)+'\n\n'+sigPlain(SIG);
+ try{await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);if(btn)btn.textContent='✓ Email copied – paste it in';return true;}catch(e){try{await navigator.clipboard.writeText(text);}catch(_){}return false;}}
+/* keep the raw text (with {LINK}) so the email can be built as HTML; the plain mailto body is no longer used */
+(function(){const o=window.sendDocsDefaults;if(typeof o!=='function')return;window.sendDocsDefaults=function(){const d=o.apply(this,arguments);d.body=d.body.replace(/\n\nKind regards,[\s\S]*$/,'\n\nKind regards,');return d;};})();
+(function(){const st=document.createElement('style');st.textContent='.sig-edit{min-height:90px;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;overflow:auto}';document.head.appendChild(st);})();
+window.openJobDocsMail=async function(){const s=window.__sendDocs;if(!s)return;if(!(navigator.canShare&&navigator.canShare({files:sendDocsFiles})))downloadJobDocs();
+ await docsCopyEmail();location.href='mailto:'+encodeURIComponent(s.to)+'?'+[s.cc?'cc='+encodeURIComponent(s.cc):'','subject='+encodeURIComponent(s.subject)].filter(Boolean).join('&');};
+window.shareJobDocs=async function(){const s=window.__sendDocs;if(!s)return;await docsCopyEmail();
+ try{await navigator.share({files:sendDocsFiles,title:s.subject});}catch(e){if(e.name!=='AbortError')alert('Could not open the share window: '+e.message+'\n\nUse “Open email” and attach the downloaded PDFs instead.');}};
+/* after the link is made: remember the typed text, add Copy email + signature buttons, and explain the paste step */
+const __sdObs=new MutationObserver(()=>{const s=window.__sendDocs;if(!s||s.rawBody)return;const b=el('sdBody');s.rawBody=(b?.value||s.body.replace(s.link,'{LINK}'));
+ const box=[...document.querySelectorAll('#sendDocsPanel .ok')].find(x=>/Ready to send/.test(x.textContent));if(!box||box.querySelector('.sd-rich'))return;
+ const acts=box.querySelector('.actions');acts?.insertAdjacentHTML('afterbegin','<button class="btn primary sd-rich" type="button" onclick="docsCopyEmail(this)">📋 Copy email (link button + signature)</button>');
+ const note=box.querySelector('.muted');if(note)note.innerHTML='Your email opens with the recipient and subject filled in. <b>Paste (Ctrl+V, or long-press → Paste) into the message</b> – the text, a <b>View your job documents</b> button and your signature are copied for you. '+(navigator.canShare?'“Email with attachments” attaches both PDFs on phones.':'Drag the downloaded PDFs into the email.')+' <a href="#" onclick="sigEdit();return false">✍ Edit my signature</a>';});
+setTimeout(()=>{const p=el('sendDocsPanel');if(p)__sdObs.observe(p,{childList:true,subtree:true});},0);
+(function(){const o=window.renderSendDocsPanel;if(typeof o!=='function')return;window.renderSendDocsPanel=async function(){const r=await o.apply(this,arguments);try{const p=el('sendDocsPanel');if(p&&!p.dataset.sigObs){p.dataset.sigObs='1';__sdObs.observe(p,{childList:true,subtree:true});}const b=el('sdBody');if(b&&!b.dataset.sigNote){b.dataset.sigNote='1';b.insertAdjacentHTML('afterend','<div class="muted" style="font-size:12.5px;margin-top:3px">{LINK} becomes a “View your job documents” button. Your signature is added after “Kind regards,” – <a href="#" onclick="sigEdit();return false">edit signature</a>.</div>');}}catch(_){}return r;};})();
+/* signature editor */
+async function sigEdit(){await sigLoad(true);const p=SIG;let ov=el('sigOverlay');if(!ov){ov=document.createElement('div');ov.id='sigOverlay';ov.className='ct-overlay';document.body.appendChild(ov);}
+ ov.innerHTML='<div class="ct-modal" style="max-width:720px"><div class="row"><h2>✍ My email signature</h2><button class="mini-btn" type="button" onclick="el(\'sigOverlay\').remove()">✕</button></div>'
+  +'<div class="s-chk" style="margin:8px 0"><label><input type="radio" name="sigMode" value="standard" '+(p.signature_mode!=='custom'?'checked':'')+' onchange="sigPreview()"> Aura standard signature</label><label><input type="radio" name="sigMode" value="custom" '+(p.signature_mode==='custom'?'checked':'')+' onchange="sigPreview()"> My own (paste from Outlook)</label></div>'
+  +'<div id="sigStd"><div class="two"><div class="field"><label>Name</label><input value="'+esc(p.full_name||'')+'" disabled></div><div class="field"><label>Job title</label><input id="sigTitle" value="'+esc(p.job_title||'')+'" placeholder="e.g. Director" oninput="sigPreview()"></div></div><div class="field"><label>Mobile / direct number</label><input id="sigPhone" value="'+esc(p.phone||'')+'" placeholder="e.g. 07700 900000" oninput="sigPreview()"></div></div>'
+  +'<div id="sigCus"><div class="muted" style="font-size:13px;margin-bottom:4px">In Outlook, open a new email, select all of your signature, copy it, then click in the box below and paste.</div><div id="sigBox" class="sig-edit" contenteditable="true" oninput="sigPreview()">'+(p.email_signature_html||'')+'</div></div>'
+  +'<h3 style="margin:12px 0 4px">Preview</h3><div id="sigPrev" style="border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff"></div>'
+  +'<div class="actions" style="margin-top:10px"><button class="btn primary" type="button" onclick="sigSave()">Save signature</button></div><div id="sigMsg"></div></div>';
+ sigPreview();}
+function sigPreview(){const mode=document.querySelector('input[name=sigMode]:checked')?.value||'standard';el('sigStd').classList.toggle('hidden',mode!=='standard');el('sigCus').classList.toggle('hidden',mode!=='custom');
+ const p={...SIG,signature_mode:mode,job_title:el('sigTitle').value.trim(),phone:el('sigPhone').value.trim(),email_signature_html:sigClean(el('sigBox').innerHTML)};el('sigPrev').innerHTML='<div style="font:14px Arial;color:#17261c">Kind regards,</div>'+sigHtml(p);}
+/* keep formatting and links from the paste, drop scripts and anything that can't travel in an email */
+function sigClean(h){const d=document.createElement('div');d.innerHTML=h||'';d.querySelectorAll('script,style,meta,link,iframe,object,embed,form,input,button').forEach(x=>x.remove());d.querySelectorAll('*').forEach(x=>{[...x.attributes].forEach(a=>{if(/^on/i.test(a.name)||(/^(href|src)$/i.test(a.name)&&/^\s*javascript:/i.test(a.value)))x.removeAttribute(a.name);});if(x.tagName==='IMG'&&/^(file:|cid:)/i.test(x.getAttribute('src')||''))x.remove();});return d.innerHTML.trim();}
+async function sigSave(){const mode=document.querySelector('input[name=sigMode]:checked')?.value||'standard',html=sigClean(el('sigBox').innerHTML);
+ if(mode==='custom'&&!html){el('sigMsg').innerHTML='<div class="err">Paste your signature into the box first.</div>';return;}
+ const r=await db.rpc('aura_save_my_signature',{p_job_title:el('sigTitle').value,p_phone:el('sigPhone').value,p_mode:mode,p_html:html||null});
+ if(r.error){el('sigMsg').innerHTML='<div class="err">'+esc(r.error.message)+'</div>';return;}await sigLoad(true);el('sigMsg').innerHTML='<div class="ok">Saved – it\'ll be used on the emails you copy from the app.'+(mode==='custom'&&/<img/i.test(html)===false&&/img/i.test(el('sigBox').innerHTML)?' (Pictures saved only on your computer can\'t travel in an email, so they were left out.)':'')+'</div>';}
+/* the menu: Setup → My email signature */
+(function(){try{const g=AURA_NAV.find(x=>x.g==='Setup');if(g&&!g.items.some(i=>i[0]==='signature'))g.items.push(['signature','✍','My email signature']);}catch(_){}})();
+(function(){const o=window.navGo;if(typeof o!=='function')return;window.navGo=function(k){if(k==='signature'){sigEdit();return;}return o.apply(this,arguments);};})();
+
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
