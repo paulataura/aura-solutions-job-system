@@ -5303,7 +5303,7 @@ function gcDecorate(ctx){const sel=el(ctx==='detail'?'detail_contractor_id':'con
 /* no secure link for the generic contractor – the office fills the job in */
 (function(){const o=window.contractorLinkControls;if(typeof o!=='function')return;window.contractorLinkControls=function(){if(activeJob&&GENERIC_CONTRACTOR_ID&&activeJob.contractor_id===GENERIC_CONTRACTOR_ID)return '<div class="secure-link-card"><b>🧾 Office fills in this job</b><div class="muted" style="font-size:13px;margin-top:4px">'+esc(activeJob.contractor_name||'The third-party contractor')+' isn\'t sent a link. Fill in the arrival, photos, completion and any WTN from the office as the job is done.</div></div>';return o.apply(this,arguments);};})();
 /* who it's assigned to shows the typed contractor name */
-(function(){const o=window.refreshActiveJobAssignee;if(typeof o!=='function')return;window.refreshActiveJobAssignee=async function(){const r=await o.apply(this,arguments);try{await gcLoad();if(activeJob&&activeJob.contractor_id&&activeJob.contractor_id===GENERIC_CONTRACTOR_ID)activeJob.assigneeLabel=(activeJob.contractor_name||'Third-party contractor')+' — third-party (office fills in)';}catch(_){}return r;};})();
+(function(){const o=window.refreshActiveJobAssignee;if(typeof o!=='function')return;window.refreshActiveJobAssignee=async function(){const r=await o.apply(this,arguments);try{await gcLoad();if(activeJob&&activeJob.contractor_id&&activeJob.contractor_id===GENERIC_CONTRACTOR_ID)activeJob.assigneeLabel=activeJob.contractor_name||'Third-party contractor';}catch(_){}return r;};})();
 
 
 /* ===== 9 Nov 2026: emails that look right – a proper signature and a button link instead of a long web address ===== */
