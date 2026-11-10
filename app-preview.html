@@ -4728,8 +4728,22 @@ async function quoteEdit(id,preset){await salesLoad();await ensureRateCard().cat
   const loose=(lr.data||[]).filter(l=>!l.stage_id);if(loose.length){if(!stages.length)stages.push(qeBlankStage());stages[0].lines=stages[0].lines.concat(loose);}}
  else{q={title:'',intro:Q_INTRO,terms:Q_TERMS,vat_rate:20,quote_date:localDateKey(new Date()),valid_until:localDateKey(new Date(Date.now()+30*864e5)),status:'draft',...(preset||{})};}
  if(!stages.length)stages=[qeBlankStage()];
- QE={q,stages,multi:stages.length>1||!!stages[0].title,sites:[],contacts:[],prices:[],dirty:false};
+ QE={q,stages,multi:stages.length>1||!!stages[0].title,sites:[],contacts:[],prices:[],files:[],dirty:false};
+ if(q.id){try{const f=await db.from('quote_files').select('*').eq('quote_id',q.id).order('created_at');QE.files=f.data||[];}catch(_){}}
  await qeLoadParty();qeRender();}
+function qeDocsHtml(){const q=QE.q;if(!q.id)return '<div class="muted" style="font-size:13px">Save the quote first, then add documents.</div>';
+ const icon=n=>/\.pdf$/i.test(n)?'📄':/\.(xlsx?|csv)$/i.test(n)?'📊':/\.(dxf|dwg)$/i.test(n)?'📐':/\.(png|jpe?g|webp)$/i.test(n)?'🖼':'📎';
+ const kb=b=>b==null?'':b>1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
+ return (QE.files.length?'<div style="display:flex;flex-direction:column;gap:4px">'+QE.files.map(f=>'<div style="display:flex;gap:8px;align-items:center;border:1px solid #dfe8df;border-radius:8px;padding:6px 9px;background:#fff"><span>'+icon(f.file_name)+'</span><a href="#" onclick="qeDocOpen(\''+f.id+'\');return false" style="flex:1;word-break:break-all">'+esc(f.file_name)+'</a><span class="muted" style="font-size:12px">'+kb(f.size_bytes)+'</span><button class="tpe-mini" type="button" title="Remove" onclick="qeDocDelete(\''+f.id+'\')">✕</button></div>').join('')+'</div>':'<div class="muted" style="font-size:13px">No documents attached yet.</div>')
+  +'<label class="mini-btn" style="display:inline-block;margin-top:6px;cursor:pointer">+ Add documents<input type="file" multiple style="display:none" onchange="qeDocsUpload(this.files);this.value=\'\'"></label>';}
+function qeDocsRefresh(){const b=el('qeDocs');if(b)b.innerHTML=qeDocsHtml();}
+async function qeDocsUpload(files){const q=QE.q;if(!q.id||!files||!files.length)return;const b=el('qeDocs');if(b)b.insertAdjacentHTML('beforeend','<div class="muted" id="qeDocsBusy">Uploading '+files.length+' file(s)…</div>');
+ try{for(const f of Array.from(files)){const safe=f.name.replace(/[^A-Za-z0-9._-]+/g,'_');const path='quotes/'+q.id+'/'+Date.now()+'-'+safe;
+   const up=await db.storage.from('job-files').upload(path,f,{contentType:f.type||'application/octet-stream',upsert:false});if(up.error)throw up.error;
+   const ins=await db.from('quote_files').insert({quote_id:q.id,file_name:f.name,storage_path:path,mime_type:f.type||null,size_bytes:f.size,created_by_name:activeProfile?.full_name||null}).select('*').single();if(ins.error)throw ins.error;QE.files.push(ins.data);}
+  qeDocsRefresh();}catch(e){qeDocsRefresh();qeMsg('<div class="err">Upload failed: '+esc(e.message||e)+'</div>');}}
+async function qeDocOpen(id){const f=QE.files.find(x=>x.id===id);if(!f)return;const r=await db.storage.from('job-files').createSignedUrl(f.storage_path,1800,{download:f.file_name});if(r.error){qeMsg('<div class="err">'+esc(r.error.message)+'</div>');return;}window.open(r.data.signedUrl,'_blank','noopener');}
+async function qeDocDelete(id){const f=QE.files.find(x=>x.id===id);if(!f||!await auraConfirm('Remove '+f.file_name+' from this quote?'))return;await db.storage.from('job-files').remove([f.storage_path]);const d=await db.from('quote_files').delete().eq('id',id);if(d.error){qeMsg('<div class="err">'+esc(d.error.message)+'</div>');return;}QE.files=QE.files.filter(x=>x.id!==id);qeDocsRefresh();}
 function qeParty(){return QE.q.customer_id?'c:'+QE.q.customer_id:QE.q.lead_id?'l:'+QE.q.lead_id:'';}
 async function qeLoadParty(){QE.sites=[];QE.contacts=[];QE.prices=[];const cid=QE.q.customer_id;if(!cid)return;
  const [s,c,p]=await Promise.all([auraSitesFor(cid),db.from('customer_contacts').select('*').eq('customer_id',cid).order('is_primary',{ascending:false}),db.from('customer_prices').select('*').eq('customer_id',cid).eq('active',true)]);
@@ -4781,6 +4795,7 @@ function qeRender(){const q=QE.q,lock=qeLocked(),T=qeTotals(),dis=lock?' disable
   +(!lock?'<button class="btn light" type="button" style="margin-top:4px" onclick="qeAddScope()">+ Add another scope</button> <span class="muted" style="font-size:12.5px">a separate task with its own price – the customer can accept or turn down each one, and you choose which go together when you book the jobs</span>':'')
   +'<div class="qe-tot" id="qeTotals">'+qeTotalsHtml(T)+'</div>'
   +'<div class="two" style="margin-top:12px"><div class="field"><label>Terms (one per line)</label>'+ta(q.terms,"qeF('terms',this.value)",'',6)+'</div><div class="field"><label>Internal notes <span class="muted" style="font-weight:400">– not on the quote</span></label><textarea rows="6" oninput="qeF(\'internal_notes\',this.value)">'+esc(q.internal_notes||'')+'</textarea><label style="margin-top:6px">VAT rate %</label><input'+dis+' inputmode="decimal" style="max-width:90px" value="'+esc(q.vat_rate??20)+'" oninput="qeF(\'vat_rate\',qeNum(this.value));qeTotalsRender()"></div></div>'
+  +'<div class="field" style="margin-top:12px"><label>Documents <span class="muted" style="font-weight:400;font-size:12px">– drawings, calculations, specs attached to this quote</span></label><div id="qeDocs">'+qeDocsHtml()+'</div></div>'
   +'<div id="qeMsg"></div><div class="qe-bar">'+qeActions()+'</div>',true);
  el('salesOverlay').dataset.sticky='1';}
 function qeActions(){const q=QE.q,s=q.id?salesEffStatus(q):'draft',b=(t,f,cls)=>'<button class="btn '+(cls||'light')+'" type="button" onclick="'+f+'">'+t+'</button>';
