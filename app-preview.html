@@ -4975,7 +4975,7 @@ async function crmCustomer(id){await salesLoad();const c=(SALES.customers||[]).f
  const [ct,co,jb]=await Promise.all([db.from('customer_contacts').select('*').eq('customer_id',id).eq('active',true).order('is_primary',{ascending:false}),db.from('contracts').select('id,title,status,start_date,end_date').eq('customer_id',id),db.from('jobs').select('id,job_number,job_date,status,reference').eq('customer_id',id).is('archived_at',null).order('created_at',{ascending:false}).limit(8)]);
  const acts=SALES.acts.filter(a=>a.customer_id===id),qs=SALES.quotes.filter(q=>q.customer_id===id),fu=salesFollowUps().filter(f=>f.a?.customer_id===id);
  salesModal('<div class="row" style="flex-wrap:wrap;gap:8px"><div><h2>'+esc(c.company_name)+'</h2><div class="muted" style="font-size:13px">'+esc([c.contact_name,c.email,c.phone].filter(Boolean).join(' · '))+'</div></div><button class="mini-btn" type="button" onclick="window.__crmReturn=null;closeSalesModal()">✕ Close</button></div>'
-  +'<div class="actions" style="flex-wrap:wrap;margin:10px 0"><button class="btn primary" type="button" onclick="crmLogEdit({customer_id:\''+id+'\'})">📞 Log a call / note</button><button class="btn light" type="button" onclick="quoteEdit(null,{customer_id:\''+id+'\'}).then(()=>qeSetParty(\'c:'+id+'\'))">🧾 New quote</button><button class="btn light" type="button" onclick="window.__crmReturn=null;closeSalesModal();contractsView.customer=\''+id+'\';navGo(\'contracts\')">📑 Contracts</button></div>'
+  +'<div class="actions" style="flex-wrap:wrap;margin:10px 0"><button class="btn primary" type="button" onclick="crmLogEdit({customer_id:\''+id+'\'})">📞 Log a call / note</button><button class="btn light" type="button" onclick="quoteEdit(null,{customer_id:\''+id+'\'}).then(()=>qeSetParty(\'c:'+id+'\'))">🧾 New quote</button><button class="btn light" type="button" onclick="ctForCustomer(\''+id+'\')">📑 Contracts</button></div>'
   +(fu.length?fu.map(f=>'<div class="fu-row '+(f.due<localDateKey(new Date())?'late':'')+'"><div>⏰ <b>'+esc(f.what)+'</b> · '+esc(crmDate(f.due))+'</div><button class="mini-btn" type="button" onclick="crmFollowDone(\'act\',\''+f.id+'\',true)">Done – log it</button></div>').join(''):'')
   +'<div class="two" style="align-items:start"><div><h3 style="margin:10px 0 4px">History</h3>'+(acts.length?'<div class="tl">'+acts.map(crmActHtml).join('')+'</div>':'<div class="muted">Nothing logged yet.</div>')+'</div>'
   +'<div><h3 style="margin:10px 0 4px">Contacts</h3>'+((ct.data||[]).map(x=>'<div style="font-size:14px;margin:4px 0"><b>'+esc(x.full_name)+'</b>'+(x.job_title?' · '+esc(x.job_title):'')+'<div class="muted" style="font-size:12.5px">'+[x.email?'<a href="mailto:'+esc(x.email)+'">'+esc(x.email)+'</a>':'',x.mobile||x.phone?'<a href="tel:'+esc(x.mobile||x.phone)+'">'+esc(x.mobile||x.phone)+'</a>':''].filter(Boolean).join(' · ')+(x.last_contacted_at?' · last spoke '+esc(crmDate(x.last_contacted_at)):'')+'</div></div>').join('')||'<div class="muted">No contacts saved.</div>')
@@ -5397,6 +5397,71 @@ async function completeDisposalOnsite(){const msg=el('onsiteMsg');if(!activeJob|
    const cell=grid.querySelector('.calendar-day[ondrop*="\''+day+'\'"]');if(!cell||cell.querySelector('[data-done-visit="'+v.id+'"]'))return;cell.querySelector('.calendar-empty')?.remove();
    cell.insertAdjacentHTML('beforeend','<button type="button" class="cal-job done-visit" data-done-visit="'+v.id+'" onclick="openJob(\''+v.job_id+'\')" title="Visit done on this day"><b>'+esc(j.job_number||'')+'</b>'+(j.reference?'<small class="cal-reference">🔖 '+esc(j.reference)+'</small>':'')+'<small>'+esc(j.customers?.company_name||'')+'</small><small>✓ Visit '+(v.visit_number||1)+' done</small></button>');});}catch(_){}})();
  return r;};})();
+
+/* ===== 10 Nov 2026: a Back button (and phone swipe-back) that returns to the page you came from ===== */
+(function(){const st=document.createElement('style');st.textContent='#navBackBar{position:sticky;top:calc(var(--aura-head,0px) + 4px);z-index:30;margin:0 0 6px;pointer-events:none}#navBackBar button{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line,#d9e3dc);background:#fff;color:#0b3425;font-weight:700;font-size:14px;border-radius:999px;padding:7px 14px;box-shadow:0 2px 8px rgba(0,0,0,.08);cursor:pointer}#navBackBar button:hover{background:#f3f8f3}'
+ +'.call-btn,.cc-lines a,#salesOverlay a[href^="mailto:"],#salesOverlay a[href^="tel:"]{display:inline-flex;align-items:center;gap:5px;border:1px solid #b9dd97;background:#f1f9e8;color:#0b3425!important;text-decoration:none!important;border-radius:999px;padding:5px 11px;font-size:13.5px;font-weight:600;margin:2px 4px 2px 0;line-height:1.2}.call-btn:hover,.cc-lines a:hover,#salesOverlay a[href^="mailto:"]:hover,#salesOverlay a[href^="tel:"]:hover{background:#e3f3cf}.cc-lines{gap:4px!important}';document.head.appendChild(st);})();
+const NAVBACK={stack:[],busy:false};
+function navLabel(s){if(s.job)return s.jobNo||'the job';if(s.crm){const c=(window.SALES?.customers||[]).find(x=>x.id===s.crm)||(directoryCustomers||[]).find(x=>x.id===s.crm);if(c)return c.company_name;}
+ if(s.key==='contracts'&&s.ct.customer){const c=(directoryCustomers||[]).find(x=>x.id===s.ct.customer)||(window.SALES?.customers||[]).find(x=>x.id===s.ct.customer);return 'Contracts'+(c?' – '+c.company_name:'');}
+ for(const g of AURA_NAV)for(const i of g.items)if(i[0]===s.key)return i[2];return {jobs:'Job Centre'}[s.key]||'previous page';}
+function navSnap(){const jd=!el('jobDetail')?.classList.contains('hidden')&&activeJob?.id;const cc=window.__crmClosed&&Date.now()-window.__crmClosed.t<1500?window.__crmClosed.id:(el('salesOverlay')&&window.__crmOpen)||null;
+ return {job:jd?activeJob.id:null,jobNo:jd?(activeJob.job_number||''):'',key:auraNavCurrent||centreMode||'jobs',crm:jd?null:cc,ct:{customer:contractsView.customer,filter:contractsView.filter},
+  exp:{s:typeof expandedCustomerSiteId!=='undefined'?expandedCustomerSiteId:null,j:typeof expandedCustomerJobsId!=='undefined'?expandedCustomerJobsId:null,c:typeof expandedContactsCustomerId!=='undefined'?expandedContactsCustomerId:null},q:el('customerDirectorySearch')?.value||'',y:window.scrollY};}
+function navPush(){if(NAVBACK.busy)return;const s=navSnap(),t=NAVBACK.stack[NAVBACK.stack.length-1];
+ if(t&&t.job===s.job&&t.key===s.key&&t.crm===s.crm&&t.ct.customer===s.ct.customer)return;
+ NAVBACK.stack.push(s);if(NAVBACK.stack.length>30)NAVBACK.stack.shift();try{history.pushState({auraBack:NAVBACK.stack.length},'');}catch(_){}navBackRender();}
+function navBackRender(){const m=el('appMain')||document.querySelector('main');if(!m)return;let b=el('navBackBar');if(!b){b=document.createElement('div');b.id='navBackBar';m.insertBefore(b,m.firstChild);}
+ const s=NAVBACK.stack[NAVBACK.stack.length-1];b.classList.toggle('hidden',!s);b.innerHTML=s?'<button type="button" onclick="navBackClick()">← Back to '+esc(navLabel(s))+'</button>':'';}
+function navBackClick(){if(!NAVBACK.stack.length)return;if(history.state&&history.state.auraBack){history.back();return;}navBack();}
+async function navBack(){const s=NAVBACK.stack.pop();navBackRender();if(!s)return;NAVBACK.busy=true;
+ try{if(el('salesOverlay'))closeSalesModal();
+  if(s.job){await openJob(s.job);}
+  else{window.__ctKeep=true;contractsView.customer=s.ct.customer;contractsView.filter=s.ct.filter;try{await navGo(s.key);}finally{window.__ctKeep=false;}
+   if(s.key==='customers'){if(s.q&&el('customerDirectorySearch'))el('customerDirectorySearch').value=s.q;for(let i=0;i<40&&!(directoryCustomers||[]).length;i++)await new Promise(r=>setTimeout(r,100));
+    try{renderCustomersDirectory();}catch(_){}
+    if(s.exp.s&&typeof toggleCustomerSites==='function'){expandedCustomerSiteId=null;await toggleCustomerSites(s.exp.s);}
+    if(s.exp.j&&typeof toggleCustomerJobs==='function'){expandedCustomerJobsId=null;await toggleCustomerJobs(s.exp.j);}
+    if(s.exp.c&&typeof toggleCustomerContacts==='function'){expandedContactsCustomerId=null;await toggleCustomerContacts(s.exp.c);}}
+   if(s.crm)await crmCustomer(s.crm);}
+  setTimeout(()=>window.scrollTo({top:s.y||0}),350);}
+ catch(_){}finally{NAVBACK.busy=false;navBackRender();}}
+window.addEventListener('popstate',()=>{if(NAVBACK.stack.length&&!NAVBACK.busy)navBack();});
+/* remember where you were before each move */
+(function(){const o=window.navGo;if(typeof o!=='function')return;window.navGo=async function(key){const jd=!el('jobDetail')?.classList.contains('hidden');
+ if(!NAVBACK.busy&&(jd||key!==(auraNavCurrent||centreMode)||el('salesOverlay')||window.__ctKeep))navPush();
+ /* the Contracts menu shows every customer; only a customer's own Contracts button narrows it */
+ if(key==='contracts'&&!window.__ctKeep)contractsView.customer=null;
+ return o.apply(this,arguments);};})();
+(function(){const o=window.openJob;if(typeof o!=='function')return;window.openJob=async function(id){if(!NAVBACK.busy&&!(activeJob?.id===id&&!el('jobDetail')?.classList.contains('hidden')))navPush();return o.apply(this,arguments);};})();
+(function(){const o=window.showDashboard;if(typeof o!=='function')return;window.showDashboard=function(){const jd=!el('jobDetail')?.classList.contains('hidden');const r=o.apply(this,arguments);
+ /* leaving a job with its own Back to dashboard button: drop the matching Back step so it doesn't send you to the same page twice */
+ if(!NAVBACK.busy&&jd){const t=NAVBACK.stack[NAVBACK.stack.length-1];if(t&&!t.job&&t.key===(auraNavCurrent||centreMode))NAVBACK.stack.pop();navBackRender();}return r;};})();
+(function(){const o=window.crmCustomer;if(typeof o!=='function')return;window.crmCustomer=async function(id){window.__crmOpen=id;return o.apply(this,arguments);};})();
+(function(){const o=window.closeSalesModal;if(typeof o!=='function')return;window.closeSalesModal=function(){if(window.__crmOpen&&el('salesOverlay'))window.__crmClosed={id:window.__crmOpen,t:Date.now()};window.__crmOpen=null;return o.apply(this,arguments);};})();
+/* a customer's Contracts button: only that customer's contracts */
+function ctForCustomer(id){if(el('salesOverlay'))closeSalesModal();window.__ctKeep=true;contractsView.customer=id;contractsView.filter='all';return navGo('contracts').finally(()=>{window.__ctKeep=false;});}
+window.toggleCustomerMaintenance=async function(customerId){return ctForCustomer(customerId);};
+/* when one customer is chosen, the totals and the Reports due tab are that customer's too, and the heading names them */
+(function(){const o=window.renderContractsPage;if(typeof o!=='function')return;window.renderContractsPage=function(){const V=contractsView;if(!V.customer)return o.apply(this,arguments);
+ const allC=contractsCache,allJ=jobCentreJobs;let r;try{contractsCache=allC.filter(c=>c.customer_id===V.customer);jobCentreJobs=(allJ||[]).filter(j=>!j.contract_id||contractsCache.some(c=>c.id===j.contract_id));r=o.apply(this,arguments);}finally{contractsCache=allC;jobCentreJobs=allJ;}
+ try{const p=el('contractsPanel');const c=(directoryCustomers||[]).find(x=>x.id===V.customer)||(window.SALES?.customers||[]).find(x=>x.id===V.customer);
+  const nm=c?.company_name;const h=p.querySelector('h2');if(h&&nm){h.textContent='Contracts – '+nm;const sub=h.nextElementSibling;if(sub)sub.innerHTML='Only '+esc(nm)+'\'s contracts. <a href="#" onclick="contractsView.customer=null;renderContractsPage();return false">Show all customers</a>';}
+  p.querySelectorAll('.pill').forEach(x=>{if(/^Customer:/.test(x.textContent.trim())&&nm)x.firstChild.textContent='Customer: '+nm+' ';});
+  if(!nm&&!window.__ctNameFetch){window.__ctNameFetch=1;db.from('customers').select('id,company_name').eq('id',V.customer).maybeSingle().then(q=>{window.__ctNameFetch=0;if(q.data){(directoryCustomers=directoryCustomers||[]).some(x=>x.id===q.data.id)||directoryCustomers.push(q.data);renderContractsPage();}});}}catch(_){}
+ return r;};})();
+/* the customer's main contact is always one of their contacts */
+(function(){const o=window.loadCustomerContacts;if(typeof o!=='function')return;window.loadCustomerContacts=async function(cid){let rows=await o.apply(this,arguments);
+ try{const c=(directoryCustomers||[]).find(x=>x.id===cid);const nm=String(c?.contact_name||'').trim(),em=String(c?.email||'').trim().toLowerCase();
+  if(nm&&!rows.some(x=>x.active!==false&&(String(x.full_name||'').trim().toLowerCase()===nm.toLowerCase()||(em&&String(x.email||'').toLowerCase()===em)))){
+   const ins=await db.from('customer_contacts').insert({customer_id:cid,full_name:nm,email:c.email||null,phone:c.phone||null,is_primary:!rows.some(x=>x.is_primary&&x.active!==false),roles:[]});
+   if(!ins.error)rows=await o.apply(this,arguments);}}catch(_){}return rows;};})();
+/* email and phone on the customer card are buttons: tap to email or call */
+(function(){const o=window.renderCustomersDirectory;if(typeof o!=='function')return;window.renderCustomersDirectory=function(){const r=o.apply(this,arguments);
+ try{el('customerDirectoryList')?.querySelectorAll('.person-meta span').forEach(sp=>{const t=sp.textContent.trim();let m;
+  if((m=t.match(/^✉\s*(.+)$/))){sp.outerHTML='<a class="call-btn" href="mailto:'+esc(m[1])+'">✉ '+esc(m[1])+'</a>';}
+  else if((m=t.match(/^☎\s*(.+)$/))){sp.outerHTML='<a class="call-btn" href="tel:'+esc(m[1].replace(/[^\d+]/g,''))+'">📞 '+esc(m[1])+'</a>';}});}catch(_){}return r;};})();
+setTimeout(navBackRender,0);
 
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
