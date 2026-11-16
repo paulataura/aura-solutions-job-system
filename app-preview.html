@@ -6009,6 +6009,24 @@ async function disposalDateOk(msgId){try{const d=el('disposal_date')?.value;if(!
  document.addEventListener('dragstart',()=>{window.__calDragging=true;});document.addEventListener('dragend',()=>{window.__calDragging=false;});
 })();
 
+/* 16 Nov 2026: Equipment required – pick it from your own fleet, cross-hire kit and the rate card instead of typing */
+let eqPickCache=null;
+async function eqPickLoad(force){if(eqPickCache&&!force)return eqPickCache;const [a,r]=await Promise.all([db.from('hire_assets').select('id,code,name,ownership,active').eq('active',true).order('code').order('name'),db.from('rate_card_items').select('id,name,category,unit').in('category',['vehicle','equipment','hire']).eq('active',true).order('category').order('sort_order')]);
+ eqPickCache={assets:a.data||[],rates:r.data||[]};return eqPickCache;}
+async function eqPickFill(){const s=el('eqPick');if(!s||s.dataset.loaded)return;const d=await eqPickLoad();const o=t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>';
+ const grp=(lab,list)=>list.length?'<optgroup label="'+lab+'">'+list.join('')+'</optgroup>':'';
+ s.innerHTML='<option value="">+ Add equipment from your list…</option>'
+  +grp('Own fleet',d.assets.filter(a=>a.ownership==='owned').map(a=>o((a.code?a.code+' – ':'')+a.name)))
+  +grp('Cross-hire kit',d.assets.filter(a=>a.ownership!=='owned').map(a=>o(a.name)))
+  +grp('Vehicles & plant',d.rates.filter(x=>x.category==='vehicle').map(x=>o(x.name)))
+  +grp('Equipment',d.rates.filter(x=>x.category==='equipment').map(x=>o(x.name)))
+  +grp('Hire items',d.rates.filter(x=>x.category==='hire'&&!/delivery|collection|mobilis|visit/i.test(x.name)).map(x=>o(x.name)));
+ s.dataset.loaded='1';}
+function eqPickAdd(v){const t=el('equipment_required');if(!t||!v)return;const lines=String(t.value||'').split('\n').map(x=>x.trim()).filter(Boolean);const item='• '+v;
+ if(!lines.some(x=>x.replace(/^•\s*/,'').toLowerCase()===v.toLowerCase()))lines.push(item);t.value=lines.join('\n');t.dispatchEvent(new Event('input',{bubbles:true}));const s=el('eqPick');if(s)s.value='';}
+(function(){function inject(){const t=el('equipment_required');if(!t||el('eqPick'))return;t.insertAdjacentHTML('afterend','<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><select id="eqPick" style="max-width:420px" onfocus="eqPickFill()" onmousedown="eqPickFill()" onchange="eqPickAdd(this.value)"><option value="">+ Add equipment from your list…</option></select><span class="muted" style="font-size:12px">Pick from your fleet, cross-hire kit and rate card – or type anything else in the box.</span></div>');}
+ inject();const o=window.showCreateJob;if(typeof o==='function')window.showCreateJob=function(){const r=o.apply(this,arguments);try{inject();const s=el('eqPick');if(s){delete s.dataset.loaded;eqPickCache=null;}}catch(_){}return r;};})();
+
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
