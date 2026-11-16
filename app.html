@@ -5955,6 +5955,16 @@ async function disposalDateOk(msgId){try{const d=el('disposal_date')?.value;if(!
  if(d>localDateKey(new Date())){markRequired(['disposal_date']);const m=el(msgId);if(m)m.innerHTML='<div class="err">The tipping date is in the future.</div>';return false;}return true;}catch(_){return true;}}
 (function(){const o=window.completeDisposal;if(typeof o!=='function')return;window.completeDisposal=async function(){if(!await disposalDateOk('disposalMsg'))return;return o.apply(this,arguments);};})();
 (function(){const o=window.completeDisposalOnsite;if(typeof o!=='function')return;window.completeDisposalOnsite=async function(){if(!el('disposal_date')?.value&&el('disposal_date'))el('disposal_date').value=localDateKey(new Date());if(!await disposalDateOk('onsiteMsg'))return;return o.apply(this,arguments);};})();
+/* 16 Nov 2026: while dragging a job, the page scrolls when you hold it near the top or bottom of the screen */
+(function(){let dy=0,raf=0,last=0;const EDGE=90;
+ const step=()=>{if(!dy){raf=0;return;}window.scrollBy(0,dy);raf=requestAnimationFrame(step);};
+ document.addEventListener('dragover',e=>{last=Date.now();const y=e.clientY,h=window.innerHeight;let v=0;if(y<EDGE)v=-Math.ceil((EDGE-y)/4);else if(y>h-EDGE)v=Math.ceil((y-(h-EDGE))/4);dy=Math.max(-28,Math.min(28,v));if(dy&&!raf)raf=requestAnimationFrame(step);});
+ const stop=()=>{dy=0;};document.addEventListener('dragend',stop);document.addEventListener('drop',stop);document.addEventListener('dragleave',e=>{if(!e.relatedTarget)setTimeout(()=>{if(Date.now()-last>150)stop();},160);});
+ /* the mouse wheel scrolls during a drag too */
+ document.addEventListener('wheel',e=>{if(document.querySelector('.cal-job.dragging,[data-dragging]')||window.__calDragging)window.scrollBy(0,e.deltaY);},{passive:true});
+ document.addEventListener('dragstart',()=>{window.__calDragging=true;});document.addEventListener('dragend',()=>{window.__calDragging=false;});
+})();
+
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
