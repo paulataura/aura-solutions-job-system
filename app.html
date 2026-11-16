@@ -6633,6 +6633,32 @@ window.saveSupplierRates=saveSupplierRates=async function(id){const msg=el('srMs
    await db.from('supplier_rates').update({resource_id:m.resource_id,category_id:m.category_id,tax_type:c?.tax_type||null,description:it.name}).eq('rate_card_item_id',it.id);
    if(prefSup)await db.from('supplier_rates').update({preferred:false}).eq('rate_card_item_id',it.id).neq('supplier_id',prefSup);}}catch(_){}}
  return r;};})();
+/* ===== 16 Nov 2026: supplier rates can add a NEW rate card item (it syncs both ways), and the rate card list shows every supplier's price per item ===== */
+(function(){const o=window.srRowHtml;window.srRowHtml=srRowHtml=function(id,x){let h=o.apply(this,arguments);
+ h=h.replace('>Something not on the rate card…</option>','>+ Add a new item to the rate card…</option>');
+ const other=x&&!x.rate_card_item_id&&x.description;
+ /* the "new item" box: name, rate card category, what we charge – it goes onto the rate card when you save */
+ h=h.replace(/<div class="srOther([^"]*)"([^>]*)>[\s\S]*?<\/div><div class="srInfo">/,(m,cls,att)=>'<div class="srOther'+cls+'"'+att+'><input class="srDesc" value="'+esc(other?x.description:'')+'" placeholder="Item name, e.g. Jetvac & 2 operatives" style="flex:1;min-width:160px"><select class="srRcCat" style="width:auto">'+RC_CATS.map(([k,l])=>'<option value="'+k+'">'+esc(l)+'</option>').join('')+'</select><input class="srSell" inputmode="decimal" placeholder="We charge £ (optional)" style="width:150px"><div class="muted" style="font-size:12px;flex-basis:100%">Added to the rate card when you save, with this supplier\'s price.</div></div><div class="srInfo">');
+ return h;};})();
+(function(){const o=window.saveSupplierRates;window.saveSupplierRates=saveSupplierRates=async function(id){const msg=el('srMsg_'+id),body=el('srBody_'+id);if(!body)return o.apply(this,arguments);
+ const news=[...body.querySelectorAll('tr')].filter(tr=>tr.querySelector('.srItem')?.value==='__other'&&tr.querySelector('.srDesc')?.value.trim());
+ if(news.some(tr=>hrNum(tr.querySelector('.srPrice').value)==null)){msg.innerHTML='<div class="err">Put this supplier\'s price on each new item.</div>';return;}
+ try{await ensureRateCard();const sup=(financeSuppliers||[]).find(s=>s.id===id);
+  for(const tr of news){const name=tr.querySelector('.srDesc').value.trim(),cat=tr.querySelector('.srRcCat').value;
+   let it=(rateCardItems||[]).find(i=>i.name.trim().toLowerCase()===name.toLowerCase());
+   if(!it){const row={name,category:cat,code:rcNextCode(cat),unit:tr.querySelector('.srUnit').value.trim()||'item',cost_price:hrNum(tr.querySelector('.srPrice').value),sell_price:hrNum(tr.querySelector('.srSell')?.value),vat_rate:20,supplier:sup?.name||null,active:true};
+    const r=await db.from('rate_card_items').insert(row).select('*').single();if(r.error)throw r.error;it=r.data;rateCardItems.push(it);}
+   const sel=tr.querySelector('.srItem');if(![...sel.options].some(op=>op.value===it.id))sel.insertAdjacentHTML('afterbegin','<option value="'+it.id+'">'+esc(it.name)+'</option>');sel.value=it.id;}
+ }catch(e){msg.innerHTML='<div class="err">Could not add to the rate card: '+esc(e.message||String(e))+'</div>';return;}
+ const r=await o.apply(this,arguments);if(news.length){try{rateCardLoaded=false;}catch(_){}const m=el('srMsg_'+id);if(m)m.innerHTML='<div class="ok">Saved – '+news.length+' new item'+(news.length===1?'':'s')+' added to the rate card, and the prices show under "Who supplies this".</div>';}return r;};})();
+/* rate card list: each item shows its suppliers, cheapest first, best value and ★ preferred */
+function rcSupLine(itemId){const rs=(SUPR.rates||[]).filter(x=>x.rate_card_item_id===itemId&&x.unit_price!=null).sort((a,b)=>a.unit_price-b.unit_price);if(!rs.length)return '';const sups=window.suppliersCache||financeSuppliers||[];const it=(rateCardItems||[]).find(i=>i.id===itemId);const sell=it?.sell_price!=null?Number(it.sell_price):null;
+ return '<div class="rc-sups" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+rs.map((x,i)=>{const n=sups.find(s=>s.id===x.supplier_id)?.name||'Supplier',m=sell?((sell-x.unit_price)/sell*100):null;
+  return '<span title="'+(m!=null?'Margin at our price: '+m.toFixed(0)+'%':'')+'" style="font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid '+(i===0?'#7fbf8a;background:#eef8f0':'#d8d8d8;background:#fafafa')+'">'+(x.preferred?'★ ':'')+esc(n)+' <b>'+poGbp(x.unit_price)+'</b>'+(i===0&&rs.length>1?' · best value':'')+(i>0?' <span class="muted">+'+poGbp(x.unit_price-rs[0].unit_price)+'</span>':'')+'</span>';}).join('')+'</div>';}
+function rcDecorateSups(){if(rcView==='check'||!isFinanceAdmin())return;document.querySelectorAll('#rcBody table.rc tbody tr').forEach(tr=>{const b=tr.querySelector('button[onclick^="editRateCardItem("]');const id=(b?.getAttribute('onclick').match(/'([^']+)'/)||[])[1];if(!id)return;tr.querySelector('.rc-sups')?.remove();const html=rcSupLine(id);if(html)tr.firstElementChild.insertAdjacentHTML('beforeend',html);});}
+(function(){const o=window.renderRateCard;window.renderRateCard=renderRateCard=function(){const r=o.apply(this,arguments);try{if(rcView!=='check'&&isFinanceAdmin()){if(SUPR.rates&&(window.suppliersCache||financeSuppliers))rcDecorateSups();else Promise.all([suprLoad(),loadSuppliers()]).then(([_,s])=>{window.suppliersCache=s;rcDecorateSups();}).catch(()=>{});}}catch(_){}return r;};})();
+/* fresh supplier prices whenever the rate card is reloaded */
+(function(){const o=window.loadRateCard;window.loadRateCard=loadRateCard=async function(){try{SUPR.rates=null;}catch(_){}return o.apply(this,arguments);};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
