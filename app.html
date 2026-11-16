@@ -5549,6 +5549,33 @@ document.addEventListener('change',e=>{if(['waste_expected','assignment_type'].i
   if(j.data?.waste_expected&&c?.waste_carrier_registration&&!j.data.carrier_registration){const u=await db.from('jobs').update({aura_role:'broker',carrier_name:c.company_name,carrier_registration:c.waste_carrier_registration}).eq('id',activeJob.id);
    if(!u.error){Object.assign(activeJob,{aura_role:'broker',carrier_name:c.company_name,carrier_registration:c.waste_carrier_registration});const m=el('detailAssignmentMsg');if(m)m.insertAdjacentHTML('beforeend','<div class="muted" style="font-size:13px">♻ '+esc(c.company_name)+' set as the waste carrier ('+esc(c.waste_carrier_registration)+') for the WTN.</div>');}}}catch(_){}return r;};})();
 
+/* ===== 16 Nov 2026: the calendar shows what's still outstanding on finished work – paperwork, documents to send, invoicing ===== */
+(function(){const st=document.createElement('style');st.textContent='.cal-flags{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}.cal-flag{display:inline-block;font-size:10px;font-weight:800;line-height:1.2;padding:2px 5px;border-radius:5px;background:#fde7e5;color:#9b1c13;border:1px solid #f1b3ad}.cal-flag.f-rev{background:#fff1d6;color:#8a4b00;border-color:#f0c77a}.cal-flag.f-disp{background:#fff7dc;color:#7a5a00;border-color:#e8cf7a}.cal-flag.f-docs{background:#e8f2ff;color:#1d4f86;border-color:#9cc0ea}.cal-flag.f-ok{background:#e3f1e6;color:#2f6b3a;border-color:#b6d8bd}.cal-job.cal-alldone{opacity:.6}.cal-job.cal-outstanding{box-shadow:inset 0 0 0 1px #f1b3ad}'
+ +'#calOutBar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:8px 10px;border:1px solid var(--line,#d9e3dc);border-radius:10px;background:#fbfcfb;font-size:13px}#calOutBar button.cal-flag{cursor:pointer;font-size:12px;padding:4px 8px}#calOutBar button.cal-flag.on{outline:2px solid #0b3425}.cal-hide{display:none!important}';document.head.appendChild(st);})();
+let calOutFilter='';
+function jobOutstanding(j){if(!j||j.status==='aborted'||j.archived_at)return [];const f=[];
+ if(j.status==='completed')f.push(['disp','⏳ Disposal to confirm']);
+ if(j.status==='returned')f.push(['rev','📝 Paperwork to review']);
+ if(['reviewed','closed'].includes(j.status)){if(!j.documents_sent_at)f.push(['docs','✉ Docs to send']);if(!j.invoiced_at)f.push(['inv','£ To invoice']);}
+ return f;}
+function jobAllDone(j){return ['reviewed','closed'].includes(j?.status)&&!!j.documents_sent_at&&!!j.invoiced_at;}
+function calOutSet(k){calOutFilter=calOutFilter===k?'':k;renderCalendar();}
+(function(){const o=window.renderCalendar;if(typeof o!=='function')return;window.renderCalendar=function(){const r=o.apply(this,arguments);
+ const decorate=()=>{try{const grid=el('calendarGrid');if(!grid)return;const J=jobCentreJobs||[];
+  grid.querySelectorAll('.cal-job').forEach(b=>{const id=((b.getAttribute('onclick')||'').match(/openJob\('([^']+)'\)/)||[])[1];const j=J.find(x=>x.id===id);if(!j)return;
+   const pending=b.classList.contains('planned-visit')&&!b.classList.contains('done-visit');const f=pending?[]:jobOutstanding(j);
+   b.querySelector('.cal-flags')?.remove();b.classList.toggle('cal-outstanding',!!f.length);b.classList.toggle('cal-alldone',!pending&&jobAllDone(j));
+   if(f.length)b.insertAdjacentHTML('beforeend','<span class="cal-flags">'+f.map(x=>'<span class="cal-flag f-'+x[0]+'">'+x[1]+'</span>').join('')+'</span>');else if(!pending&&jobAllDone(j))b.insertAdjacentHTML('beforeend','<span class="cal-flags"><span class="cal-flag f-ok">✓ Paperwork & invoice done</span></span>');
+   b.classList.toggle('cal-hide',!!calOutFilter&&!(calOutFilter==='any'?f.length:f.some(x=>x[0]===calOutFilter)));});
+  /* totals for everything outstanding (not just the dates on screen) */
+  const all=J.map(jobOutstanding),n=k=>all.filter(f=>f.some(x=>x[0]===k)).length,any=all.filter(f=>f.length).length;
+  let bar=el('calOutBar');if(!bar){bar=document.createElement('div');bar.id='calOutBar';grid.parentNode.insertBefore(bar,grid);}
+  const btn=(k,label,cls)=>'<button type="button" class="cal-flag '+cls+(calOutFilter===k?' on':'')+'" onclick="calOutSet(\''+k+'\')">'+label+'</button>';
+  bar.innerHTML=any?'<b>Outstanding on finished work:</b>'+(n('disp')?btn('disp','⏳ '+n('disp')+' disposal to confirm','f-disp'):'')+(n('rev')?btn('rev','📝 '+n('rev')+' to review','f-rev'):'')+(n('docs')?btn('docs','✉ '+n('docs')+' docs to send','f-docs'):'')+(n('inv')?btn('inv','£ '+n('inv')+' to invoice','f-inv'):'')
+   +btn('any',calOutFilter?'Show everything':'Show only outstanding','f-ok')+(calOutFilter?'<span class="muted">Showing only the jobs with this outstanding. Tap again to show everything.</span>':''):'<span class="cal-flag f-ok">✓ Nothing outstanding – all finished jobs reviewed, sent and invoiced</span>';
+  if(calOutFilter==='any'&&any)bar.querySelector('button[onclick="calOutSet(\'any\')"]').textContent='Show everything';}catch(_){}};
+ decorate();setTimeout(decorate,900);setTimeout(decorate,2000);return r;};})();
+
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
