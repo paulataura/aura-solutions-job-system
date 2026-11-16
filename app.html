@@ -289,7 +289,7 @@ async function saveJobFinance(jobId,patch){const fin={},job={};Object.entries(pa
  if(Object.keys(fin).length){const u=await db.from('job_finance').upsert({job_id:jobId,...fin,updated_at:new Date().toISOString()},{onConflict:'job_id'});if(u.error)return u;}return {error:null};}
 async function loadJobs(){
  const management=['admin','manager'].includes(activeProfile?.role);
- const fields=management?'id,job_number,customer_id,site_address,postcode,reference,job_date,job_time,instructions,scope_of_work,status,created_at,revisit_due_on,revisit_source_job_id,maintenance_plan_id,maintenance_due_month,contract_id,contract_due_month,contract_group,customer_po,invoiced_at,documents_sent_at,archived_at,assigned_to,contractor_id,job_types(name,code,requires_waste_workflow),customers(company_name)':'id,job_number,site_address,postcode,reference,job_date,job_time,instructions,scope_of_work,status,created_at,archived_at,job_types(name,code,requires_waste_workflow)';
+ const fields=management?'id,job_number,customer_id,site_address,postcode,reference,job_date,job_time,instructions,scope_of_work,status,created_at,revisit_due_on,revisit_source_job_id,maintenance_plan_id,maintenance_due_month,contract_id,contract_due_month,contract_group,customer_po,invoiced_at,documents_sent_at,archived_at,assigned_to,contractor_id,contractor_name,contractor_paperwork,job_types(name,code,requires_waste_workflow),customers(company_name)':'id,job_number,site_address,postcode,reference,job_date,job_time,instructions,scope_of_work,status,created_at,archived_at,job_types(name,code,requires_waste_workflow)';
  const {data:jobs,error:jErr}=await db.from('jobs').select(fields).order('created_at',{ascending:false});
  if(jErr){el('status').className='err';el('status').textContent='Connected, but jobs could not be loaded: '+jErr.message;return;}
  if(isFinanceAdmin()&&jobs?.length)await mergeJobFinance(jobs);
@@ -5571,10 +5571,54 @@ function calOutSet(k){calOutFilter=calOutFilter===k?'':k;renderCalendar();}
   const all=J.map(jobOutstanding),n=k=>all.filter(f=>f.some(x=>x[0]===k)).length,any=all.filter(f=>f.length).length;
   let bar=el('calOutBar');if(!bar){bar=document.createElement('div');bar.id='calOutBar';grid.parentNode.insertBefore(bar,grid);}
   const btn=(k,label,cls)=>'<button type="button" class="cal-flag '+cls+(calOutFilter===k?' on':'')+'" onclick="calOutSet(\''+k+'\')">'+label+'</button>';
-  bar.innerHTML=any?'<b>Outstanding on finished work:</b>'+(n('disp')?btn('disp','⏳ '+n('disp')+' disposal to confirm','f-disp'):'')+(n('rev')?btn('rev','📝 '+n('rev')+' to review','f-rev'):'')+(n('docs')?btn('docs','✉ '+n('docs')+' docs to send','f-docs'):'')+(n('inv')?btn('inv','£ '+n('inv')+' to invoice','f-inv'):'')
+  bar.innerHTML=any?'<b>Outstanding on finished work:</b>'+(n('paper')?btn('paper','📄 '+n('paper')+' contractor paperwork awaited','f-paper'):'')+(n('disp')?btn('disp','⏳ '+n('disp')+' disposal to confirm','f-disp'):'')+(n('rev')?btn('rev','📝 '+n('rev')+' to review','f-rev'):'')+(n('docs')?btn('docs','✉ '+n('docs')+' docs to send','f-docs'):'')+(n('inv')?btn('inv','£ '+n('inv')+' to invoice','f-inv'):'')
    +btn('any',calOutFilter?'Show everything':'Show only outstanding','f-ok')+(calOutFilter?'<span class="muted">Showing only the jobs with this outstanding. Tap again to show everything.</span>':''):'<span class="cal-flag f-ok">✓ Nothing outstanding – all finished jobs reviewed, sent and invoiced</span>';
   if(calOutFilter==='any'&&any)bar.querySelector('button[onclick="calOutSet(\'any\')"]').textContent='Show everything';}catch(_){}};
  decorate();setTimeout(decorate,900);setTimeout(decorate,2000);return r;};})();
+
+/* ===== 16 Nov 2026: third-party job cards – the office records a contractor's job without the arrival picture, attaches their paperwork now or marks it to follow ===== */
+(function(){const st=document.createElement('style');st.textContent='#tpcBox{margin-top:14px;background:#f8fbf5;border:1px solid #cfe5b8}#tpcBox .tpc-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.cal-flag.f-paper{background:#f3e8ff;color:#5b2a86;border-color:#cdb3ea}.tpc-wait{margin:0 0 10px;padding:10px 12px;border-radius:10px;background:#f3e8ff;border:1px solid #cdb3ea;color:#3d1d5c;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}';document.head.appendChild(st);})();
+let tpcMode='';
+async function tpcContractorName(){const j=activeJob;if(!j)return 'the contractor';if(j.contractor_name)return j.contractor_name;if(j.contractor_id){try{const c=await contractorCarrier(j.contractor_id);if(c?.company_name)return c.company_name;}catch(_){}}return 'the contractor';}
+async function tpcInject(){const cap=el('arrivalCapture');const show=!!cap&&!cap.classList.contains('hidden')&&typeof officeEntering==='function'&&officeEntering();const old=el('tpcBox');if(!show){old?.remove();return;}if(old)return;
+ const nm=await tpcContractorName();const j=activeJob;
+ cap.insertAdjacentHTML('beforeend','<div id="tpcBox" class="saved-site-card"><b>🏢 Done by a third party?</b><div class="muted" style="font-size:13px">If '+esc(nm)+' won\'t fill in our job card, record the job here instead of the arrival picture. The job goes to Awaiting review.</div>'
+  +'<div class="tpc-btns"><button class="btn primary" type="button" onclick="tpcOpen(\'attach\')">📎 3rd-party job card</button><button class="btn light" type="button" onclick="tpcOpen(\'later\')">✓ Job complete – paperwork to follow</button></div>'
+  +'<div id="tpcForm" class="hidden" style="margin-top:10px"><div class="two"><div class="field"><label for="tpcDate">Date the work was done *</label><input id="tpcDate" type="date" value="'+esc(j.job_date||localDateKey(new Date()))+'"></div><div class="two"><div class="field"><label for="tpcStart">Start</label><input id="tpcStart" type="time" value="'+esc((j.job_time||'08:00').slice(0,5))+'"></div><div class="field"><label for="tpcEnd">Finish</label><input id="tpcEnd" type="time"></div></div></div>'
+  +'<div class="field"><label for="tpcNotes">What was done (optional)</label><textarea id="tpcNotes" style="min-height:60px" placeholder="e.g. Tank emptied, 3,000 gallons removed by '+esc(nm)+'"></textarea></div>'
+  +'<div id="tpcFileWrap"><div class="field"><label for="tpcFile">Their job card / paperwork *</label><input id="tpcFile" type="file" multiple accept=".pdf,.doc,.docx,image/*"><div class="muted" style="font-size:12.5px">Add their WTN too if they did one. PDF, Word or photos.</div></div><div class="field"><label for="tpcTitle">Title your customer sees</label><input id="tpcTitle" value="'+esc('Contractor job card – '+nm)+'"></div></div>'
+  +'<div class="actions"><button id="tpcGo" class="btn primary" type="button" onclick="tpcSave()">Save</button><button class="btn light" type="button" onclick="el(\'tpcForm\').classList.add(\'hidden\')">Cancel</button></div><div id="tpcMsg"></div></div></div>');}
+function tpcOpen(m){tpcMode=m;el('tpcForm').classList.remove('hidden');el('tpcFileWrap').classList.toggle('hidden',m!=='attach');el('tpcGo').textContent=m==='attach'?'Attach job card & complete job':'Mark complete – paperwork to follow';el('tpcMsg').innerHTML='';el('tpcDate').scrollIntoView({behavior:'smooth',block:'center'});}
+async function tpcUpload(files,title){const j=activeJob;for(let i=0;i<files.length;i++){const f=files[i];if(f.size>25*1024*1024)throw new Error(f.name+' is larger than 25 MB.');
+  const safe=String(f.name).replace(/[^A-Za-z0-9._-]+/g,'-').slice(-80),path='jobs/'+j.id+'/office/'+Date.now()+'-'+safe;const up=await db.storage.from('job-files').upload(path,f,{contentType:f.type||'application/octet-stream',upsert:false});if(up.error)throw up.error;
+  const ins=await db.from('job_files').insert({job_id:j.id,file_type:'office_document',file_name:f.name,caption:(title||'Contractor job card')+(files.length>1?' ('+(i+1)+')':''),storage_path:path,uploaded_by:activeSession?.user?.id||null});if(ins.error)throw ins.error;}}
+async function tpcSave(){const msg=el('tpcMsg'),j=activeJob;if(!j)return;const d=el('tpcDate').value,st=el('tpcStart').value||'08:00',en=el('tpcEnd').value||st,files=[...(el('tpcFile')?.files||[])];
+ if(!d){msg.innerHTML='<div class="err">Enter the date the work was done.</div>';return;}if(tpcMode==='attach'&&!files.length){msg.innerHTML='<div class="err">Choose their job card to attach.</div>';return;}
+ const arr=new Date(d+'T'+st),fin=new Date(d+'T'+en);if(fin<arr){msg.innerHTML='<div class="err">The finish time is before the start time.</div>';return;}if(arr>new Date()){msg.innerHTML='<div class="err">That date is in the future.</div>';return;}
+ el('tpcGo').disabled=true;msg.innerHTML='<div class="upload-loading"><span class="upload-spinner" aria-hidden="true"></span><span>Saving…</span></div>';
+ try{const nm=await tpcContractorName();const now=new Date().toISOString();
+  if(files.length)await tpcUpload(files,String(el('tpcTitle')?.value||'').trim());
+  const visitId=await getLatestVisitId();const cur=await db.from('job_visits').select('waste_removed').eq('id',visitId).maybeSingle();
+  const note='Completed by third-party contractor ('+nm+'). '+(tpcMode==='attach'?'Their job card is attached to the job.':'Their paperwork is to follow.')+(String(el('tpcNotes').value||'').trim()?'\n'+String(el('tpcNotes').value).trim():'');
+  const vu={arrived_at:arr.toISOString(),completed_at:fin.toISOString(),left_site_at:fin.toISOString(),submitted_at:now,issues:note,updated_at:now};if(cur.data?.waste_removed==null)vu.waste_removed=false;
+  const u=await db.from('job_visits').update(vu).eq('id',visitId);if(u.error)throw u.error;
+  await persistJobStatus('returned');
+  const p=await db.from('jobs').update({contractor_paperwork:tpcMode==='attach'?'received':'awaited',contractor_paperwork_at:tpcMode==='attach'?now:null}).eq('id',j.id);if(p.error)throw p.error;
+  await openJob(j.id);setTimeout(()=>el('jobDocsPanel')?.scrollIntoView({behavior:'smooth',block:'start'}),500);}
+ catch(e){el('tpcGo').disabled=false;msg.innerHTML='<div class="err">Could not save: '+esc(e.message||String(e))+'</div>';}}
+(function(){const o=window.renderWorkflow;if(typeof o!=='function')return;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{tpcInject();}catch(_){}return r;};})();
+/* on the job later: waiting for their paperwork – attach it when it arrives */
+async function tpcAttachLater(input){const files=[...(input.files||[])];input.value='';if(!files.length||!activeJob)return;const msg=el('jobDocsMsg');
+ try{if(msg)msg.innerHTML='<div class="upload-loading"><span class="upload-spinner" aria-hidden="true"></span><span>Uploading…</span></div>';const nm=await tpcContractorName();await tpcUpload(files,'Contractor job card – '+nm);
+  const u=await db.from('jobs').update({contractor_paperwork:'received',contractor_paperwork_at:new Date().toISOString()}).eq('id',activeJob.id);if(u.error)throw u.error;activeJob.contractor_paperwork='received';
+  const jc=(jobCentreJobs||[]).find(x=>x.id===activeJob.id);if(jc)jc.contractor_paperwork='received';await renderJobDocsPanel();try{renderSendDocsPanel();}catch(_){}}
+ catch(e){if(msg)msg.innerHTML='<div class="err">Could not attach: '+esc(e.message||String(e))+'</div>';}}
+(function(){const o=window.renderJobDocsPanel;if(typeof o!=='function')return;window.renderJobDocsPanel=async function(){const r=await o.apply(this,arguments);
+ try{const box=el('jobDocsPanel');if(!box||box.classList.contains('hidden')||!activeJob)return r;const q=await db.from('jobs').select('contractor_paperwork').eq('id',activeJob.id).maybeSingle();activeJob.contractor_paperwork=q.data?.contractor_paperwork||null;
+  box.querySelector('.tpc-wait')?.remove();if(activeJob.contractor_paperwork!=='awaited')return r;const nm=await tpcContractorName();
+  box.insertAdjacentHTML('afterbegin','<div class="tpc-wait"><div><b>⏳ Waiting for '+esc(nm)+'\'s paperwork</b><div style="font-size:13px">Attach their job card when it arrives – it\'s added below and ticked to send to the customer.</div></div><label class="btn primary" style="cursor:pointer;margin:0">📎 Attach 3rd-party job card<input type="file" multiple accept=".pdf,.doc,.docx,image/*" style="display:none" onchange="tpcAttachLater(this)"></label></div>');}catch(_){}return r;};})();
+/* the calendar and its totals: paperwork awaited from a contractor */
+(function(){const o=window.jobOutstanding;if(typeof o!=='function')return;window.jobOutstanding=jobOutstanding=function(j){const f=o.apply(this,arguments);if(j&&j.contractor_paperwork==='awaited'&&j.status!=='aborted')f.unshift(['paper','📄 Contractor paperwork awaited']);return f;};})();
 
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
