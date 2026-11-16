@@ -6444,6 +6444,7 @@ JOB_FIN_FIELDS.push('bundle_per_visit');
  try{const [v,f]=await Promise.all([db.from('job_visits').select('id,visit_number,planned_date,arrived_at,completed_at,created_at').eq('job_id',j.id).order('created_at'),db.from('job_finance').select('bundle_per_visit').eq('job_id',j.id).maybeSingle()]);
   const p=await db.from('job_visit_plan').select('planned_date,status').eq('job_id',j.id).eq('status','planned').order('planned_date');
   const vs=(v.data||[]).map((x,i)=>({n:x.visit_number||i+1,date:x.arrived_at?localDateKey(new Date(x.arrived_at)):(x.planned_date||(i===0?j.job_date:null)),done:!!x.completed_at}));
+  if(!vs.length)vs.push({n:1,date:j.job_date||null,done:false,planned:true});/* visit 1 is the job itself until it's been started */
   (p.data||[]).forEach((x,k)=>vs.push({n:vs.length+1,date:x.planned_date,done:false,planned:true}));
   JC.visits=vs;JC.perVisit=!!f.data?.bundle_per_visit;}catch(_){JC.visits=JC.visits||[];}return JC;};})();
 const jcMulti=()=>(JC?.visits||[]).length>1;
