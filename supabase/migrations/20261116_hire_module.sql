@@ -1,0 +1,5 @@
+-- Hire module (applied 16 Nov 2026 via MCP as "hire_module"): hire_assets, hires, hire_items, hire_charges,
+-- hire_invoices, hire_money (admin-only prices/costs), jobs.hire_id, job_visits.hire_check,
+-- job type hire_check, revenue category "Equipment hire", resource "Plant & equipment hire".
+-- Also: contractor_waste_carrier (contractors.waste_carrier_registration, waste_carrier_expires_at),
+-- contractor_paperwork (jobs.contractor_paperwork, contractor_paperwork_at).
