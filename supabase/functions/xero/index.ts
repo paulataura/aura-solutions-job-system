@@ -162,8 +162,9 @@ Deno.serve(async (req) => {
       const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
       const s = conn?.settings || {};
       if (!s.sales_account_code || !s.sales_tax_type) return json({ error: "Choose the Xero sales account and VAT rate in the Xero settings first." }, 400);
-      const lines = (body.lines || []).filter((l: any) => l.description && Number(l.unit_amount) !== 0);
-      if (!lines.length) return json({ error: "Add at least one invoice line with a price." }, 400);
+      // lines with no price are allowed when they list what a bundled price includes
+      const lines = (body.lines || []).filter((l: any) => l.description && (Number(l.unit_amount) !== 0 || l.included));
+      if (!lines.some((l: any) => Number(l.unit_amount) !== 0)) return json({ error: "Add at least one invoice line with a price." }, 400);
       const contactId = await ensureContact("customers", job.customer_id);
       const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", job.customer_id).maybeSingle();
       const today = new Date();
