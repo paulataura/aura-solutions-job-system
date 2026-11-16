@@ -6568,7 +6568,7 @@ async function rcCpFill(itemId){const sel=el('rcCpCust');if(!sel)return;const cs
 /* ===== 16 Nov 2026: rate card – "+ Add" in each category, the form opens right there ===== */
 (function(){const o=window.renderRateCard;window.renderRateCard=renderRateCard=function(){const r=o.apply(this,arguments);try{if(rcView==='check')return r;
  document.querySelectorAll('#rcBody .rc-cathead').forEach(hd=>{if(hd.querySelector('.rc-add-here'))return;const t=hd.firstChild?.textContent?.trim()||'';const c=RC_CATS.find(([k,l])=>l===t);if(!c)return;
-  hd.style.display='flex';hd.style.alignItems='center';hd.style.gap='8px';hd.insertAdjacentHTML('beforeend','<button class="mini-btn rc-add-here" type="button" style="margin-left:auto" onclick="rcAddIn(\''+c[0]+'\',this)">+ Add '+esc(c[1].toLowerCase())+' item</button>');});}catch(_){}return r;};})();
+  hd.style.display='flex';hd.style.alignItems='center';hd.style.gap='8px';hd.insertAdjacentHTML('beforeend','<button class="mini-btn rc-add-here" type="button" style="margin-left:auto" onclick="rcAddIn(\''+c[0]+'\',this)" title="Add an item to '+esc(c[1])+'">+ Add item</button>');});}catch(_){}return r;};})();
 function rcAddIn(cat,btn){const hd=btn.closest('.rc-cathead');newRateCardItem();const f=el('rcFormWrap')?.querySelector('form');if(!f)return;
  el('rcCategory').value=cat;el('rcCategory').dispatchEvent(new Event('change'));rcAutoCode(true);
  const again=[...document.querySelectorAll('#rcBody .rc-cathead')].find(h=>h.querySelector('.rc-add-here')?.getAttribute('onclick')?.includes("'"+cat+"'"))||hd;
