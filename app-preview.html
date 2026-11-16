@@ -3161,15 +3161,7 @@ async function moreVisitsPlanned(){try{if(!activeJob)return false;const r=await 
  catch(e){window.__jcVisitId=null;window.__jcWindow=null;window.__jcCollect=null;w.document.body.innerHTML='<p style="font:16px Arial;padding:20px;color:#b42318">Could not build the job card: '+esc(e.message||String(e))+'</p>';}};})();
 /* 30 Oct 2026: planned visits show on the calendar */
 (function(){const st=document.createElement('style');st.textContent='.visit-card{border:1px solid #cfe5d3;border-left:4px solid #2f6b3a;border-radius:10px;padding:10px 12px;margin:8px 0;background:#fff}.cal-job.planned-visit{border-style:dashed!important;background:#f3f8f3!important;opacity:.95}';document.head.appendChild(st);})();
-let calendarPlannedVisits=[];
-(function(){const o=window.renderCalendar;if(typeof o!=='function')return;window.renderCalendar=function(){const r=o.apply(this,arguments);
- (async()=>{try{if(!['admin','manager'].includes(activeProfile?.role))return;const q=await db.from('job_visit_plan').select('id,job_id,planned_date,operator_id,status,jobs(job_number,reference,status,customers(company_name))').eq('status','planned');calendarPlannedVisits=q.data||[];
-  const grid=el('calendarGrid');if(!grid)return;const byJob={};calendarPlannedVisits.forEach(p=>{(byJob[p.job_id]=byJob[p.job_id]||[]).push(p);});
-  const vcount={};try{const vv=await db.from('job_visits').select('job_id').in('job_id',Object.keys(byJob));(vv.data||[]).forEach(v=>vcount[v.job_id]=(vcount[v.job_id]||0)+1);}catch(_){}
-  Object.values(byJob).forEach(a=>a.sort((x,y)=>String(x.planned_date).localeCompare(String(y.planned_date))));
-  calendarPlannedVisits.forEach(p=>{const cell=grid.querySelector('.calendar-day[ondrop*="\''+p.planned_date+'\'"]');if(!cell||!p.jobs||p.jobs.status==='aborted')return;const n=Math.max(vcount[p.job_id]||0,1)+byJob[p.job_id].indexOf(p)+1;
-   cell.querySelector('.calendar-empty')?.remove();cell.insertAdjacentHTML('beforeend','<button type="button" class="cal-job planned-visit'+(p.operator_id?'':' needs-assign')+'" onclick="openJob(\''+p.job_id+'\')" title="Planned visit – issued automatically when the previous visit is submitted"><b>'+esc(p.jobs.job_number||'')+'</b>'+(p.jobs.reference?'<small class="cal-reference">🔖 '+esc(p.jobs.reference)+'</small>':'')+'<small>'+esc(p.jobs.customers?.company_name||'')+'</small><small>📅 Visit '+n+' · planned</small>'+(p.operator_id?'':'<small class="na-flag">⚠ NO OPERATOR</small>')+'</button>');});}catch(_){}})();
- return r;};})();
+/* (planned-visit drawing moved to the 16 Nov block) */
 /* 30 Oct 2026: jobs and planned visits with no operator stand out (red) and are counted as "To assign" */
 (function(){const st=document.createElement('style');st.textContent='.cal-job.needs-assign{background:#fde7e5!important;border:2px solid #c62828!important;color:#7a1410}.cal-job.needs-assign .na-flag{display:block;color:#b42318;font-weight:800}.pill.na-pill{background:#fde7e5;color:#9b1c13;border:1px solid #f1b3ad;font-weight:800}.na-stat{border:2px solid #f1b3ad!important;background:#fff6f5!important}.na-stat .stat{color:#b42318}';document.head.appendChild(st);})();
 let unassignedVisitJobs={};
@@ -5402,16 +5394,7 @@ async function completeDisposalOnsite(){const msg=el('onsiteMsg');if(!activeJob|
 /* the disposal step: add the option each time it shows, and tick it when the office planned "tipped on site" */
 (function(){const o=window.renderWorkflow;if(typeof o!=='function')return;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{onsiteInit();const ds=String(el('disposal_site')?.value||'');if(el('onsiteChk')&&!el('onsiteChk').dataset.auto&&/on\s*-?\s*site/i.test(ds)){el('onsiteChk').dataset.auto='1';el('onsiteChk').checked=true;onsiteToggle();}}catch(_){}return r;};})();
 
-/* 9 Nov 2026: on a job with more than one visit, a visit that's been done stays on the calendar on the day it was done */
-(function(){const st=document.createElement('style');st.textContent='.cal-job.done-visit{background:#eef7e6!important;border:1px solid #b9dd97!important;opacity:.9}';document.head.appendChild(st);})();
-(function(){const o=window.renderCalendar;if(typeof o!=='function')return;window.renderCalendar=function(){const r=o.apply(this,arguments);
- (async()=>{try{if(!['admin','manager'].includes(activeProfile?.role))return;const grid=el('calendarGrid');if(!grid)return;
-  const keys=[...grid.querySelectorAll('.calendar-day[ondrop]')].map(c=>(c.getAttribute('ondrop').match(/'(\d{4}-\d{2}-\d{2})'/)||[])[1]).filter(Boolean).sort();if(!keys.length)return;
-  const q=await db.from('job_visits').select('id,job_id,visit_number,arrived_at,completed_at,jobs(job_number,reference,job_date,status,customers(company_name))').not('completed_at','is',null).gte('completed_at',keys[0]+'T00:00:00').lte('completed_at',keys[keys.length-1]+'T23:59:59');
-  (q.data||[]).forEach(v=>{const j=v.jobs;if(!j||j.status==='aborted')return;const day=localDateKey(new Date(v.arrived_at&&v.arrived_at<v.completed_at?v.arrived_at:v.completed_at));if(day===j.job_date)return;
-   const cell=grid.querySelector('.calendar-day[ondrop*="\''+day+'\'"]');if(!cell||cell.querySelector('[data-done-visit="'+v.id+'"]'))return;cell.querySelector('.calendar-empty')?.remove();
-   cell.insertAdjacentHTML('beforeend','<button type="button" class="cal-job done-visit" data-done-visit="'+v.id+'" onclick="openJob(\''+v.job_id+'\')" title="Visit done on this day"><b>'+esc(j.job_number||'')+'</b>'+(j.reference?'<small class="cal-reference">🔖 '+esc(j.reference)+'</small>':'')+'<small>'+esc(j.customers?.company_name||'')+'</small><small>✓ Visit '+(v.visit_number||1)+' done</small></button>');});}catch(_){}})();
- return r;};})();
+
 
 /* ===== 10 Nov 2026: a Back button (and phone swipe-back) that returns to the page you came from ===== */
 (function(){const st=document.createElement('style');st.textContent='#navBackBar{position:sticky;top:calc(var(--aura-head,0px) + 4px);z-index:30;margin:0 0 6px;pointer-events:none}#navBackBar button{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line,#d9e3dc);background:#fff;color:#0b3425;font-weight:700;font-size:14px;border-radius:999px;padding:7px 14px;box-shadow:0 2px 8px rgba(0,0,0,.08);cursor:pointer}#navBackBar button:hover{background:#f3f8f3}'
@@ -5477,6 +5460,66 @@ window.toggleCustomerMaintenance=async function(customerId){return ctForCustomer
   if((m=t.match(/^✉\s*(.+)$/))){sp.outerHTML='<a class="call-btn" href="mailto:'+esc(m[1])+'">✉ '+esc(m[1])+'</a>';}
   else if((m=t.match(/^☎\s*(.+)$/))){sp.outerHTML='<a class="call-btn" href="tel:'+esc(m[1].replace(/[^\d+]/g,''))+'">📞 '+esc(m[1])+'</a>';}});}catch(_){}return r;};})();
 setTimeout(navBackRender,0);
+
+let calendarPlannedVisits=[];
+/* 16 Nov 2026: jobs with more than one visit – every visit sits on the calendar on its own date and can be dragged on its own.
+   The job's own card is Visit 1; later visits come from the visit plan (planned, or issued to the operator); a visit that's been done shows ✓ on the day it was done. */
+(function(){const st=document.createElement('style');st.textContent='.cal-job.done-visit{background:#eef7e6!important;border:1px solid #b9dd97!important;opacity:.9}.cal-job.issued-visit{border-style:solid!important;background:#e8f2ff!important;border-color:#9cc0ea!important}';document.head.appendChild(st);})();
+let calDraggedPlan='';
+function calVisitDragStart(ev,id){calDraggedPlan=id;try{ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain','vplan:'+id);}catch(_){}}
+async function calMoveVisit(planId,date){const p=calendarPlannedVisits.find(x=>x.id===planId);if(!p||!date)return;
+ if(p.visit&&p.visit.arrived_at){alert('That visit has already started, so its date can\'t be moved.');return;}
+ const r=await db.from('job_visit_plan').update({planned_date:date}).eq('id',planId);if(r.error){alert('Could not move the visit: '+r.error.message);return;}
+ if(p.visit_id)await db.from('job_visits').update({planned_date:date}).eq('id',p.visit_id);
+ try{if(activeJob?.id===p.job_id&&typeof renderVisitPanel==='function')renderVisitPanel();}catch(_){}renderCalendar();}
+(function(){const o=window.calendarDropOnDate;if(typeof o!=='function')return;window.calendarDropOnDate=async function(ev,date){let t='';try{t=ev.dataTransfer?.getData('text/plain')||'';}catch(_){}
+ const id=calDraggedPlan||(t.startsWith('vplan:')?t.slice(6):'');if(id){ev.preventDefault();ev.currentTarget.classList.remove('drag-over');calDraggedPlan='';calendarDraggedJobId='';return calMoveVisit(id,date);}return o.apply(this,arguments);};})();
+(function(){const o=window.calendarDropUnscheduled;if(typeof o!=='function')return;window.calendarDropUnscheduled=async function(ev){if(calDraggedPlan){ev.preventDefault();ev.currentTarget.classList.remove('drag-over');calDraggedPlan='';return;}return o.apply(this,arguments);};})();
+(function(){const o=window.calendarDragEnd;if(typeof o!=='function')return;window.calendarDragEnd=function(){calDraggedPlan='';return o.apply(this,arguments);};})();
+(function(){const o=window.renderCalendar;if(typeof o!=='function')return;window.renderCalendar=function(){const r=o.apply(this,arguments);
+ (async()=>{try{if(!['admin','manager'].includes(activeProfile?.role))return;const grid=el('calendarGrid');if(!grid)return;
+  const keys=[...grid.querySelectorAll('.calendar-day[ondrop]')].map(c=>(c.getAttribute('ondrop').match(/'(\d{4}-\d{2}-\d{2})'/)||[])[1]).filter(Boolean).sort();if(!keys.length)return;
+  const JS='job_number,reference,status,job_date,assigned_to,contractor_id,customers(company_name)';
+  const pq=await db.from('job_visit_plan').select('id,job_id,planned_date,operator_id,status,visit_id,jobs('+JS+')').in('status',['planned','issued']);const plans=(pq.data||[]).filter(p=>p.jobs&&p.jobs.status!=='aborted');
+  const ids=[...new Set(plans.map(p=>p.job_id))];
+  const [vq,dq]=await Promise.all([ids.length?db.from('job_visits').select('id,job_id,visit_number,planned_date,arrived_at,completed_at,submitted_at,created_at').in('job_id',ids):Promise.resolve({data:[]}),
+   db.from('job_visits').select('id,job_id,visit_number,arrived_at,completed_at,created_at,jobs('+JS+')').not('completed_at','is',null).gte('completed_at',keys[0]+'T00:00:00').lte('completed_at',keys[keys.length-1]+'T23:59:59')]);
+  const visits=vq.data||[],byJobV={};visits.forEach(v=>(byJobV[v.job_id]=byJobV[v.job_id]||[]).push(v));Object.values(byJobV).forEach(a=>a.sort((x,y)=>String(x.created_at).localeCompare(y.created_at)));
+  const multi=new Set(ids);(dq.data||[]).forEach(v=>{if((v.visit_number||1)>1)multi.add(v.job_id);});
+  /* visit numbers: issued rows take their visit's number; planned rows follow on after the visits that exist */
+  const byJobP={};plans.forEach(p=>{p.visit=visits.find(v=>v.id===p.visit_id)||null;(byJobP[p.job_id]=byJobP[p.job_id]||[]).push(p);});
+  Object.entries(byJobP).forEach(([jid,a])=>{const nv=(byJobV[jid]||[]).length;let k=0;a.filter(p=>p.status==='planned').sort((x,y)=>String(x.planned_date).localeCompare(y.planned_date)).forEach(p=>{p.n=Math.max(nv,1)+(++k);});a.filter(p=>p.status==='issued').forEach(p=>{p.n=p.visit?.visit_number||((byJobV[jid]||[]).indexOf(p.visit)+1)||2;});});
+  calendarPlannedVisits=plans;
+  const cellFor=d=>grid.querySelector('.calendar-day[ondrop*="\''+d+'\'"]');const add=(d,html)=>{const c=cellFor(d);if(!c)return;c.querySelector('.calendar-empty')?.remove();c.insertAdjacentHTML('beforeend',html);};
+  const head=j=>'<b>'+esc(j.job_number||'')+'</b>'+(j.reference?'<small class="cal-reference">🔖 '+esc(j.reference)+'</small>':'')+'<small>'+esc(j.customers?.company_name||'')+'</small>';
+  /* the job's own card is Visit 1: label it, or swap it for a ✓ once Visit 1 is done */
+  grid.querySelectorAll('.cal-job:not(.planned-visit):not(.done-visit)').forEach(b=>{const id=((b.getAttribute('onclick')||'').match(/openJob\('([^']+)'\)/)||[])[1];if(!id||!multi.has(id))return;
+   const v1=(byJobV[id]||[])[0];if(v1&&v1.completed_at){b.remove();return;}if(!b.querySelector('.v1-tag'))b.insertAdjacentHTML('beforeend','<small class="v1-tag">📅 Visit 1</small>');});
+  /* later visits */
+  plans.forEach(p=>{if(p.visit&&p.visit.completed_at)return;const started=!!p.visit?.arrived_at,j=p.jobs,noOp=p.status==='planned'?!p.operator_id:!(j.assigned_to||j.contractor_id);
+   add(p.planned_date,'<button type="button" class="cal-job planned-visit'+(p.status==='issued'?' issued-visit':'')+(noOp?' needs-assign':'')+'"'+(started?'':' draggable="true" ondragstart="calVisitDragStart(event,\''+p.id+'\')" ondragend="calendarDragEnd(event)"')+' onclick="openJob(\''+p.job_id+'\')" title="Visit '+p.n+(started?' – started, date locked':' – drag to move this visit only')+'">'+head(j)+'<small>📅 Visit '+p.n+' · '+(p.status==='issued'?(started?'on site':(noOp?'ready to issue':'issued')):'planned')+(started?'':' · drag to move')+'</small>'+(noOp?'<small class="na-flag">⚠ NO OPERATOR</small>':'')+'</button>');});
+  /* visits that have been done, on the day they were done */
+  const seen=new Set();[...(dq.data||[])].forEach(v=>{if(!multi.has(v.job_id)||seen.has(v.id))return;seen.add(v.id);const j=v.jobs;if(!j||j.status==='aborted')return;
+   const day=localDateKey(new Date(v.arrived_at&&v.arrived_at<v.completed_at?v.arrived_at:v.completed_at));const n=v.visit_number||((byJobV[v.job_id]||[]).findIndex(x=>x.id===v.id)+1)||1;
+   add(day,'<button type="button" class="cal-job done-visit" onclick="openJob(\''+v.job_id+'\')" title="Visit '+n+' done on this day">'+head(j)+'<small>✓ Visit '+n+' done</small></button>');});
+ }catch(_){}})();
+ return r;};})();
+/* the visit that's been issued can have its date changed from the job too, until the operator arrives */
+async function visitMoveIssued(visitId){const d=el('vmDate_'+visitId)?.value,msg=el('vmMsg_'+visitId);if(!d){msg.innerHTML='<div class="err">Choose a date.</div>';return;}
+ const a=await db.from('job_visits').update({planned_date:d}).eq('id',visitId).is('arrived_at',null);if(a.error){msg.innerHTML='<div class="err">'+esc(a.error.message)+'</div>';return;}
+ await db.from('job_visit_plan').update({planned_date:d}).eq('visit_id',visitId);await renderVisitPanel();if(typeof renderCalendar==='function')renderCalendar();}
+(function(){const o=window.renderVisitPanel;if(typeof o!=='function')return;window.renderVisitPanel=async function(){const r=await o.apply(this,arguments);
+ try{const box=el('visitPlanPanel');if(!box||!activeJob)return r;const vr=await db.from('job_visits').select('id,visit_number,planned_date,arrived_at,completed_at,created_at').eq('job_id',activeJob.id).order('created_at');const vs=vr.data||[];
+  const cur=vs[vs.length-1];if(!cur||vs.length<2||cur.arrived_at||cur.completed_at||el('vmDate_'+cur.id))return r;
+  const rows=[...box.querySelectorAll('.cf-row')];const row=rows[rows.length-1];if(!row)return r;
+  row.insertAdjacentHTML('afterend','<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:4px 0 8px"><div class="field" style="margin:0"><label style="font-size:12.5px">Move visit '+vs.length+' to</label><input id="vmDate_'+cur.id+'" type="date" value="'+esc(cur.planned_date||'')+'"></div><button class="mini-btn" type="button" onclick="visitMoveIssued(\''+cur.id+'\')">Save date</button><div id="vmMsg_'+cur.id+'"></div></div>');}catch(_){}return r;};})();
+/* saving a planned visit's date from the job keeps the issued visit in step too */
+(function(){const o=window.savePlannedVisit;if(typeof o!=='function')return;window.savePlannedVisit=async function(id){const r=await o.apply(this,arguments);try{const d=el('vpDate_'+id)?.value;const p=await db.from('job_visit_plan').select('visit_id').eq('id',id).maybeSingle();if(d&&p.data?.visit_id)await db.from('job_visits').update({planned_date:d}).eq('id',p.data.visit_id).is('arrived_at',null);}catch(_){}return r;};})();
+/* operators see the date of the visit they've been sent, not the job's first day */
+(function(){const o=window.loadJobs;if(typeof o!=='function')return;window.loadJobs=async function(){const r=await o.apply(this,arguments);
+ try{if(['admin','manager'].includes(activeProfile?.role)||!(jobCentreJobs||[]).length)return r;const q=await db.from('job_visits').select('job_id,visit_number,planned_date,completed_at,created_at').in('job_id',jobCentreJobs.map(j=>j.id)).is('completed_at',null).not('planned_date','is',null);
+  let ch=false;(q.data||[]).forEach(v=>{const j=jobCentreJobs.find(x=>x.id===v.job_id);if(j&&v.planned_date&&j.job_date!==v.planned_date){j.job_date=v.planned_date;j.__visitNo=v.visit_number;ch=true;}});
+  if(ch){try{if(typeof renderJobs==='function')renderJobs();else if(typeof renderJobCentre==='function')renderJobCentre();}catch(_){}}}catch(_){}return r;};})();
 
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
