@@ -5941,6 +5941,14 @@ async function visitJobCard(id){const vs=await mvLoadVisits(activeJob.id);const 
  try{const box=el('visitPlanPanel');if(!box||!activeJob)return r;const vr=await db.from('job_visits').select('id,arrived_at,completed_at,created_at').eq('job_id',activeJob.id).order('created_at');const vs=vr.data||[];const rows=[...box.querySelectorAll('.cf-row')];
   rows.forEach((row,i)=>{const v=vs[i];if(!v||!(v.arrived_at||v.completed_at)||row.querySelector('.ve-btn'))return;const tag=row.lastElementChild;if(tag)tag.insertAdjacentHTML('afterend','<button class="mini-btn ve-btn" type="button" onclick="visitEdit(\''+v.id+'\')">View / change</button>');});}catch(_){}return r;};})();
 
+/* 16 Nov 2026: "Visits on this job" only shows in full when the job has more than one visit; otherwise just a small "+ Add another visit" */
+(function(){const st=document.createElement('style');st.textContent='#visitPlanPanel.vp-compact{background:none!important;border:0!important;padding:0!important;margin:6px 0!important;box-shadow:none!important}#visitPlanPanel.vp-compact>*:not(.vp-mini){display:none!important}#visitPlanPanel:not(.vp-compact) .vp-mini{display:none}';document.head.appendChild(st);})();
+function vpExpand(){const b=el('visitPlanPanel');if(!b)return;b.classList.remove('vp-compact');el('visitAddForm')?.classList.remove('hidden');el('visitAddDate')?.focus();}
+(function(){const o=window.renderVisitPanel;if(typeof o!=='function')return;window.renderVisitPanel=async function(){const r=await o.apply(this,arguments);
+ try{const box=el('visitPlanPanel');if(!box||!activeJob||box.classList.contains('hidden'))return r;const nVisits=box.querySelectorAll('.cf-row').length,nPlanned=box.querySelectorAll('.visit-card').length;
+  const single=nVisits<=1&&nPlanned===0;box.classList.toggle('vp-compact',single);
+  if(!box.querySelector('.vp-mini'))box.insertAdjacentHTML('afterbegin','<div class="vp-mini"><button class="mini-btn" type="button" onclick="vpExpand()">📅 + Add another visit</button></div>');}catch(_){}return r;};})();
+
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
