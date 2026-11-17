@@ -6910,6 +6910,27 @@ async function jobPartsHtml(jobId){if(!isFinanceAdmin()||!jobId)return '';const 
  return '<div id="jobPartsBox" style="margin:8px 0;padding:9px 11px;border:1px solid #9cc0ea;border-radius:9px;background:#f4f8ff"><b>£ Invoices on this job</b> <span class="muted" style="font-size:12.5px">('+all.length+' parts)</span><div class="jcost-bar"><span>Invoiced so far<b>'+poGbp(tot-drafts)+'</b></span><span>In draft<b>'+poGbp(drafts)+'</b></span><span>Total<b>'+poGbp(tot)+'</b></span></div>'
   +all.map(x=>'<div style="display:flex;gap:8px;font-size:13px;padding:2px 0"><span style="min-width:90px">'+(x.xero_invoice_id?'<a href="'+xeroInvoiceUrl(x.xero_invoice_id)+'" target="_blank" rel="noopener">'+esc(x.invoice_number||'Xero')+'</a>':esc(x.invoice_number||''))+'</span><span style="flex:1">'+esc(x.part_label||'')+'</span><span>'+poGbp(x.net_total)+'</span><span class="muted" style="min-width:110px;text-align:right">'+esc(lab[x.status]||x.status||'')+'</span></div>').join('')+'</div>';}
 (function(){const o=window.jcRender;if(typeof o!=='function')return;window.jcRender=jcRender=function(){const r=o.apply(this,arguments);try{const id=JC?.jobId,w=el('jcWrap');if(id&&w&&!el('jobPartsBox')){jobPartsHtml(id).then(h=>{if(h&&el('jcWrap')&&!el('jobPartsBox'))el('jcWrap').insertAdjacentHTML('afterbegin',h);});}}catch(_){}return r;};})();
+/* ===== 17 Nov 2026: Finance – quick periods: this week, this month, last month, this FY, last FY, or your own dates ===== */
+const finFyStart=()=>{const m=Number(xeroInfo?.settings?.fy_start_month);return m>=1&&m<=12?m:4;};
+function finPeriod(k){const t=new Date(),d=n=>localDateKey(n),y=t.getFullYear(),m=t.getMonth();let a,b;
+ if(k==='week'){const dow=(t.getDay()+6)%7;a=new Date(y,m,t.getDate()-dow,12);b=new Date(y,m,t.getDate()-dow+6,12);}
+ else if(k==='month'){a=new Date(y,m,1,12);b=new Date(y,m+1,0,12);}
+ else if(k==='lastmonth'){a=new Date(y,m-1,1,12);b=new Date(y,m,0,12);}
+ else if(k==='fy'||k==='lastfy'){const fs=finFyStart()-1;let sy=m>=fs?y:y-1;if(k==='lastfy')sy--;a=new Date(sy,fs,1,12);b=new Date(sy+1,fs,0,12);}
+ else return;return [d(a),d(b)];}
+function finSetPeriod(k){window.__finPeriod=k;if(k==='custom'){el('finFrom')?.focus();finPeriodMark();return;}const r=finPeriod(k);if(!r)return;el('finFrom').value=r[0];el('finTo').value=r[1];finPeriodMark();loadFinance();}
+function finPeriodMark(){document.querySelectorAll('#finPeriods button[data-p]').forEach(b=>b.classList.toggle('active',b.dataset.p===(window.__finPeriod||'')));}
+async function finFySet(v){try{await xeroCall({action:'save_settings',settings:{fy_start_month:Number(v)}});if(xeroInfo){xeroInfo.settings={...(xeroInfo.settings||{}),fy_start_month:Number(v)};}}catch(e){alert('Could not save: '+e.message);return;}if(/fy/.test(window.__finPeriod||''))finSetPeriod(window.__finPeriod);}
+(function(){const o=window.loadFinance;window.loadFinance=loadFinance=async function(){const p=ensureFinancePanel();const first=!p.dataset.ready;if(first&&!window.__finPeriod){window.__finPeriod='fy';}
+ const r=await o.apply(this,arguments);
+ try{if(!el('finPeriods')&&el('finFrom')){const row=el('finFrom').parentElement;const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  row.insertAdjacentHTML('beforebegin','<div id="finPeriods" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 0">'+[['week','This week'],['month','This month'],['lastmonth','Last month'],['fy','This FY'],['lastfy','Last FY'],['custom','Date range…']].map(x=>'<button class="modebtn" type="button" data-p="'+x[0]+'" onclick="finSetPeriod(\''+x[0]+'\')">'+x[1]+'</button>').join('')
+   +'<span class="muted" style="font-size:12.5px;margin-left:6px">FY starts</span><select style="width:auto;font-size:12.5px;padding:3px 6px" onchange="finFySet(this.value)">'+M.map((n,i)=>'<option value="'+(i+1)+'"'+(i+1===finFyStart()?' selected':'')+'>'+n+'</option>').join('')+'</select></div>');
+  ['finFrom','finTo'].forEach(id=>el(id)?.addEventListener('change',()=>{window.__finPeriod='custom';finPeriodMark();}));
+  if(first){const rr=finPeriod(window.__finPeriod);if(rr&&(el('finFrom').value!==rr[0]||el('finTo').value!==rr[1])){el('finFrom').value=rr[0];el('finTo').value=rr[1];finPeriodMark();return loadFinance();}}}
+  finPeriodMark();}catch(_){}return r;};})();
+/* jobs now start in the app – the Xero invoice import isn't needed on screen any more */
+(function(){const st=document.createElement('style');st.textContent='button[onclick="xjiOpen()"]{display:none!important}';document.head.appendChild(st);})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
