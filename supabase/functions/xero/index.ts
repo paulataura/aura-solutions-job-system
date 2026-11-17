@@ -358,6 +358,28 @@ Deno.serve(async (req) => {
       return json({ ok: true, category: catName, changes: report });
     }
 
+    if (action === "list_sales_invoices") {
+      // Sales invoices (not voided/deleted) from a date, with their lines, for turning into jobs in the app
+      const since = /^\d{4}-\d{2}-\d{2}$/.test(String(body.since || "")) ? String(body.since) : "2024-01-01";
+      const [y, m, d] = since.split("-").map(Number);
+      const where = `Type=="ACCREC" AND Date>=DateTime(${y},${m},${d})`;
+      const out: any[] = [];
+      for (let page = 1; page <= 30; page++) {
+        const r = await xero(`Invoices?page=${page}&order=Date%20DESC&Statuses=DRAFT,SUBMITTED,AUTHORISED,PAID&where=${encodeURIComponent(where)}`);
+        const list = r?.Invoices || [];
+        for (const x of list) out.push({
+          id: x.InvoiceID, number: x.InvoiceNumber || null, status: x.Status, reference: x.Reference || null,
+          date: (x.DateString || "").slice(0, 10) || null, due: (x.DueDateString || "").slice(0, 10) || null,
+          paid_on: x.FullyPaidOnDate ? new Date(Number(String(x.FullyPaidOnDate).replace(/[^0-9-]/g, "").slice(0, 13))).toISOString().slice(0, 10) : null,
+          contact_id: x.Contact?.ContactID || null, contact_name: x.Contact?.Name || null,
+          subtotal: x.SubTotal, total: x.Total, amount_due: x.AmountDue, amount_paid: x.AmountPaid,
+          lines: (x.LineItems || []).map((l: any) => ({ description: l.Description || "", qty: l.Quantity, unit_price: l.UnitAmount, amount: l.LineAmount, account: l.AccountCode || null })),
+        });
+        if (list.length < 100) break;
+      }
+      return json({ ok: true, invoices: out });
+    }
+
     if (["list_suppliers", "import_suppliers", "list_customers", "import_customers"].includes(action)) {
       // Bring Xero contacts into the app, matching ones already here so nothing is duplicated
       const cust = action.endsWith("customers"), table = cust ? "customers" : "suppliers", nameCol = cust ? "company_name" : "name";
