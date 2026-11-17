@@ -358,6 +358,44 @@ Deno.serve(async (req) => {
       return json({ ok: true, category: catName, changes: report });
     }
 
+    if (action === "create_adhoc_invoice") {
+      // a one-off invoice with no job (e.g. an equipment sale) – created as a DRAFT in Xero
+      const { data: si } = await admin.from("sales_invoices").select("*").eq("id", body.sales_invoice_id).maybeSingle();
+      if (!si) return json({ error: "Invoice not found." }, 404);
+      if (si.xero_invoice_id) return json({ error: "This invoice is already in Xero." }, 400);
+      if (!si.customer_id) return json({ error: "Choose the customer first." }, 400);
+      const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
+      const s = conn?.settings || {};
+      if (!s.sales_account_code || !s.sales_tax_type) return json({ error: "Choose the Xero sales account and VAT rate in the Xero settings first." }, 400);
+      const lines = (si.lines || []).filter((l: any) => l.description && Number(l.unit_amount) !== 0);
+      if (!lines.length) return json({ error: "Add at least one line with a price." }, 400);
+      const contactId = await ensureContact("customers", si.customer_id);
+      const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", si.customer_id).maybeSingle();
+      const d = new Date((si.invoice_date || new Date().toISOString().slice(0, 10)) + "T12:00:00Z");
+      const inv = await xero("Invoices", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ Invoices: [{
+          Type: "ACCREC", Contact: { ContactID: contactId }, Date: d.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, d),
+          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: (si.reference || "").slice(0, 255) || undefined, BrandingThemeID: s.branding_theme_id || undefined,
+          LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)),
+        }] }),
+      });
+      const x = inv?.Invoices?.[0];
+      if (!x?.InvoiceID) throw new Error("Xero didn't return the invoice.");
+      await admin.from("sales_invoices").update({ xero_invoice_id: x.InvoiceID, invoice_number: x.InvoiceNumber || null, status: x.Status, net_total: x.SubTotal, updated_at: new Date().toISOString() }).eq("id", si.id);
+      return json({ ok: true, invoice: { id: x.InvoiceID, number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
+    }
+
+    if (action === "sync_adhoc_invoice") {
+      const { data: si } = await admin.from("sales_invoices").select("id,xero_invoice_id").eq("id", body.sales_invoice_id).maybeSingle();
+      if (!si?.xero_invoice_id) return json({ error: "Not in Xero yet." }, 400);
+      const x = (await xero(`Invoices/${si.xero_invoice_id}`))?.Invoices?.[0];
+      if (!x) throw new Error("Invoice not found in Xero.");
+      const gone = x.Status === "VOIDED" || x.Status === "DELETED";
+      await admin.from("sales_invoices").update(gone ? { xero_invoice_id: null, invoice_number: null, status: "draft", updated_at: new Date().toISOString() } : { invoice_number: x.InvoiceNumber || null, status: x.Status, net_total: x.SubTotal, updated_at: new Date().toISOString() }).eq("id", si.id);
+      return json({ ok: true, status: x.Status, number: x.InvoiceNumber, removed: gone });
+    }
+
     if (action === "list_sales_invoices") {
       // Sales invoices (not voided/deleted) from a date, with their lines, for turning into jobs in the app
       const since = /^\d{4}-\d{2}-\d{2}$/.test(String(body.since || "")) ? String(body.since) : "2024-01-01";
