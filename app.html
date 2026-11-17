@@ -305,7 +305,7 @@ async function loadJobs(){
  el('draft').textContent=jobCentreJobs.filter(j=>j.status==='draft').length;
  el('issued').textContent=jobCentreJobs.filter(j=>['issued','accepted','on_site','completed'].includes(j.status)).length;
  el('complete').textContent=jobCentreJobs.filter(j=>j.status==='returned').length;
- if(el('docsToSend'))el('docsToSend').textContent=jobCentreJobs.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at).length;if(el('toInvoice'))el('toInvoice').textContent=jobCentreJobs.filter(j=>['reviewed','closed'].includes(j.status)&&!j.invoiced_at).length;
+ if(el('docsToSend'))el('docsToSend').textContent=jobCentreJobs.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at).length;if(el('toInvoice'))el('toInvoice').textContent=jobCentreJobs.filter(j=>jobToInvoiceOk(j)).length;
  if(!management) jobCentreView='all';
  renderJobCentre();
  if(management){await loadMaintenancePlans();renderCalendar();renderRevisitAlerts();renderOutstandingWaste();}
@@ -341,7 +341,7 @@ function renderJobCentre(){
  else if(status==='to_assign') list=list.filter(jobNeedsOperator);
  else if(status==='docs_to_send') list=list.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at);
  else if(status==='docs_sent') list=list.filter(j=>!!j.documents_sent_at);
- else if(status==='to_invoice') list=list.filter(j=>['reviewed','closed'].includes(j.status)&&!j.invoiced_at);
+ else if(status==='to_invoice') list=list.filter(j=>jobToInvoiceOk(j));
  else if(status==='invoiced') list=list.filter(j=>!!j.invoiced_at);
  else if(status!=='all') list=list.filter(j=>j.status===status);
  if(q) list=list.filter(j=>[j.job_number,j.customers?.company_name,j.site_address,j.postcode,j.reference,j.customer_po,j.invoice_number,j.scope_of_work,j.instructions,displayJobTypeName(j.job_types),j.job_types?.name,statusLabel(j.status)].some(v=>String(v||'').toLowerCase().includes(q)));
@@ -4046,7 +4046,7 @@ function attentionItems(){const t=new Date(),today=localDateKey(t),in2=localDate
  const assign=J.filter(j=>typeof jobNeedsOperator==='function'&&jobNeedsOperator(j)&&j.job_date&&j.job_date<=in2);
  const review=J.filter(j=>j.status==='returned');
  const docs=J.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at);
- const inv=isFinanceAdmin()?J.filter(j=>['reviewed','closed'].includes(j.status)&&!j.invoiced_at&&!j.contract_id):[];
+ const inv=isFinanceAdmin()?J.filter(j=>jobToInvoiceOk(j)&&!j.contract_id):[];
  const forms=(typeof customerApplications!=='undefined'?customerApplications:[]).filter(a=>a.status==='submitted');
  const reports=J.filter(j=>j.contract_id&&j.job_types?.code==='monthly_site_report'&&j.contract_due_month<=thisMonth&&!['closed','aborted','reviewed','returned','completed'].includes(j.status));
  const renew=(contractsCache||[]).filter(contractRenewalDue);
@@ -4177,7 +4177,7 @@ function renderOverview(D){const since=new Date();since.setMonth(since.getMonth(
  ovChart('ovAhead',{data:{labels:days.map(d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})),datasets:[{label:'Jobs',data:days.map(d=>dc[d]||0),backgroundColor:days.map(d=>[0,6].includes(new Date(d+'T12:00:00').getDay())?OV.greenL:OV.green)}]}});
  /* pipeline */
  const soon=in14,live=J.filter(j=>!(j.contract_id&&j.status==='draft'&&!j.job_date&&j.contract_due_month>soon));
- const stages=[['Draft',live.filter(j=>j.status==='draft').length],['Issued / in progress',live.filter(j=>['issued','accepted','on_site','completed'].includes(j.status)).length],['Awaiting review',live.filter(j=>j.status==='returned').length],['Docs to send',live.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at).length]];if(admin)stages.push(['To invoice',live.filter(j=>['reviewed','closed'].includes(j.status)&&!j.invoiced_at&&!j.contract_id).length]);
+ const stages=[['Draft',live.filter(j=>j.status==='draft').length],['Issued / in progress',live.filter(j=>['issued','accepted','on_site','completed'].includes(j.status)).length],['Awaiting review',live.filter(j=>j.status==='returned').length],['Docs to send',live.filter(j=>['reviewed','closed'].includes(j.status)&&!j.documents_sent_at).length]];if(admin)stages.push(['To invoice',live.filter(j=>jobToInvoiceOk(j)&&!j.contract_id).length]);
  ovChart('ovPipe',{horizontal:true,data:{labels:stages.map(s=>s[0]),datasets:[{label:'Jobs',data:stages.map(s=>s[1]),backgroundColor:OV.blue}]}});
  /* job types */
  const yAgo=localDateKey(since),tc={};J.forEach(j=>{if(j.job_date&&j.job_date>=yAgo&&j.status!=='aborted'){const n=displayJobTypeName(j.job_types)||'Other';tc[n]=(tc[n]||0)+1;}});const types=Object.entries(tc).sort((a,b)=>b[1]-a[1]).slice(0,8);
@@ -6953,6 +6953,8 @@ async function jcPickCostSup(itemId,rateId){const it=(rateCardItems||[]).find(x=
    if(mine.has(it.id))row.dataset.mine='1';});
   /* this job's charges first */
   const rows=[...box.querySelectorAll('.it[data-mine="1"]')];if(rows.length&&!box.querySelector('.grp-mine')){box.insertAdjacentHTML('afterbegin','<div class="grp grp-mine">For this job\'s charges</div>');let after=box.querySelector('.grp-mine');rows.forEach(rw=>{const c=rw.cloneNode(true);after.insertAdjacentElement('afterend',c);after=c;});}}catch(_){}return r;};})();
+/* ===== 17 Nov 2026: To invoice – jobs completed by a contractor (third-party job card, paperwork awaited or in) count as ready to invoice too ===== */
+function jobToInvoiceOk(j){return !!j&&!j.invoiced_at&&(['reviewed','closed'].includes(j.status)||(!!j.contractor_paperwork&&!['draft','issued','accepted','aborted'].includes(j.status)));}
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
