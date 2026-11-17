@@ -6659,6 +6659,30 @@ function rcDecorateSups(){if(rcView==='check'||!isFinanceAdmin())return;document
 (function(){const o=window.renderRateCard;window.renderRateCard=renderRateCard=function(){const r=o.apply(this,arguments);try{if(rcView!=='check'&&isFinanceAdmin()){if(SUPR.rates&&(window.suppliersCache||financeSuppliers))rcDecorateSups();else Promise.all([suprLoad(),loadSuppliers()]).then(([_,s])=>{window.suppliersCache=s;rcDecorateSups();}).catch(()=>{});}}catch(_){}return r;};})();
 /* fresh supplier prices whenever the rate card is reloaded */
 (function(){const o=window.loadRateCard;window.loadRateCard=loadRateCard=async function(){try{SUPR.rates=null;}catch(_){}return o.apply(this,arguments);};})();
+/* ===== 17 Nov 2026: CONTRACT TEMPLATES – start a new contract from a template (e.g. Pump station service agreement), or save any contract as one ===== */
+let CT_TPL=null;
+async function ctTplLoad(force){if(CT_TPL&&!force)return CT_TPL;const r=await db.from('contract_templates').select('*').eq('active',true).order('name');CT_TPL=r.data||[];return CT_TPL;}
+function ctTplBarHtml(){const c=contractCtx;if(!c)return '';const tpl=CT_TPL||[];
+ const pick=!c.id&&tpl.length?'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>📋 Start from a template</b><select id="ctTplPick" style="width:auto;min-width:240px">'+tpl.map(t=>'<option value="'+t.id+'">'+esc(t.name)+' ('+(t.services||[]).length+' service'+((t.services||[]).length===1?'':'s')+')</option>').join('')+'</select><button class="btn primary" type="button" onclick="ctTplApply(el(\'ctTplPick\').value)">Use template</button></div><div class="muted" style="font-size:12.5px;margin-top:3px">Fills in the services, visits per year, job types, scopes and length. You can change anything afterwards.</div>':'';
+ const save='<button class="mini-btn" type="button" onclick="ctTplSaveFrom()" title="Save these services as a template for future contracts">💾 Save as a template</button>';
+ return '<div id="ctTplBar" style="margin:8px 0;padding:9px 11px;border:1px solid #9cc0ea;border-radius:9px;background:#f4f8ff;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;justify-content:space-between"><div style="flex:1;min-width:240px">'+(pick||'<span class="muted" style="font-size:12.5px">Lots of contracts are the same? Save this one\'s services as a template and start the next one from it.</span>')+'</div><div>'+save+'</div></div>';}
+async function ctTplApply(id){const t=(CT_TPL||[]).find(x=>x.id===id),c=contractCtx;if(!t||!c)return;
+ if(c.services.length&&!await auraConfirm('Replace the services already on this contract with the "'+t.name+'" template?'))return;
+ c.services.forEach(s=>{if(!s._new)c.removedServices.push(s.id);});c.visits=c.visits.filter(v=>!c.services.some(s=>s.id===v.service_id));
+ c.services=(t.services||[]).map((x,i)=>({id:ctUid(),_new:true,name:x.name||'',kind:x.kind||'visit',job_type_id:x.job_type_id||null,qty_per_year:Number(x.qty_per_year)||0,crew:x.crew||'own',contractor_id:x.crew==='contractor'?x.contractor_id||null:null,scope:x.scope||'',waste_expected:!!x.waste_expected,report_template_id:x.report_template_id||null,sort:i,active:true}));
+ if(t.duration_months&&!c.id){c.duration=Number(t.duration_months);c.end_date=contractEndFor(c.start_date,c.duration);}
+ if(!String(c.title||'').trim()){const site=(customerSiteDirectoryCache[c.customer_id]||[]).find(x=>x.id===c.customer_site_id)?.site_name;c.title=(site?site+' – ':'')+(t.title||t.name);}
+ if(!String(c.notes||'').trim()&&t.notes)c.notes=t.notes;
+ c.services.forEach(s=>contractRespread(s.id,true));c.__tpl=t.name;renderContractEditor();}
+async function ctTplSaveFrom(){const c=contractCtx;if(!c)return;const sv=c.services.filter(s=>String(s.name||'').trim());if(!sv.length){alert('Add the services first, then save them as a template.');return;}
+ await ctTplLoad();const name=prompt('Template name:',c.__tpl||'Pump station service agreement');if(!name||!name.trim())return;
+ const row={name:name.trim(),title:name.trim(),duration_months:Number(c.duration)||12,notes:null,services:sv.map(s=>({name:s.name.trim(),kind:s.kind,job_type_id:s.kind==='ongoing'?null:s.job_type_id,qty_per_year:Number(s.qty_per_year)||0,crew:s.crew||'own',contractor_id:s.crew==='contractor'?s.contractor_id||null:null,scope:s.scope||null,waste_expected:!!s.waste_expected,report_template_id:s.report_template_id||null})),updated_at:new Date().toISOString()};
+ const ex=CT_TPL.find(t=>t.name.toLowerCase()===row.name.toLowerCase());
+ if(ex&&!await auraConfirm('A template called "'+ex.name+'" already exists. Replace it with these services?'))return;
+ const r=ex?await db.from('contract_templates').update(row).eq('id',ex.id):await db.from('contract_templates').insert(row);if(r.error){alert('Could not save the template: '+r.error.message);return;}
+ await ctTplLoad(true);c.__tpl=row.name;alert('Saved – "'+row.name+'" is now offered when you start a new contract.');}
+(function(){const o=window.openContractEditor;window.openContractEditor=openContractEditor=async function(){try{await ctTplLoad();}catch(_){}return o.apply(this,arguments);};})();
+(function(){const o=window.renderContractEditor;window.renderContractEditor=renderContractEditor=function(){const r=o.apply(this,arguments);try{const box=el('contractModal'),sec=box&&[...box.querySelectorAll('.ct-sec')].find(x=>x.querySelector('#ctServices'));if(sec&&!el('ctTplBar'))sec.insertAdjacentHTML('beforebegin',ctTplBarHtml());}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
