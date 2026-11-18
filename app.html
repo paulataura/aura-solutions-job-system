@@ -7106,7 +7106,7 @@ async function invSend(kind,id,cust,btn){let to='';try{if(cust){const c=await db
  if(j.invoice_sent_at)row?.insertAdjacentHTML('afterend','<div class="muted" style="font-size:12.5px;margin-top:4px">✉ Emailed by Xero to '+esc(j.invoice_sent_to||'')+' on '+esc(new Date(j.invoice_sent_at).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>');}}catch(_){}return r;};})();
 /* ===== 18 Nov 2026: EMAIL FROM THE APP – invoices and job documents go from info@ through the company mailbox (SMTP),
    with Xero's own invoice PDF, the job card and the WTN attached. Xero still tracks payment; a copy of every email goes to info@. ===== */
-const EM={status:null};
+const EM={status:null,on:false}; /* 18 Nov: Paul chose invoices by Xero email and job documents by link – set on:true to send from info@ again */
 async function emailCall(body){const {data,error}=await db.functions.invoke('email',{body});if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m;}catch(_){}throw new Error(m);}if(data&&data.error)throw new Error(data.error);return data;}
 async function emailStatus(force){if(EM.status&&!force)return EM.status;try{EM.status=await emailCall({action:'status'});}catch(e){EM.status={configured:false,error:e.message||String(e)};}return EM.status;}
 async function emailTest(btn){if(btn){btn.disabled=true;btn.textContent='Sending test…';}try{const r=await emailCall({action:'test'});alert('✓ Test email sent to '+r.to+'. Check the inbox in Outlook.');}catch(e){alert('The test didn\'t send: '+(e.message||e));}finally{if(btn){btn.disabled=false;btn.textContent='Send a test email';}}}
@@ -7115,6 +7115,10 @@ function emClose(){el('emOverlay')?.remove();}
 const emFileB64=async f=>({filename:f.name,content_type:f.type||'application/pdf',base64:await blobB64(f)});
 /* compose an invoice email */
 window.invSend=invSend=async function(kind,id,cust,btn){
+ if(!EM.on){let cu={};try{if(cust){const c=await db.from('customers').select('company_name,invoice_email,accounts_email,email').eq('id',cust).maybeSingle();cu=c.data||{};}}catch(_){}
+  emOverlay('<div class="row"><h2 style="margin:0">✉ Approve &amp; send</h2><button class="mini-btn" type="button" onclick="emClose()">✕</button></div><div class="muted" style="font-size:13px;margin:4px 0 10px">The invoice is approved in Xero and Xero emails it to the customer with a link to view, download and pay it online (the job card and waste transfer note are on the online invoice).</div>'
+   +'<div class="field"><label for="emTo">Send to</label><input id="emTo" type="email" value="'+esc(cu.invoice_email||cu.accounts_email||cu.email||'')+'"></div><div id="emMsg"></div>'
+   +'<div class="actions" style="margin-top:8px"><button class="btn primary" type="button" onclick="invSendViaXero(\''+kind+'\',\''+id+'\')">✉ Approve &amp; send</button><button class="btn light" type="button" onclick="emClose()">Cancel</button></div>');return;}
  const st=await emailStatus(true);let cu={};try{if(cust){const c=await db.from('customers').select('company_name,contact_name,invoice_email,accounts_email,email').eq('id',cust).maybeSingle();cu=c.data||{};}}catch(_){}
  const to=cu.invoice_email||cu.accounts_email||cu.email||'';const first=String(cu.contact_name||'').split(' ')[0];
  const j=(kind==='job'||kind==='part')&&activeJob?activeJob:null;
@@ -7168,7 +7172,7 @@ async function invSendGo(kind,id){const to=el('emTo').value.trim(),cc=el('emCc')
   alert('✓ Invoice '+num+' emailed to '+to+' with '+atts.length+' attachment'+(atts.length===1?'':'s')+'.');}
  catch(e){btn.disabled=false;m.innerHTML='<div class="err">'+esc(e.message||String(e))+'</div>';}}
 /* the job panel note says how it went, not "by Xero" */
-(function(){const o=window.decorateInvoicePanelXero;window.decorateInvoicePanelXero=decorateInvoicePanelXero=async function(){const r=await o.apply(this,arguments);try{el('invoicePanel')?.querySelectorAll('.xero-inv .muted').forEach(d=>{if(/^✉ Emailed by Xero to/.test(d.textContent))d.textContent=d.textContent.replace('Emailed by Xero to','Emailed to');});}catch(_){}return r;};})();
+(function(){const o=window.decorateInvoicePanelXero;window.decorateInvoicePanelXero=decorateInvoicePanelXero=async function(){const r=await o.apply(this,arguments);try{if(EM.on)el('invoicePanel')?.querySelectorAll('.xero-inv .muted').forEach(d=>{if(/^✉ Emailed by Xero to/.test(d.textContent))d.textContent=d.textContent.replace('Emailed by Xero to','Emailed to');});}catch(_){}return r;};})();
 /* job documents: send straight from info@ with the PDFs attached */
 async function sendJobDocsDirect(btn){const s=window.__sendDocs;if(!s)return;const st=await emailStatus();if(!st.configured){alert('Sending from info@ isn\'t set up yet – use “Copy email” and Outlook for now.');return;}
  btn.disabled=true;btn.textContent='Sending…';
@@ -7177,7 +7181,7 @@ async function sendJobDocsDirect(btn){const s=window.__sendDocs;if(!s)return;con
   await emailCall({action:'send',to:s.to,cc:s.cc,subject:s.subject,text:raw.replace('{LINK}',label+': '+s.link)+'\n\n'+sigPlain(SIG),html:docsEmailHtml(raw,s.link,label),attachments:atts,kind:'job-docs',ref_id:activeJob?.id,job_id:activeJob?.id});
   await markJobDocsSent(true);alert('✓ Sent to '+s.to+' from '+(st.from||'info@')+' with '+atts.length+' PDF'+(atts.length===1?'':'s')+' attached.');}
  catch(e){btn.disabled=false;btn.textContent='✉ Send now from info@';alert('Not sent: '+(e.message||e));}}
-const __emObs=new MutationObserver(()=>{const box=[...document.querySelectorAll('#sendDocsPanel .ok')].find(x=>/Ready to send/.test(x.textContent));if(!box||box.querySelector('.em-direct'))return;
+const __emObs=new MutationObserver(()=>{if(!EM.on)return;const box=[...document.querySelectorAll('#sendDocsPanel .ok')].find(x=>/Ready to send/.test(x.textContent));if(!box||box.querySelector('.em-direct'))return;
  const acts=box.querySelector('.actions');if(!acts)return;const b=document.createElement('button');b.className='btn primary em-direct';b.type='button';b.textContent='✉ Send now from info@';b.onclick=()=>sendJobDocsDirect(b);acts.prepend(b);
  acts.insertAdjacentHTML('afterend','<div class="muted em-direct-note" style="font-size:12.5px;margin-top:4px">“Send now from info@” emails it straight away with the PDFs attached and marks it sent. Or use the other buttons to send it from Outlook yourself.</div>');
  emailStatus().then(st=>{if(!st.configured){b.disabled=true;b.title='Sending from info@ isn\'t set up yet';}});});
