@@ -7257,6 +7257,19 @@ async function officeNoArrival(){if(!activeJob||!['issued','accepted'].includes(
   el('detailMsg').innerHTML='<div class="ok">Visit opened without an arrival picture – the reason is noted on the visit.</div>';}
  catch(e){btn.disabled=false;m.innerHTML='<div class="err">Could not continue: '+esc(e.message||String(e))+'</div>';}}
 (function(){const o=window.renderWorkflow;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{noPicInject();}catch(_){}return r;};})();
+/* ===== 18 Nov 2026: "Open email" is back to how it was – your email opens with the recipient, subject and the full message filled in,
+   including the "view your job documents" link (the online page with the job card and WTNs) and your signature. Nothing to paste or attach. ===== */
+window.openJobDocsMail=openJobDocsMail=async function(){const s=window.__sendDocs;if(!s)return;try{await sigLoad();}catch(_){}
+ const raw=s.rawBody||String(el('sdBody')?.value||s.body||'');const label='View your job documents'+(activeJob?.job_number?' – '+activeJob.job_number:'');
+ let body=raw.includes('{LINK}')?raw.replace('{LINK}',label+':\n'+s.link):(raw.includes(s.link)?raw:raw+'\n\n'+label+':\n'+s.link);
+ try{if(typeof SIG!=='undefined'&&SIG)body=body.replace(/\s*$/,'')+'\n'+sigPlain(SIG);}catch(_){}
+ location.href='mailto:'+encodeURIComponent(s.to)+'?'+[s.cc?'cc='+encodeURIComponent(s.cc):'','subject='+encodeURIComponent(s.subject),'body='+encodeURIComponent(body)].filter(Boolean).join('&');};
+const __sdObs2=new MutationObserver(()=>{const box=[...document.querySelectorAll('#sendDocsPanel .ok')].find(x=>/Ready to send/.test(x.textContent));if(!box||box.dataset.mail2)return;box.dataset.mail2='1';
+ const acts=box.querySelector('.actions');const open=[...(acts?.querySelectorAll('button')||[])].find(b=>/Open email/.test(b.textContent));
+ if(open){open.textContent='✉ Open email with the link';open.className='btn primary';acts.prepend(open);}
+ acts?.querySelectorAll('.sd-rich,button[onclick="shareJobDocs()"]').forEach(b=>b.className='btn light'+(b.classList.contains('sd-rich')?' sd-rich':''));
+ const note=box.querySelector('.muted');if(note)note.innerHTML='“Open email with the link” opens your email with everything filled in – the message, the link to the customer\'s job documents page (job card and WTNs) and your signature. Just check it and press send. <a href="#" onclick="sigEdit();return false">✍ Edit my signature</a>';});
+setTimeout(()=>{const p=el('sendDocsPanel');if(p)__sdObs2.observe(p,{childList:true,subtree:true});},0);
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
