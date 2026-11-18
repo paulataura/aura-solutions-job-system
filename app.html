@@ -2462,7 +2462,7 @@ document.head.appendChild(st);})();
 
 async function ensureRateCard(force){if(rateCardLoaded&&!force)return rateCardItems;const r=await db.from('rate_card_items').select('*').order('sort_order').order('name');if(r.error)throw r.error;rateCardItems=r.data||[];rateCardLoaded=true;return rateCardItems;}
 async function loadRateCard(){const box=el('rcBody');if(!box)return;box.innerHTML='<div class="muted">Loading rate card…</div>';try{await ensureRateCard(true);if(!(directoryDisposals||[]).length){const d=await db.from('disposal_sites').select('id,site_name,postcode,active').order('site_name');window.rcDisposalSites=d.data||[];}renderRateCard();}catch(e){box.innerHTML='<div class="err">Could not load the rate card: '+esc(e.message||String(e))+'</div>';}}
-function rcSites(){return (window.rcDisposalSites&&window.rcDisposalSites.length?window.rcDisposalSites:(directoryDisposals||[]));}
+function rcSites(){return (window.rcDisposalSites&&window.rcDisposalSites.length?window.rcDisposalSites:(directoryDisposals||[])).filter(x=>x.active!==false);}
 function setRateCardView(v){rcView=v;renderRateCard();}
 
 function renderRateCard(){const box=el('rcBody');if(!box)return;
