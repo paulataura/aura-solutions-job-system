@@ -7380,6 +7380,18 @@ async function vwInject(){const cap=el('arrivalCapture');const office=['admin','
 const __rcObs=new MutationObserver(()=>{const b=el('rcSupBox');if(!b||b.dataset.tidy)return;const th=b.querySelector('thead th:nth-child(2)');if(!th)return;b.dataset.tidy='1';th.textContent='Their cost £ per '+((el('rcUnit')?.value||'unit').trim()||'unit');
  const m=b.querySelector('.muted');if(m)m.textContent='Add each supplier who offers it and what they charge you per '+((el('rcUnit')?.value||'unit').trim()||'unit')+'. ★ = the one you normally use – its price is the item\'s cost.';});
 setTimeout(()=>{const w=el('rcFormWrap')||document.body;__rcObs.observe(w,{childList:true,subtree:true});},0);
+/* ===== 18 Nov 2026: the job's additional documents (e.g. a contractor's job card) can go on the Xero invoice too ===== */
+(function(){const o=window.xeroShowInvoiceForm;window.xeroShowInvoiceForm=xeroShowInvoiceForm=async function(){const r=await o.apply(this,arguments);
+ try{const j=activeJob,f=el('xeroInvForm');if(!j||!f||el('xaDocs'))return r;const docs=await loadJobOfficeDocs();if(activeJob!==j||!docs.length)return r;
+  const anchor=(el('xaWtn')||el('xaJc'))?.closest('label');if(!anchor)return r;
+  anchor.insertAdjacentHTML('afterend','<div id="xaDocs">'+docs.map(d=>'<label style="display:block"><input type="checkbox" class="xaDoc" value="'+esc(d.id)+'" checked> Attach '+esc(officeDocTitle(d).replace(/\s*\(Aura\)$/,''))+'</label>').join('')+'</div>');}catch(_){}return r;};})();
+(function(){const o=window.xeroCreateInvoice;window.xeroCreateInvoice=xeroCreateInvoice=async function(){const j=activeJob;const ids=[...document.querySelectorAll('.xaDoc:checked')].map(x=>x.value);
+ const r=await o.apply(this,arguments);
+ try{if(!ids.length||!j||activeJob!==j||!j.xero_invoice_id)return r;const docs=(await loadJobOfficeDocs()).filter(d=>ids.includes(d.id));const fails=[];
+  for(const d of docs){try{const dl=await db.storage.from('job-files').download(d.storage_path);if(dl.error)throw dl.error;
+   const name=(officeDocTitle(d).replace(/\s*\(Aura\)$/,'')+officeDocExt(d)).normalize('NFKD').replace(/[–—]/g,'-').replace(/[^A-Za-z0-9 ._-]+/g,'-');
+   await xeroCall({action:'attach',job_id:j.id,filename:name,base64:await blobB64(dl.data),content_type:dl.data.type||'application/pdf'});}catch(e){fails.push(officeDocTitle(d)+' ('+(e.message||e)+')');}}
+  setTimeout(()=>{const m=el('xeroInvMsg');if(m)m.insertAdjacentHTML('beforeend','<div class="'+(fails.length?'err':'ok')+'" style="margin-top:6px">'+(fails.length?'Could not attach: '+esc(fails.join('; ')):'✓ Also attached: '+esc(docs.map(d=>officeDocTitle(d).replace(/\s*\(Aura\)$/,'')).join(', ')))+'</div>');},400);}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
