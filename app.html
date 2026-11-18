@@ -7104,6 +7104,103 @@ async function invSend(kind,id,cust,btn){let to='';try{if(cust){const c=await db
   alert('✓ Invoice '+(r.number||'')+' approved and emailed to '+r.sent_to+' by Xero.');}catch(e){alert('Not sent: '+(e.message||e));if(btn){btn.disabled=false;btn.textContent='✉ Approve & send';}}}
 (function(){const o=window.decorateInvoicePanelXero;window.decorateInvoicePanelXero=decorateInvoicePanelXero=async function(){const r=await o.apply(this,arguments);try{const j=activeJob,box=el('invoicePanel');const d=box?.querySelector('.xero-inv');if(j?.xero_invoice_id&&d&&!d.querySelector('.inv-send')){const row=d.firstElementChild;const w=document.createElement('span');w.className='inv-send';w.style.cssText='display:inline-flex;gap:6px;align-items:center';w.innerHTML=invSendBtn('job',j.id,j.customer_id,j.xero_invoice_status,j.invoice_sent_at,j.invoice_sent_to);row?.appendChild(w);
  if(j.invoice_sent_at)row?.insertAdjacentHTML('afterend','<div class="muted" style="font-size:12.5px;margin-top:4px">✉ Emailed by Xero to '+esc(j.invoice_sent_to||'')+' on '+esc(new Date(j.invoice_sent_at).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>');}}catch(_){}return r;};})();
+/* ===== 18 Nov 2026: EMAIL FROM THE APP – invoices and job documents go from info@ through the company mailbox (SMTP),
+   with Xero's own invoice PDF, the job card and the WTN attached. Xero still tracks payment; a copy of every email goes to info@. ===== */
+const EM={status:null};
+async function emailCall(body){const {data,error}=await db.functions.invoke('email',{body});if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m;}catch(_){}throw new Error(m);}if(data&&data.error)throw new Error(data.error);return data;}
+async function emailStatus(force){if(EM.status&&!force)return EM.status;try{EM.status=await emailCall({action:'status'});}catch(e){EM.status={configured:false,error:e.message||String(e)};}return EM.status;}
+async function emailTest(btn){if(btn){btn.disabled=true;btn.textContent='Sending test…';}try{const r=await emailCall({action:'test'});alert('✓ Test email sent to '+r.to+'. Check the inbox in Outlook.');}catch(e){alert('The test didn\'t send: '+(e.message||e));}finally{if(btn){btn.disabled=false;btn.textContent='Send a test email';}}}
+function emOverlay(html){let ov=el('emOverlay');if(!ov){ov=document.createElement('div');ov.id='emOverlay';ov.className='ct-overlay';document.body.appendChild(ov);}ov.innerHTML='<div class="ct-modal" style="max-width:720px">'+html+'</div>';return ov;}
+function emClose(){el('emOverlay')?.remove();}
+const emFileB64=async f=>({filename:f.name,content_type:f.type||'application/pdf',base64:await blobB64(f)});
+/* compose an invoice email */
+window.invSend=invSend=async function(kind,id,cust,btn){
+ const st=await emailStatus(true);let cu={};try{if(cust){const c=await db.from('customers').select('company_name,contact_name,invoice_email,accounts_email,email').eq('id',cust).maybeSingle();cu=c.data||{};}}catch(_){}
+ const to=cu.invoice_email||cu.accounts_email||cu.email||'';const first=String(cu.contact_name||'').split(' ')[0];
+ const j=(kind==='job'||kind==='part')&&activeJob?activeJob:null;
+ let hasWtn=false;if(j){try{hasWtn=typeof sendDocsHasWtn==='function'&&sendDocsHasWtn();}catch(_){}}
+ const what=kind==='hire'?'hire':kind==='sale'?'order':'work';
+ const ref=j?('job '+(j.job_number||'')+(j.reference?' ('+j.reference+')':'')+(j.customer_po?', your PO '+j.customer_po:'')):'';
+ const body=(first?'Dear '+first+',':'Hello,')+'\n\nPlease find attached invoice {INVOICE}'+(ref?' for '+ref:'')+(j?(hasWtn?', together with the job card and waste transfer note.':', together with the job card.'):'.')+'\n\nThe total is {TOTAL}, due by {DUE}. You can view and pay it online here:\n{LINK}\n\nThank you for your '+(kind==='hire'?'continued business':'business')+' – if you have any questions about this invoice, just reply to this email.\n\nKind regards,';
+ const subj='Invoice {INVOICE} from Aura Solutions Group Limited'+(j?.customer_po?' – PO '+j.customer_po:j?.reference?' – '+j.reference:'');
+ const box=(lab,idx,on,dis)=>'<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:3px 0"><input type="checkbox" class="em-att" data-k="'+idx+'"'+(on?' checked':'')+(dis?' disabled':'')+'> '+lab+'</label>';
+ emOverlay('<div class="row"><h2 style="margin:0">✉ Email invoice</h2><button class="mini-btn" type="button" onclick="emClose()">✕</button></div>'
+  +(st.configured?'<div class="muted" style="font-size:13px;margin:4px 0 10px">Sent from <b>'+esc(st.from)+'</b>. A copy goes to that inbox so you have it in Outlook. Draft invoices are approved in Xero first.</div>'
+   :'<div class="err" style="margin:8px 0">Sending from info@ isn\'t set up yet – the mailbox details need adding in Supabase (see the setup steps). Until then you can have Xero email it instead (a link, no PDF attached).</div>')
+  +'<div class="two"><div class="field"><label for="emTo">To</label><input id="emTo" type="email" value="'+esc(to)+'"></div><div class="field"><label for="emCc">Copy to (CC)</label><input id="emCc" type="text" placeholder="optional"></div></div>'
+  +'<div class="field"><label for="emSubject">Subject</label><input id="emSubject" type="text" value="'+esc(subj)+'"></div>'
+  +'<div class="field"><label for="emBody">Message</label><textarea id="emBody" rows="10">'+esc(body)+'</textarea><div class="muted" style="font-size:12.5px;margin-top:3px">{INVOICE}, {TOTAL} and {DUE} are filled in from Xero; {LINK} becomes a “View and pay online” button. Your signature goes after “Kind regards,”.</div></div>'
+  +'<div style="margin:6px 0 10px"><b style="font-size:14px">Attach</b>'+box('Invoice PDF (from Xero)','inv',true,true)+(j?box('Job card PDF','jc',kind==='job',false)+(hasWtn?box('Waste transfer note PDF(s)','wtn',kind==='job',false):''):'')+(kind==='hire'?box('Hire statement PDF','hs',true,false):'')+'</div>'
+  +'<div id="emMsg"></div><div class="actions" style="margin-top:8px">'+(st.configured?'<button class="btn primary" type="button" id="emSendBtn" onclick="invSendGo(\''+kind+'\',\''+id+'\')">✉ Approve &amp; send</button>':'')
+  +'<button class="btn '+(st.configured?'light':'primary')+'" type="button" onclick="invSendViaXero(\''+kind+'\',\''+id+'\')">Have Xero email it instead (link only)</button>'
+  +(st.configured?'<button class="btn light" type="button" onclick="emailTest(this)">Send a test email</button>':'')+'<button class="btn light" type="button" onclick="emClose()">Cancel</button></div>');};
+async function invAfterSend(kind,id,to,status,number){
+ if(kind==='job'&&activeJob&&activeJob.id===id){Object.assign(activeJob,{invoice_sent_at:new Date().toISOString(),invoice_sent_to:to},status?{xero_invoice_status:status}:{},number?{invoice_number:number}:{});const row=(jobCentreJobs||[]).find(x=>x.id===id);if(row&&status)Object.assign(row,{xero_invoice_status:status});try{renderInvoicePanel();}catch(_){}}
+ else if(kind==='hire'){try{await hireRefresh();}catch(_){}}else if(kind==='sale'){try{await siLoad();renderFinance();}catch(_){}}else if(kind==='part'){el('jobPartsBox')?.remove();try{jcRender();}catch(_){}}}
+async function invSendViaXero(kind,id){const to=el('emTo')?.value.trim();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to||'')){alert('Check the email address.');return;}
+ const m=el('emMsg');m.innerHTML='<div class="muted">Approving and asking Xero to email it…</div>';
+ try{const r=await xeroCall({action:'send_invoice',kind,id,email:to});emClose();await invAfterSend(kind,id,r.sent_to,r.status,r.number);alert('✓ Invoice '+(r.number||'')+' approved and emailed to '+r.sent_to+' by Xero.');}catch(e){m.innerHTML='<div class="err">'+esc(e.message||String(e))+'</div>';}}
+async function invSendGo(kind,id){const to=el('emTo').value.trim(),cc=el('emCc').value.trim(),btn=el('emSendBtn'),m=el('emMsg');
+ const ok=s=>s.split(/[,;]+/).map(x=>x.trim()).filter(Boolean).every(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+ if(!to||!ok(to)||(cc&&!ok(cc))){alert('Check the email addresses.');return;}
+ const want=k=>!!document.querySelector('.em-att[data-k="'+k+'"]:checked');const step=t=>{m.innerHTML='<div class="muted">'+esc(t)+'</div>';};
+ btn.disabled=true;const atts=[];
+ try{step('Approving the invoice in Xero and getting its PDF…');const x=await xeroCall({action:'invoice_for_email',kind,id});
+  const num=x.number||'';atts.push({filename:'Invoice '+num+'.pdf',content_type:'application/pdf',base64:x.pdf_base64});
+  const j=activeJob,safe=String(j?.job_number||'Job').replace(/[^A-Za-z0-9-]/g,'');
+  if(want('jc')&&j){step('Creating the job card PDF…');const h=await auraCaptureDoc(()=>printJobCardV2());atts.push(await emFileB64(new File([await auraHtmlToPdf(h,{footer:'Job '+j.job_number})],safe+' Job Card.pdf',{type:'application/pdf'})));}
+  if(want('wtn')&&j){step('Creating the waste transfer note PDF…');const ft='Both parties must keep this note for at least two years · Job '+j.job_number;
+   const loads=typeof loadJobLoads==='function'?await loadJobLoads():[];
+   if(!loads.length||(typeof sendDocsWaste!=='undefined'&&sendDocsWaste===true)){const h=await auraCaptureDoc(()=>printWasteTransferNote());atts.push(await emFileB64(new File([await auraHtmlToPdf(h,{footer:ft})],safe+' Waste Transfer Note.pdf',{type:'application/pdf'})));}
+   for(const l of loads){step('Creating the WTN for load '+l.load_number+'…');const h=await auraCaptureDoc(()=>printLoadWtn(l.id));atts.push(await emFileB64(new File([await auraHtmlToPdf(h,{footer:ft})],safe+' '+(l.wtn_number||('Load '+l.load_number))+'.pdf',{type:'application/pdf'})));}}
+  if(want('hs')&&kind==='hire'){step('Creating the hire statement PDF…');try{const hi=(await db.from('hire_invoices').select('hire_id,period_start,period_end,lines').eq('id',id).maybeSingle()).data;if(hi){const html=await hireStatementHtml(hi.hire_id,hi.period_start,hi.period_end,hi.lines||[]);const h=HIRE.hires.find(z=>z.id===hi.hire_id);atts.push(await emFileB64(new File([await auraHtmlToPdf(html,{footer:'Hire '+(h?.hire_number||'')+' · '+hrFmt(hi.period_start)+' – '+hrFmt(hi.period_end)})],(h?.hire_number||'Hire')+' statement.pdf',{type:'application/pdf'})));}}catch(e){if(!confirm('The hire statement couldn\'t be made ('+(e.message||e)+'). Send the invoice without it?'))throw new Error('Not sent.');}}
+  const gbp=n=>'£'+Number(n||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const due=x.due?new Date(x.due+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'the due date';
+  const fill=s=>String(s).split('{INVOICE}').join(num).split('{TOTAL}').join(gbp(x.total)+' including VAT').split('{DUE}').join(due);
+  let raw=fill(el('emBody').value);const subject=fill(el('emSubject').value);
+  if(!want('jc')&&!want('wtn'))raw=raw.replace(/, together with the job card( and waste transfer note)?\./,'.');else if(!want('wtn'))raw=raw.replace(' and waste transfer note.','.');else if(!want('jc'))raw=raw.replace('together with the job card and waste transfer note','together with the waste transfer note');
+  if(!x.online_url)raw=raw.replace(/[^\n]*\n?\{LINK\}\n?/,'');
+  await sigLoad();const html=docsEmailHtml(raw,x.online_url||'','View and pay invoice '+num+' online');const text=raw.replace('{LINK}',x.online_url||'')+'\n\n'+sigPlain(SIG);
+  step('Sending from '+(EM.status?.from||'info@')+'…');
+  await emailCall({action:'send',to,cc,subject,text,html,attachments:atts,kind:'invoice-'+kind,ref_id:id,job_id:(kind==='job'||kind==='part')?activeJob?.id:null});
+  try{await xeroCall({action:'mark_invoice_sent',kind,id,to:[to,cc].filter(Boolean).join(', ')});}catch(_){}
+  emClose();await invAfterSend(kind,id,[to,cc].filter(Boolean).join(', '),x.status,num);
+  alert('✓ Invoice '+num+' emailed to '+to+' with '+atts.length+' attachment'+(atts.length===1?'':'s')+'.');}
+ catch(e){btn.disabled=false;m.innerHTML='<div class="err">'+esc(e.message||String(e))+'</div>';}}
+/* the job panel note says how it went, not "by Xero" */
+(function(){const o=window.decorateInvoicePanelXero;window.decorateInvoicePanelXero=decorateInvoicePanelXero=async function(){const r=await o.apply(this,arguments);try{el('invoicePanel')?.querySelectorAll('.xero-inv .muted').forEach(d=>{if(/^✉ Emailed by Xero to/.test(d.textContent))d.textContent=d.textContent.replace('Emailed by Xero to','Emailed to');});}catch(_){}return r;};})();
+/* job documents: send straight from info@ with the PDFs attached */
+async function sendJobDocsDirect(btn){const s=window.__sendDocs;if(!s)return;const st=await emailStatus();if(!st.configured){alert('Sending from info@ isn\'t set up yet – use “Copy email” and Outlook for now.');return;}
+ btn.disabled=true;btn.textContent='Sending…';
+ try{await sigLoad();const raw=s.rawBody||s.body.replace(s.link,'{LINK}');const label='View your job documents'+(activeJob?.job_number?' – '+activeJob.job_number:'');
+  const atts=[];for(const f of sendDocsFiles)atts.push(await emFileB64(f));
+  await emailCall({action:'send',to:s.to,cc:s.cc,subject:s.subject,text:raw.replace('{LINK}',label+': '+s.link)+'\n\n'+sigPlain(SIG),html:docsEmailHtml(raw,s.link,label),attachments:atts,kind:'job-docs',ref_id:activeJob?.id,job_id:activeJob?.id});
+  await markJobDocsSent(true);alert('✓ Sent to '+s.to+' from '+(st.from||'info@')+' with '+atts.length+' PDF'+(atts.length===1?'':'s')+' attached.');}
+ catch(e){btn.disabled=false;btn.textContent='✉ Send now from info@';alert('Not sent: '+(e.message||e));}}
+const __emObs=new MutationObserver(()=>{const box=[...document.querySelectorAll('#sendDocsPanel .ok')].find(x=>/Ready to send/.test(x.textContent));if(!box||box.querySelector('.em-direct'))return;
+ const acts=box.querySelector('.actions');if(!acts)return;const b=document.createElement('button');b.className='btn primary em-direct';b.type='button';b.textContent='✉ Send now from info@';b.onclick=()=>sendJobDocsDirect(b);acts.prepend(b);
+ acts.insertAdjacentHTML('afterend','<div class="muted em-direct-note" style="font-size:12.5px;margin-top:4px">“Send now from info@” emails it straight away with the PDFs attached and marks it sent. Or use the other buttons to send it from Outlook yourself.</div>');
+ emailStatus().then(st=>{if(!st.configured){b.disabled=true;b.title='Sending from info@ isn\'t set up yet';}});});
+setTimeout(()=>{const p=el('sendDocsPanel');if(p)__emObs.observe(p,{childList:true,subtree:true});},0);
+/* ===== 18 Nov 2026: priced charges show in the invoice section straight away – the invoice lines open ready-filled from the job's
+   charges (with agreed rates labelled), the value box is filled in, and saving charges or confirming costs refreshes it ===== */
+async function invAgreedFill(j,lines){try{const need=(lines||[]).filter(l=>!l.agreed_label&&l.rate_card_item_id&&jcNum(l.unit_price));if(!need.length||!j?.customer_id)return;
+ const r=await db.from('customer_prices').select('id,rate_card_item_id,sell_price,customer_site_id,contract_id,is_fixed_price,active').eq('customer_id',j.customer_id);
+ const P=(r.data||[]).filter(p=>p.active!==false&&!p.is_fixed_price&&(!p.customer_site_id||p.customer_site_id===j.customer_site_id));
+ need.forEach(l=>{const c=P.filter(p=>p.rate_card_item_id===l.rate_card_item_id&&jcNum(p.sell_price)===jcNum(l.unit_price)).sort((a,b)=>(b.customer_site_id?1:0)-(a.customer_site_id?1:0))[0];if(c)l.agreed_label=c.contract_id?'agreed contract rate':'agreed rate'+(c.customer_site_id?' for this site':'');});}catch(_){}}
+/* the agreed label is worked out from the price list when the line didn't carry it (lines priced before labels existed, or loaded from the database) */
+(function(){const inner=window.__jobChargesFor;window.__jobChargesFor=async function(j){
+ const out=await inner.apply(this,arguments);if(!out||!out.length)return out;
+ try{const unlabelled=out.filter(l=>!l.agreed_label&&!/agreed (contract )?rate/i.test(String(l.description||'')));if(unlabelled.length){await invAgreedFill(j,unlabelled);unlabelled.forEach(l=>{if(l.agreed_label)l.description=String(l.description||'')+' ('+l.agreed_label.charAt(0).toUpperCase()+l.agreed_label.slice(1)+')';});}}catch(_){}return out;};})();
+async function invAutoOpen(){const j=activeJob,box=el('invoicePanel');if(!j||!box||box.classList.contains('hidden')||j.invoiced_at||j.xero_invoice_id)return;
+ let ch=null;try{ch=await window.__jobChargesFor(j);}catch(_){}if(activeJob!==j||!ch||!ch.length)return;
+ const tot=Math.round(ch.reduce((a,l)=>a+(Number(l.qty)||1)*jcNum(l.unit_price),0)*100)/100;
+ const amt=el('invoiceAmountInput');if(amt&&!amt.value&&tot)amt.value=tot.toFixed(2);
+ const f=el('xeroInvForm');if(f&&!f.innerHTML.trim()){await xeroShowInvoiceForm();if(activeJob!==j)return;f.insertAdjacentHTML('afterbegin','<div class="ok" style="font-size:12.5px;margin:6px 0 4px">✓ Filled in from the job\'s charges ('+poGbp(tot)+' ex VAT). Check the lines, then create the draft invoice.</div>');}}
+(function(){const o=window.decorateInvoicePanelXero;window.decorateInvoicePanelXero=decorateInvoicePanelXero=async function(){const r=await o.apply(this,arguments);try{await invAutoOpen();}catch(_){}return r;};})();
+/* saving the charges or the costs refreshes the invoice section, whether or not the form was open */
+(function(){const o=window.jcSave;window.jcSave=jcSave=async function(){const r=await o.apply(this,arguments);try{const f=el('xeroInvForm');if(f&&!f.innerHTML.trim())await invAutoOpen();const amt=el('invoiceAmountInput');if(amt){amt.value='';await invAutoOpen();}}catch(_){}return r;};})();
+(function(){const o=window.jcCostSave;if(typeof o!=='function')return;window.jcCostSave=jcCostSave=async function(){const r=await o.apply(this,arguments);try{await invAutoOpen();}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */

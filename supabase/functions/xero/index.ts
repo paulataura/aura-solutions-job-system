@@ -114,6 +114,28 @@ async function ensureContact(table: "customers" | "suppliers", id: string) {
   return cid as string;
 }
 
+async function resolveInvoice(kind: string, id: string) {
+  // which Xero invoice, which customer and which table records it – for jobs, part invoices, hire periods and one-off sales
+  let xid: string | null = null, customerId: string | null = null, table = "", key = "", sentCols: [string, string] = ["sent_at", "sent_to"];
+  if (kind === "job") {
+    const { data: f } = await admin.from("job_finance").select("xero_invoice_id").eq("job_id", id).maybeSingle();
+    const { data: j } = await admin.from("jobs").select("customer_id").eq("id", id).maybeSingle();
+    xid = f?.xero_invoice_id || null; customerId = j?.customer_id || null; table = "job_finance"; key = "job_id"; sentCols = ["invoice_sent_at", "invoice_sent_to"];
+  } else if (kind === "part") {
+    const { data: p } = await admin.from("job_invoices").select("xero_invoice_id,job_id").eq("id", id).maybeSingle();
+    const { data: j } = p ? await admin.from("jobs").select("customer_id").eq("id", p.job_id).maybeSingle() : { data: null };
+    xid = p?.xero_invoice_id || null; customerId = j?.customer_id || null; table = "job_invoices"; key = "id";
+  } else if (kind === "hire") {
+    const { data: hi } = await admin.from("hire_invoices").select("xero_invoice_id,hire_id").eq("id", id).maybeSingle();
+    const { data: h } = hi ? await admin.from("hires").select("customer_id").eq("id", hi.hire_id).maybeSingle() : { data: null };
+    xid = hi?.xero_invoice_id || null; customerId = h?.customer_id || null; table = "hire_invoices"; key = "id";
+  } else if (kind === "sale") {
+    const { data: si } = await admin.from("sales_invoices").select("xero_invoice_id,customer_id").eq("id", id).maybeSingle();
+    xid = si?.xero_invoice_id || null; customerId = si?.customer_id || null; table = "sales_invoices"; key = "id";
+  }
+  return { xid, customerId, table, key, sentCols };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -394,6 +416,39 @@ Deno.serve(async (req) => {
       const gone = x.Status === "VOIDED" || x.Status === "DELETED";
       await admin.from("sales_invoices").update(gone ? { xero_invoice_id: null, invoice_number: null, status: "draft", updated_at: new Date().toISOString() } : { invoice_number: x.InvoiceNumber || null, status: x.Status, net_total: x.SubTotal, updated_at: new Date().toISOString() }).eq("id", si.id);
       return json({ ok: true, status: x.Status, number: x.InvoiceNumber, removed: gone });
+    }
+
+    if (action === "invoice_for_email") {
+      // approve the invoice (if still a draft), and hand back Xero's own PDF and "pay online" link so the app can email it as an attachment
+      const r = await resolveInvoice(String(body.kind || "job"), String(body.id || ""));
+      if (!r.xid) return json({ error: "This invoice isn't in Xero yet." }, 400);
+      let x = (await xero(`Invoices/${r.xid}`))?.Invoices?.[0];
+      if (!x) throw new Error("Invoice not found in Xero.");
+      if (x.Status === "VOIDED" || x.Status === "DELETED") return json({ error: "This invoice has been voided or deleted in Xero." }, 400);
+      if (body.approve !== false && (x.Status === "DRAFT" || x.Status === "SUBMITTED")) {
+        const a = await xero(`Invoices/${r.xid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Invoices: [{ InvoiceID: r.xid, Status: "AUTHORISED" }] }) });
+        x = a?.Invoices?.[0] || x;
+      }
+      const c = await connection();
+      const pr = await fetch(`https://api.xero.com/api.xro/2.0/Invoices/${r.xid}`, { headers: { Authorization: "Bearer " + c.access_token, "Xero-tenant-id": c.tenant_id, Accept: "application/pdf" } });
+      if (!pr.ok) throw new Error("Xero didn't return the invoice PDF (" + pr.status + ").");
+      const bytes = new Uint8Array(await pr.arrayBuffer());
+      let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      let online: string | null = null;
+      try { online = (await xero(`Invoices/${r.xid}/OnlineInvoice`))?.OnlineInvoices?.[0]?.OnlineInvoiceUrl || null; } catch (_) { online = null; }
+      const { data: cu } = r.customerId ? await admin.from("customers").select("company_name,contact_name,invoice_email,accounts_email,email").eq("id", r.customerId).maybeSingle() : { data: null };
+      const st = r.table === "job_finance" ? { xero_invoice_status: x.Status, invoice_number: x.InvoiceNumber || null, xero_invoice_total: x.Total, invoice_net_amount: x.SubTotal } : { status: x.Status, invoice_number: x.InvoiceNumber || null };
+      await admin.from(r.table).update(st).eq(r.key, String(body.id));
+      return json({ ok: true, number: x.InvoiceNumber, status: x.Status, total: x.Total, subtotal: x.SubTotal, due: (x.DueDateString || "").slice(0, 10) || null, reference: x.Reference || null, online_url: online, pdf_base64: btoa(bin), customer: cu || null });
+    }
+
+    if (action === "mark_invoice_sent") {
+      // after the app has emailed it: tick "sent" in Xero and record when and to whom
+      const r = await resolveInvoice(String(body.kind || "job"), String(body.id || ""));
+      if (!r.xid) return json({ error: "This invoice isn't in Xero yet." }, 400);
+      try { await xero(`Invoices/${r.xid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Invoices: [{ InvoiceID: r.xid, SentToContact: true }] }) }); } catch (_) { /* recorded in the app either way */ }
+      await admin.from(r.table).update({ [r.sentCols[0]]: new Date().toISOString(), [r.sentCols[1]]: String(body.to || "").slice(0, 500) }).eq(r.key, String(body.id));
+      return json({ ok: true });
     }
 
     if (action === "send_invoice") {
