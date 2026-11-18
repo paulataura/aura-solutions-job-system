@@ -7267,8 +7267,10 @@ window.openJobDocsMail=openJobDocsMail=async function(){const s=window.__sendDoc
 const __sdObs2=new MutationObserver(()=>{const box=[...document.querySelectorAll('#sendDocsPanel .ok')].find(x=>/Ready to send/.test(x.textContent));if(!box||box.dataset.mail2)return;box.dataset.mail2='1';
  const acts=box.querySelector('.actions');const open=[...(acts?.querySelectorAll('button')||[])].find(b=>/Open email/.test(b.textContent));
  if(open){open.textContent='✉ Open email with the link';open.className='btn primary';acts.prepend(open);}
- acts?.querySelectorAll('.sd-rich,button[onclick="shareJobDocs()"]').forEach(b=>b.className='btn light'+(b.classList.contains('sd-rich')?' sd-rich':''));
- const note=box.querySelector('.muted');if(note)note.innerHTML='“Open email with the link” opens your email with everything filled in – the message, the link to the customer\'s job documents page (job card and WTNs) and your signature. Just check it and press send. <a href="#" onclick="sigEdit();return false">✍ Edit my signature</a>';});
+ /* just two buttons: open the email with the link, and download the PDFs (mark as sent is at the top) */
+ [...(acts?.querySelectorAll('button')||[])].forEach(b=>{if(!/Open email|Download PDFs/.test(b.textContent))b.remove();else if(/Download/.test(b.textContent))b.className='btn light';});
+ [...box.querySelectorAll('button')].filter(b=>/I have sent it/.test(b.textContent)).forEach(b=>b.parentElement?.remove());
+ const note=box.querySelector('.muted');if(note)note.innerHTML='Your email opens with the message, the link and your signature filled in – check it, press send, then press <b>✓ Mark as sent</b> at the top.';});
 setTimeout(()=>{const p=el('sendDocsPanel');if(p)__sdObs2.observe(p,{childList:true,subtree:true});},0);
 /* ===== 18 Nov 2026: Send job documents – a clear button, and a better email ===== */
 let SD_VISITS=[];
@@ -7291,7 +7293,7 @@ window.sendDocsDefaults=sendDocsDefaults=function(){const j=activeJob||{},cu=j.c
   const att=[...box.querySelectorAll('#sendDocsForm .muted')].find(x=>/^Attachments:/.test(x.textContent));if(att)att.firstChild.textContent='The customer\'s documents page will have: ';
   const lab=box.querySelector('label[for=sdBody] .muted');if(lab)lab.textContent='– {LINK} becomes the “View your job documents” link; your signature goes after “Kind regards,”';
   const go=el('sdGo');if(go)go.textContent='Create the documents and link';}catch(_){}return r;};})();
-(function(){const st=document.createElement('style');st.textContent='#sendDocsPanel .sd-big{font-size:16px;font-weight:800;padding:12px 20px;box-shadow:0 2px 6px rgba(12,62,23,.25)}#sendDocsPanel.sd-due{border:2px solid #2f6b3a;background:#f3faf3}';document.head.appendChild(st);})();
+(function(){const st=document.createElement('style');st.textContent='#sendDocsPanel .sd-big{font-size:16px;font-weight:800;padding:12px 20px;box-shadow:0 2px 6px rgba(12,62,23,.25)}#sendDocsPanel.sd-due{border:2px solid #2f6b3a;background:#f3faf3}#sendDocsPanel .sd-rich,#sendDocsPanel button[onclick="shareJobDocs()"]{display:none!important}';document.head.appendChild(st);})();
 /* ===== 18 Nov 2026: the Xero invoice is dated the last visit (or the job date), not today – shown on the form and can be changed ===== */
 (function(){const o=window.xeroShowInvoiceForm;window.xeroShowInvoiceForm=xeroShowInvoiceForm=async function(){const r=await o.apply(this,arguments);
  try{const j=activeJob,f=el('xeroInvForm');if(!j||!f||el('xeroInvDate'))return r;const ds=(xeroLines||[]).map(l=>String(l.date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
