@@ -396,6 +396,52 @@ Deno.serve(async (req) => {
       return json({ ok: true, status: x.Status, number: x.InvoiceNumber, removed: gone });
     }
 
+    if (action === "send_invoice") {
+      // Approve a draft invoice in Xero and have Xero email it to the customer (with its "view / pay online" link and any attached job card / WTN)
+      const kind = String(body.kind || "job"), id = String(body.id || "");
+      let xid: string | null = null, customerId: string | null = null, table = "", key = "", sentCols: [string, string] = ["sent_at", "sent_to"];
+      if (kind === "job") {
+        const { data: f } = await admin.from("job_finance").select("xero_invoice_id").eq("job_id", id).maybeSingle();
+        const { data: j } = await admin.from("jobs").select("customer_id").eq("id", id).maybeSingle();
+        xid = f?.xero_invoice_id || null; customerId = j?.customer_id || null; table = "job_finance"; key = "job_id"; sentCols = ["invoice_sent_at", "invoice_sent_to"];
+      } else if (kind === "part") {
+        const { data: p } = await admin.from("job_invoices").select("xero_invoice_id,job_id").eq("id", id).maybeSingle();
+        const { data: j } = p ? await admin.from("jobs").select("customer_id").eq("id", p.job_id).maybeSingle() : { data: null };
+        xid = p?.xero_invoice_id || null; customerId = j?.customer_id || null; table = "job_invoices"; key = "id";
+      } else if (kind === "hire") {
+        const { data: hi } = await admin.from("hire_invoices").select("xero_invoice_id,hire_id").eq("id", id).maybeSingle();
+        const { data: h } = hi ? await admin.from("hires").select("customer_id").eq("id", hi.hire_id).maybeSingle() : { data: null };
+        xid = hi?.xero_invoice_id || null; customerId = h?.customer_id || null; table = "hire_invoices"; key = "id";
+      } else if (kind === "sale") {
+        const { data: si } = await admin.from("sales_invoices").select("xero_invoice_id,customer_id").eq("id", id).maybeSingle();
+        xid = si?.xero_invoice_id || null; customerId = si?.customer_id || null; table = "sales_invoices"; key = "id";
+      } else return json({ error: "Unknown invoice type." }, 400);
+      if (!xid) return json({ error: "This invoice isn't in Xero yet." }, 400);
+      const { data: cu } = customerId ? await admin.from("customers").select("company_name,invoice_email,accounts_email,email").eq("id", customerId).maybeSingle() : { data: null };
+      const to = String(body.email || cu?.invoice_email || cu?.accounts_email || cu?.email || "").trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return json({ error: "There's no invoice email for this customer – add one on the customer (Invoice email) first." }, 400);
+      let x = (await xero(`Invoices/${xid}`))?.Invoices?.[0];
+      if (!x) throw new Error("Invoice not found in Xero.");
+      if (x.Status === "VOIDED" || x.Status === "DELETED") return json({ error: "This invoice has been voided or deleted in Xero." }, 400);
+      // Xero emails the invoice contact – make sure it has the right address
+      const cid = x.Contact?.ContactID;
+      if (cid) {
+        const c = (await xero(`Contacts/${cid}`))?.Contacts?.[0];
+        if (c && String(c.EmailAddress || "").toLowerCase() !== to.toLowerCase()) await xero("Contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Contacts: [{ ContactID: cid, EmailAddress: to }] }) });
+      }
+      if (x.Status === "DRAFT" || x.Status === "SUBMITTED") {
+        const r = await xero(`Invoices/${xid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Invoices: [{ InvoiceID: xid, Status: "AUTHORISED" }] }) });
+        x = r?.Invoices?.[0] || x;
+      }
+      await xero(`Invoices/${xid}/Email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const now = new Date().toISOString();
+      const upd: any = { [sentCols[0]]: now, [sentCols[1]]: to };
+      if (table === "job_finance") Object.assign(upd, { xero_invoice_status: x.Status, invoice_number: x.InvoiceNumber || null, xero_invoice_total: x.Total, invoice_net_amount: x.SubTotal, xero_synced_at: now });
+      else Object.assign(upd, { status: x.Status, invoice_number: x.InvoiceNumber || null });
+      await admin.from(table).update(upd).eq(key, id);
+      return json({ ok: true, sent_to: to, status: x.Status, number: x.InvoiceNumber, total: x.Total, subtotal: x.SubTotal });
+    }
+
     if (action === "list_sales_invoices") {
       // Sales invoices (not voided/deleted) from a date, with their lines, for turning into jobs in the app
       const since = /^\d{4}-\d{2}-\d{2}$/.test(String(body.since || "")) ? String(body.since) : "2024-01-01";
