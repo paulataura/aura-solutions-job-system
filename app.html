@@ -7315,7 +7315,7 @@ async function vnRender(){const old=el('vnowBanner');const mgmt=['admin','manage
  const s=await vnState();if(!s){return;}const multi=s.total>1;const live=s.live;jd?.classList.toggle('visit-live',live&&multi);
  /* costing panel goes below the work while a visit is being done, back to the top otherwise */
  const fp=el('jobFinancePanel'),head=jd?.querySelector('.row');if(fp&&head){if(live&&multi){if(fp.parentElement===jd&&fp!==jd.lastElementChild)jd.appendChild(fp);}else if(fp.previousElementSibling!==head)head.after(fp);}
- if(!live||!multi){old?.remove();return;}
+ old?.remove();return; /* 18 Nov: no banner – the page is laid out like the operator's, with the visits list on top */
  const st=activeJob.status,date=s.cur?.planned_date||activeJob.job_date,who=activeJob.contractor_name||(activeJob.assigned_to?(await operatorProfiles()).find(p=>p.id===activeJob.assigned_to)?.full_name:'')||'';
  const arrived=!!s.cur?.arrived_at&&['on_site','completed'].includes(st);const steps=['1 Arrival picture','2 Work carried out','3 Waste & WTN','4 Sign-off & submit'];const onIx=st==='draft'?-1:(['issued','accepted'].includes(st)?0:1);
  let b=old;if(!b){b=document.createElement('div');b.id='vnowBanner';}const anchor=el('jobDetail')?.querySelector('.row');if(anchor&&b.previousElementSibling!==anchor)anchor.after(b);
@@ -7333,6 +7333,8 @@ function vnGo(){const t=[el('arrivalCapture'),el('cleanOperatorPanel'),el('servi
   box.querySelectorAll('.visit-card').forEach(c=>{if(c.dataset.fold)return;c.dataset.fold='1';const kids=[...c.children].slice(1);kids.forEach(k=>k.classList.add('hidden'));const h=c.firstElementChild;h?.insertAdjacentHTML('beforeend','<button class="mini-btn" type="button" style="margin-left:auto" onclick="[...this.closest(\'.visit-card\').children].slice(1).forEach(k=>k.classList.toggle(\'hidden\'))">✎ Edit</button>');});
  }catch(_){}try{await vnRender();}catch(_){}return r;};})();
 (function(){const o=window.renderWorkflow;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{vnRender();}catch(_){}return r;};})();
+/* 18 Nov 2026: no "You are entering this visit for the operator" box – the office goes through the visit exactly as the operator does */
+window.renderOfficeTimes=renderOfficeTimes=async function(){el('officeTimesPanel')?.remove();window.__officeTimes=null;};
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
