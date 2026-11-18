@@ -7367,6 +7367,19 @@ async function vwInject(){const cap=el('arrivalCapture');const office=['admin','
 (function(){const o=window.persistJobStatus;window.persistJobStatus=persistJobStatus=async function(status){let n=null;try{if(status==='returned'&&activeJob){const s=await vwCurrentVisit();n=s?.cur?.visit_number||null;if(s?.cur)try{localStorage.removeItem(vwKey(s.cur.id));}catch(_){}}}catch(_){}
  const r=await o.apply(this,arguments);try{if(status==='returned'&&activeJob&&activeJob.__nextVisit&&n)sessionStorage.setItem('auraVisitJustDone',JSON.stringify({job:activeJob.id,n}));}catch(_){}return r;};})();
 (function(){const o=window.renderWorkflow;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{vwInject();}catch(_){}return r;};})();
+/* ===== 18 Nov 2026: rate card item – supplier and cost entered once, in "Who supplies this" =====
+   The old "Cost to Aura" and "Usual supplier" boxes are hidden: the item's cost and usual supplier now come from the ★ preferred
+   supplier (or the cheapest). The supplier's price is per the item's unit, so there's no separate unit on the supplier line. ===== */
+(function(){const st=document.createElement('style');st.textContent='.field:has(> #rcCost),.field:has(> #rcSupplier){display:none!important}#rcSupBox th:nth-child(3),#rcSupBox td:nth-child(3){display:none}';document.head.appendChild(st);})();
+(function(){const o=window.rcSupRowsNow;window.rcSupRowsNow=rcSupRowsNow=function(){const u=(el('rcUnit')?.value||'').trim()||null;return o.apply(this,arguments).map(x=>({...x,unit:u}));};})();
+(function(){const o=window.saveRateCardItem;window.saveRateCardItem=saveRateCardItem=async function(e){
+ try{const rows=isFinanceAdmin()?rcSupRowsNow():[];if(rows.length){const best=rows.find(x=>x.preferred)||rows.slice().sort((a,b)=>a.unit_price-b.unit_price)[0];
+  if(el('rcCost'))el('rcCost').value='';if(el('rcSupplier'))el('rcSupplier').value=(window.suppliersCache||[]).find(s=>s.id===best.supplier_id)?.name||'';}}catch(_){}
+ return o.apply(this,arguments);};})();
+/* the supplier column header and help text read simply */
+const __rcObs=new MutationObserver(()=>{const b=el('rcSupBox');if(!b||b.dataset.tidy)return;const th=b.querySelector('thead th:nth-child(2)');if(!th)return;b.dataset.tidy='1';th.textContent='Their cost £ per '+((el('rcUnit')?.value||'unit').trim()||'unit');
+ const m=b.querySelector('.muted');if(m)m.textContent='Add each supplier who offers it and what they charge you per '+((el('rcUnit')?.value||'unit').trim()||'unit')+'. ★ = the one you normally use – its price is the item\'s cost.';});
+setTimeout(()=>{const w=el('rcFormWrap')||document.body;__rcObs.observe(w,{childList:true,subtree:true});},0);
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
