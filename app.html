@@ -7230,6 +7230,33 @@ async function vePicUp(input,visitId,type,replaceId){const files=[...(input.file
    else{const i=await db.from('job_files').insert({job_id:activeJob.id,visit_id:visitId,file_type:type,file_name:f.name||'photo.jpg',storage_path:path,uploaded_by:activeSession.user.id,taken_at:await photoTakenAt(f)});if(i.error)throw i.error;}}
   const box=el('vePics');if(box)box.innerHTML=await vePicsHtml(visitId);const m2=el('vePicMsg');if(m2)m2.innerHTML='<div class="ok">✓ Saved on this visit.</div>';}catch(e){m.innerHTML='<div class="err">Could not save: '+esc(e.message||String(e))+'</div>';}}
 (function(){const o=window.visitEdit;window.visitEdit=visitEdit=async function(visitId){const r=await o.apply(this,arguments);try{const t=el('veArrN')?.closest('.field');if(t&&!el('vePics')){t.insertAdjacentHTML('afterend','<div id="vePics"><div class="muted">Loading pictures…</div></div>');el('vePics').innerHTML=await vePicsHtml(visitId);}}catch(_){}return r;};})();
+/* ===== 18 Nov 2026: EVERY VISIT IS RUN AS ITS OWN JOB – same steps, full sign-off (customer signature or reason) every visit,
+   the loads and WTNs on screen are this visit's only, and the office fills a visit in through the same screens.
+   Only the back office sees that the visits belong to one job. The office (never an operator) can record "no arrival picture taken". ===== */
+/* the customer signs every visit – no more "customer signs at the end" on earlier visits */
+window.moreVisitsPlanned=moreVisitsPlanned=async function(){return false;};
+/* while a visit is being done, the loads (and the customer's sign-off for them) are this visit's only */
+(function(){const o=window.loadJobLoads;window.loadJobLoads=loadJobLoads=async function(){const all=await o.apply(this,arguments);
+ try{if(!activeJob||!['issued','accepted','on_site','completed'].includes(activeJob.status))return all;const v=(await db.from('job_visits').select('id').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1)).data?.[0];
+  if(!v)return all;jobLoads=(all||[]).filter(l=>!l.visit_id||l.visit_id===v.id);return jobLoads;}catch(_){return all;}};})();
+/* operators just see the visit's date – "Visit 3 … (job started …)" is for the office */
+(function(){const o=window.openJob;if(typeof o!=='function')return;window.openJob=async function(id){const r=await o.apply(this,arguments);try{if(activeJob&&activeJob.id===id&&activeJob.__cv&&!['admin','manager'].includes(activeProfile?.role)){const d=el('detailDate');if(d)d.textContent=vFmtDay(activeJob.__cv.date)+(activeJob.job_time?' · '+String(activeJob.job_time).slice(0,5):'');}}catch(_){}return r;};})();
+/* office only: no arrival picture was taken */
+function noPicInject(){const cap=el('arrivalCapture');const show=!!cap&&!cap.classList.contains('hidden')&&officeEntering()&&['admin','manager'].includes(activeProfile?.role);const old=el('noPicBox');if(!show){old?.remove();return;}if(old)return;
+ const anchor=el('tpcBox');const html='<div id="noPicBox" class="saved-site-card" style="margin-top:12px;border:1px dashed #d7b56a;background:#fffaf0"><b>📷 No arrival picture taken?</b> <span class="muted" style="font-size:13px">Office only – carries on to the next step without one. It\'s noted on the visit and its job card.</span>'
+  +'<div class="field" style="margin:8px 0 6px"><label for="noPicReason">Why not? *</label><input id="noPicReason" placeholder="e.g. Contractor didn\'t take one / no signal on site"></div><div class="actions"><button class="btn light" type="button" id="noPicBtn" onclick="officeNoArrival()">Continue without an arrival picture</button></div><div id="noPicMsg"></div></div>';
+ anchor?anchor.insertAdjacentHTML('beforebegin',html):cap.insertAdjacentHTML('beforeend',html);}
+async function officeNoArrival(){if(!activeJob||!['issued','accepted'].includes(activeJob.status)||!['admin','manager'].includes(activeProfile?.role))return;const reason=el('noPicReason').value.trim(),m=el('noPicMsg');
+ if(!reason){m.innerHTML='<div class="err">Say why there\'s no arrival picture.</div>';return;}const btn=el('noPicBtn');btn.disabled=true;m.innerHTML='<div class="muted">Opening the visit…</div>';
+ try{if(activeJob.status==='issued')await persistJobStatus('accepted');const now=new Date().toISOString(),note='No arrival picture taken – '+reason+' (recorded by '+(activeProfile?.full_name||'the office')+')';
+  const ex=(await db.from('job_visits').select('id,arrival_notes').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1)).data?.[0];
+  const res=ex?await db.from('job_visits').update({arrived_at:now,arrival_notes:[note,ex.arrival_notes].filter(Boolean).join('\n'),updated_at:now}).eq('id',ex.id):await db.from('job_visits').insert({job_id:activeJob.id,arrived_at:now,arrival_notes:note});if(res.error)throw res.error;
+  await persistJobStatus('on_site');el('arrivalPhotoNoteModal')?.classList.add('hidden');el('arrivalCapture').classList.add('hidden');
+  renderWorkflow();await Promise.all([loadArrivalNotes(),loadCompletionDetails(),loadServiceChecklist(),loadSiteSignoff(),loadSiteVisit()]);if(typeof cleanOperatorLoad==='function')await cleanOperatorLoad();
+  try{if(window.__officeTimes&&window.__officeTimes.job===activeJob.id)await applyOfficeTimes(true);}catch(_){}
+  el('detailMsg').innerHTML='<div class="ok">Visit opened without an arrival picture – the reason is noted on the visit.</div>';}
+ catch(e){btn.disabled=false;m.innerHTML='<div class="err">Could not continue: '+esc(e.message||String(e))+'</div>';}}
+(function(){const o=window.renderWorkflow;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{noPicInject();}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
