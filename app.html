@@ -3540,7 +3540,7 @@ async function xeroCreateInvoice(){const j=activeJob,btn=el('xeroGo');if(!j)retu
  if(!lines.length||lines.some(l=>!l.description||(!(l.unit_amount>0)&&!l.included))||!lines.some(l=>l.unit_amount>0)){alertBox('xeroInvMsg','err','Each line needs a description and a price (lines starting with • can be £0 – they list what a bundled price includes).');return;}
  if(lines.some(l=>!l.category_id)){alertBox('xeroInvMsg','err','Choose a revenue category for every line – it is how the reports show where you make money.');return;}
  const wantJc=el('xaJc')?.checked,wantW=el('xaWtn')?.checked;btn.disabled=true;
- try{step('Creating the draft invoice in Xero…');const r=await xeroCall({action:'create_invoice',job_id:j.id,lines});const inv=r.invoice;
+ try{step('Creating the draft invoice in Xero…');const r=await xeroCall({action:'create_invoice',job_id:j.id,lines,invoice_date:el('xeroInvDate')?.value||null});const inv=r.invoice;
   const invLines=lines.map(l=>({description:l.description.slice(0,200),category_id:l.category_id,category:l.category,resource_id:l.resource_id,resource:l.resource,account_code:l.account_code,tax_type:l.tax_type,net:Math.round(l.quantity*l.unit_amount*100)/100}));try{await saveJobFinance(j.id,{invoice_lines:invLines});}catch(_){}
   const patch={xero_invoice_id:inv.id,invoice_number:inv.number||null,xero_invoice_status:inv.status,xero_invoice_total:inv.total,invoice_net_amount:inv.subtotal,invoiced_at:new Date().toISOString(),invoiced_by_name:activeProfile?.full_name||null,invoice_lines:invLines};
   Object.assign(j,patch);const row=(jobCentreJobs||[]).find(x=>x.id===j.id);if(row)Object.assign(row,patch);
@@ -7292,6 +7292,15 @@ window.sendDocsDefaults=sendDocsDefaults=function(){const j=activeJob||{},cu=j.c
   const lab=box.querySelector('label[for=sdBody] .muted');if(lab)lab.textContent='– {LINK} becomes the “View your job documents” link; your signature goes after “Kind regards,”';
   const go=el('sdGo');if(go)go.textContent='Create the documents and link';}catch(_){}return r;};})();
 (function(){const st=document.createElement('style');st.textContent='#sendDocsPanel .sd-big{font-size:16px;font-weight:800;padding:12px 20px;box-shadow:0 2px 6px rgba(12,62,23,.25)}#sendDocsPanel.sd-due{border:2px solid #2f6b3a;background:#f3faf3}';document.head.appendChild(st);})();
+/* ===== 18 Nov 2026: the Xero invoice is dated the last visit (or the job date), not today – shown on the form and can be changed ===== */
+(function(){const o=window.xeroShowInvoiceForm;window.xeroShowInvoiceForm=xeroShowInvoiceForm=async function(){const r=await o.apply(this,arguments);
+ try{const j=activeJob,f=el('xeroInvForm');if(!j||!f||el('xeroInvDate'))return r;const ds=(xeroLines||[]).map(l=>String(l.date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const today=localDateKey(new Date());let d=ds[ds.length-1]||j.job_date||today;if(d>today)d=today;
+  const btn=[...f.querySelectorAll('button')].find(b=>/Create draft in Xero/.test(b.textContent));const host=btn?.closest('.actions')||btn?.parentElement;if(!host)return r;
+  host.insertAdjacentHTML('beforebegin','<div class="field" style="max-width:260px;margin:8px 0"><label for="xeroInvDate">Invoice date</label><input id="xeroInvDate" type="date" value="'+d+'" max="'+today+'" onchange="xeroInvDateNote()"><div class="muted" style="font-size:12.5px" id="xeroInvDateNote"></div></div>');xeroInvDateNote();}catch(_){}return r;};})();
+async function xeroInvDateNote(){const d=el('xeroInvDate')?.value,n=el('xeroInvDateNote');if(!d||!n)return;let terms='30 days EOM';try{const c=await db.from('customers').select('payment_terms').eq('id',activeJob.customer_id).maybeSingle();terms=c.data?.payment_terms||terms;}catch(_){}
+ const due=payTermsDue(terms,d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});n.textContent='The last visit / job date. Due '+due+' ('+payTermsLabel(terms)+').';
+ const f=el('xeroInvForm');if(f)f.querySelectorAll('b').forEach(b=>{if(b.nextSibling&&/if created today/.test(b.nextSibling.textContent||'')){b.textContent=due;b.nextSibling.textContent=' from the invoice date';}});}
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */

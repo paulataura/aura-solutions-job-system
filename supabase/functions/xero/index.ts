@@ -189,7 +189,8 @@ Deno.serve(async (req) => {
       if (!lines.some((l: any) => Number(l.unit_amount) !== 0)) return json({ error: "Add at least one invoice line with a price." }, 400);
       const contactId = await ensureContact("customers", job.customer_id);
       const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", job.customer_id).maybeSingle();
-      const today = new Date();
+      // dated the last visit (or the job date) – sent by the app; today if none given
+      const today = /^\d{4}-\d{2}-\d{2}$/.test(String(body.invoice_date || "")) && String(body.invoice_date) <= new Date().toISOString().slice(0, 10) ? new Date(String(body.invoice_date) + "T12:00:00Z") : new Date();
       const inv = await xero("Invoices", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
