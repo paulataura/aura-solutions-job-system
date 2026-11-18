@@ -7335,9 +7335,9 @@ function vnGo(){const t=[el('arrivalCapture'),el('cleanOperatorPanel'),el('servi
 (function(){const o=window.renderWorkflow;window.renderWorkflow=function(){const r=o.apply(this,arguments);try{vnRender();}catch(_){}return r;};})();
 /* 18 Nov 2026: no "You are entering this visit for the operator" box – the office goes through the visit exactly as the operator does */
 window.renderOfficeTimes=renderOfficeTimes=async function(){el('officeTimesPanel')?.remove();window.__officeTimes=null;};
-/* 18 Nov 2026: no "← Back to ASG-…" bar on the calendar / job centre / other pages – the back bar only shows inside a job (e.g. "← Back to Calendar") or a customer */
+/* 18 Nov 2026: no back bar on the menu pages (calendar, job centre, customers …) – the back bar only shows inside a job (e.g. "← Back to Calendar") or a customer */
 (function(){const o=window.navBackRender;window.navBackRender=navBackRender=function(){const r=o.apply(this,arguments);try{const b=el('navBackBar'),s=NAVBACK.stack[NAVBACK.stack.length-1];const inJob=!el('jobDetail')?.classList.contains('hidden');
- if(b&&s&&s.job&&!inJob)b.classList.add('hidden');}catch(_){}return r;};})();
+ if(b&&!inJob)b.classList.add('hidden');}catch(_){}return r;};})();
 (function(){const o=window.navGo;if(typeof o!=='function')return;window.navGo=navGo=async function(){const r=await o.apply(this,arguments);try{navBackRender();}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
