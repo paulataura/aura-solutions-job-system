@@ -7270,6 +7270,28 @@ const __sdObs2=new MutationObserver(()=>{const box=[...document.querySelectorAll
  acts?.querySelectorAll('.sd-rich,button[onclick="shareJobDocs()"]').forEach(b=>b.className='btn light'+(b.classList.contains('sd-rich')?' sd-rich':''));
  const note=box.querySelector('.muted');if(note)note.innerHTML='“Open email with the link” opens your email with everything filled in – the message, the link to the customer\'s job documents page (job card and WTNs) and your signature. Just check it and press send. <a href="#" onclick="sigEdit();return false">✍ Edit my signature</a>';});
 setTimeout(()=>{const p=el('sendDocsPanel');if(p)__sdObs2.observe(p,{childList:true,subtree:true});},0);
+/* ===== 18 Nov 2026: Send job documents – a clear button, and a better email ===== */
+let SD_VISITS=[];
+window.sendDocsDefaults=sendDocsDefaults=function(){const j=activeJob||{},cu=j.customers||{};const first=String(cu.contact_name||j.site_contact_name||'').trim().split(' ')[0];const wtn=sendDocsHasWtn();
+ const fmt=d=>new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'});
+ const days=[...new Set((SD_VISITS||[]).map(v=>String(v).slice(0,10)))].sort();
+ const when=days.length>1?'over '+days.length+' visits ('+days.map((d,i)=>new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',...(i===days.length-1?{year:'numeric'}:{})})).join(', ')+')':(days[0]?'on '+fmt(days[0]+'T12:00:00Z'):(j.job_date?'on '+fmt(j.job_date+'T12:00:00Z'):''));
+ const site=String(j.site_address||'').split(',')[0].trim();
+ const docs='• Job card – the work carried out, what we found and photographs'+(wtn?'\n• Waste transfer note'+(days.length>1?'s':'')+' – for your duty of care records (please keep for at least two years)':'');
+ const facts=[j.reference?'Job: '+j.reference:'',site&&!String(j.reference||'').toLowerCase().includes(site.toLowerCase())?'Site: '+site:'','Our ref: '+(j.job_number||''),j.customer_po?'Your PO: '+j.customer_po:''].filter(Boolean).join('\n');
+ return {to:cu.email||'',subject:(j.reference?j.reference+' – ':'')+'job documents'+(j.customer_po?' (PO '+j.customer_po+')':'')+' – '+(j.job_number||''),
+  body:(first?'Dear '+first+',':'Hello,')+'\n\nThank you for using Aura Solutions Group Limited. We\'ve completed the work'+(when?' '+when:'')+', and your job documents are ready to view and download:\n\n'+docs+'\n\n{LINK}\n\n'+facts+'\n\nYour invoice for this work will follow separately.\n\nIf anything doesn\'t look right or you have any questions, just reply to this email – we\'re happy to help.\n\nKind regards,'};};
+(function(){const o=window.renderSendDocsPanel;window.renderSendDocsPanel=renderSendDocsPanel=async function(){
+ try{if(activeJob){const v=await db.from('job_visits').select('arrived_at,completed_at').eq('job_id',activeJob.id);SD_VISITS=(v.data||[]).map(x=>x.arrived_at||x.completed_at).filter(Boolean);}}catch(_){SD_VISITS=[];}
+ const r=await o.apply(this,arguments);
+ try{const box=el('sendDocsPanel');if(!box||box.classList.contains('hidden'))return r;const sent=!!activeJob?.documents_sent_at;
+  const b=[...box.querySelectorAll('button')].find(x=>/sendDocsForm/.test(x.getAttribute('onclick')||''));
+  if(b){b.parentElement.prepend(b);b.className='btn primary sd-big';b.textContent=sent?'✉ Send job documents again':'✉ Send job documents';}
+  box.classList.toggle('sd-due',!sent);
+  const att=[...box.querySelectorAll('#sendDocsForm .muted')].find(x=>/^Attachments:/.test(x.textContent));if(att)att.firstChild.textContent='The customer\'s documents page will have: ';
+  const lab=box.querySelector('label[for=sdBody] .muted');if(lab)lab.textContent='– {LINK} becomes the “View your job documents” link; your signature goes after “Kind regards,”';
+  const go=el('sdGo');if(go)go.textContent='Create the documents and link';}catch(_){}return r;};})();
+(function(){const st=document.createElement('style');st.textContent='#sendDocsPanel .sd-big{font-size:16px;font-weight:800;padding:12px 20px;box-shadow:0 2px 6px rgba(12,62,23,.25)}#sendDocsPanel.sd-due{border:2px solid #2f6b3a;background:#f3faf3}';document.head.appendChild(st);})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
