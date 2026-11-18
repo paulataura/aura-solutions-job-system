@@ -7213,6 +7213,8 @@ function invTidyPanel(){const box=el('invoicePanel'),j=activeJob;if(!box||!j||j.
  const note=[...box.querySelectorAll('.xero-inv .muted')].find(x=>/fill in the boxes above/.test(x.textContent));if(note)note.innerHTML='– the invoice number comes back from Xero automatically.';
  const x=box.querySelector('.xero-inv');if(x&&!box.querySelector('.inv-manual')){x.insertAdjacentHTML('beforeend','<div class="inv-manual" style="margin-top:10px;font-size:12.5px"><a href="#" onclick="event.preventDefault();const r=el(\'invoiceNumberInput\')?.closest(\'.row\');if(r){r.style.display=r.style.display===\'none\'?\'\':\'none\';}">Invoiced outside Xero? Mark it as invoiced by hand</a></div>');}}
 (function(){const o=window.decorateInvoicePanelXero;window.decorateInvoicePanelXero=decorateInvoicePanelXero=async function(){const r=await o.apply(this,arguments);try{invTidyPanel();}catch(_){}return r;};})();
+/* one "Create" button: while the invoice lines are showing, the top "Create draft invoice in Xero" button (which only opens them) is hidden */
+(function(){const st=document.createElement('style');st.textContent='.xero-inv:has(#xeroInvForm:not(:empty)) button[onclick="xeroShowInvoiceForm()"],.xero-inv:has(#xeroInvForm:not(:empty)) button[onclick="xeroShowInvoiceForm()"]+span.muted{display:none}';document.head.appendChild(st);})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
