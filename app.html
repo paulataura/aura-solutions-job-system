@@ -595,7 +595,7 @@ async function refreshActiveJobAssignee(){
   if(data)activeJob.assigneeLabel=(data.full_name||'Operative')+' — '+(data.role||'operative');
  }else if(activeJob.contractor_id){
   const {data}=await db.from('contractors').select('company_name,contact_name').eq('id',activeJob.contractor_id).maybeSingle();
-  if(data)activeJob.assigneeLabel=[data.company_name,data.contact_name].filter(Boolean).join(' — ');
+  if(data)activeJob.assigneeLabel=data.company_name||data.contact_name||'Contractor' /* the company, not their contact – we don't know who actually goes */;
  }
 }
 
