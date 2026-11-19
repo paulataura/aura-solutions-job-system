@@ -7441,6 +7441,19 @@ async function qeSendMail(){const s=QSEND;if(!s)return;try{await sigLoad();}catc
  let body=s.raw.includes('{LINK}')?s.raw.replace('{LINK}',label+':\n'+s.link):s.raw+'\n\n'+label+':\n'+s.link;try{if(typeof SIG!=='undefined'&&SIG)body=body.replace(/\s*$/,'')+'\n'+sigPlain(SIG);}catch(_){}
  location.href='mailto:'+encodeURIComponent(s.to)+'?'+[s.cc?'cc='+encodeURIComponent(s.cc):'','subject='+encodeURIComponent(s.subject),'body='+encodeURIComponent(body)].filter(Boolean).join('&');}
 function qeSendDownload(){(QSEND?.files||[]).forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();},i*400));}
+/* ===== 19 Nov 2026: unsaved quote changes are kept on this device, so a quote closed without saving can be restored ===== */
+const QD_KEY='auraQuoteUnsaved';let qdT=0;
+function qdKeep(){clearTimeout(qdT);qdT=setTimeout(()=>{try{if(QE&&QE.dirty&&!qeLocked())localStorage.setItem(QD_KEY,JSON.stringify({at:Date.now(),q:QE.q,stages:QE.stages}));}catch(_){}},800);}
+function qdGet(){try{const d=JSON.parse(localStorage.getItem(QD_KEY)||'null');if(d&&Date.now()-d.at<14*864e5)return d;}catch(_){}return null;}
+function qdClear(){try{localStorage.removeItem(QD_KEY);}catch(_){}}
+['qeF','qeS','qeL'].forEach(n=>{const o=window[n];if(typeof o!=='function')return;window[n]=function(){const r=o.apply(this,arguments);qdKeep();return r;};});
+(function(){const o=window.qeRender;window.qeRender=qeRender=function(){const r=o.apply(this,arguments);try{if(QE?.dirty)qdKeep();}catch(_){}return r;};})();
+(function(){const o=window.qeSave;window.qeSave=qeSave=async function(){const r=await o.apply(this,arguments);if(r!==false)qdClear();return r;};})();
+async function qdRestore(){const d=qdGet();if(!d)return;await salesLoad();await ensureRateCard().catch(()=>{});
+ QE={q:d.q,stages:d.stages,multi:true,sites:[],contacts:[],prices:[],files:[],dirty:true};if(d.q.id){try{const f=await db.from('quote_files').select('*').eq('quote_id',d.q.id).order('created_at');QE.files=f.data||[];}catch(_){}}
+ await qeLoadParty();qeRender();qeMsg('<div class="ok">Your unsaved changes are back. Press 💾 Save to keep them.</div>');}
+(function(){const o=window.renderQuotesPage;window.renderQuotesPage=renderQuotesPage=function(){const r=o.apply(this,arguments);try{const d=qdGet(),p=el('salesPanel');if(d&&p&&!el('qdBanner')){const when=new Date(d.at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+ p.insertAdjacentHTML('afterbegin','<div id="qdBanner" class="flag" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">✎ <span>Unsaved changes to <b>'+esc(d.q.quote_number||'a new quote')+'</b>'+(d.q.title?' – '+esc(d.q.title):'')+' ('+esc(when)+')</span><button class="btn primary" type="button" onclick="qdRestore()">Restore</button><button class="btn light" type="button" onclick="qdClear();el(\'qdBanner\').remove()">Discard</button></div>');}}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(!text||!ds)return ds||null;return text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())?ds:null;}
 /* ===== 27 Oct 2026: archive jobs (test / aborted) ===== */
