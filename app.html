@@ -2360,7 +2360,7 @@ async function printJobCardV2(){
   for(let tx=Math.floor((px-W/2)/256);tx<=Math.floor((px+W/2)/256);tx++)for(let ty=Math.floor((py-H/2)/256);ty<=Math.floor((py+H/2)/256);ty++)tiles+='<img src="https://tile.openstreetmap.org/'+z+'/'+tx+'/'+ty+'.png" style="left:'+Math.round(tx*256-(px-W/2))+'px;top:'+Math.round(ty*256-(py-H/2))+'px" alt="">';
   mapHtml='<div class="map">'+tiles+'<div class="pin"></div><div class="attr">© OpenStreetMap contributors</div></div>';}
  const arrP=ofType('arrival_photo'),arrHtml=photos(arrP,'No arrival picture recorded.').replace('<div class="photos">','<div class="photos'+(arrP.filter(f=>url[f.storage_path]).length===1?' one':'')+'">');
- const tpArr='<div class="okline">Work carried out by '+esc2(tpName)+' (third-party contractor) on behalf of '+esc2(co.company_name||'Aura Solutions Group Limited')+'. Their own job card is attached separately.</div>';
+ const tpArr='<div class="okline">Work carried out on behalf of '+esc2(String(co.company_name||'Aura Solutions Group Limited').toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase()))+'. The detailed site record is supplied with this document.</div>';
  const s2='<div class="keepblock">'+(mapHtml?'<div class="arrgrid">'+mapHtml+'<div>'+(tp?tpArr:arrHtml)+'</div></div>':(tp?tpArr:arrHtml))+kv([[tp?'Work carried out':'Arrived on site',tp&&tpTbc?dOnly(v.arrived_at):dt(v.arrived_at)],['Arrival notes',v.arrival_notes]])+'</div>';
 
  /* 3. work, one block per scope */
@@ -2377,12 +2377,12 @@ async function printJobCardV2(){
 
  /* 4. issues */
  const tpOut=(tpNote.match(/Works (?:partly|not) completed\.(?: Outstanding: ([\s\S]*?))?(?= Their | Times |$)/)||[]);
- const s4=tp?(tpOut[0]?'<div class="flag">'+nl(tpOut[0].replace(/\s*$/,''))+'</div>':'<div class="okline">All works completed by '+esc2(tpName)+'.</div>'):noIssues&&!otherIssue?'<div class="okline">No issues reported and no revisit needed.</div>'
+ const s4=tp?(tpOut[0]?'<div class="flag">'+nl(tpOut[0].replace(/\s*$/,''))+'</div>':'<div class="okline">All works completed.</div>'):noIssues&&!otherIssue?'<div class="okline">No issues reported and no revisit needed.</div>'
   :'<div class="flag">'+nl((issuePara?issuesRaw.replace(/^Issue\/revisit:\s*/i,'').replace(/\n\s*\n+Customer (signed|absent|refused)[\s\S]*$/i,'').trim().replace(/^See pictures$/,''):'')||otherIssue)+'</div>'+photos(ofType('issue_photo'));
 
  /* 5. waste & disposal */
  let s5='';
- if(tp&&!v.waste_removed)s5='<div class="okline">'+(j.waste_expected?'Waste removed by '+esc2(tpName)+' is covered by their own Waste Transfer Note, supplied with their job card.':'No waste removed from site.')+'</div>';
+ if(tp&&!v.waste_removed)s5='<div class="okline">'+(j.waste_expected?'Waste removed is covered by the Waste Transfer Note supplied with this document.':'No waste removed from site.')+'</div>';
  else if(v.waste_removed===false)s5='<div class="okline">No waste removed from site.</div>';
  else if(v.waste_removed){
   const tipped=!!(v.disposal_onsite||v.tipping_site_signature||v.tipping_signed_at||v.disposal_date);
@@ -2403,7 +2403,7 @@ async function printJobCardV2(){
   +'<div class="sigs">'+sigBox('Customer',v.customer_signature,v.customer_signed_name||(v.customer_signature?(j.site_contact_name||cu.contact_name):''),v.customer_signed_at,custReason||'Not signed')
   +sigBox('Signed for Aura Solutions',v.operative_signature,(()=>{const cn=String(co.company_name||'Aura Solutions Group Limited').toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());return operative?operative+', on behalf of '+cn:cn;})(),v.operative_signed_at)+'</div>'
   +(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by '+esc2(j.reviewed_by_name||co.company_name||'Aura Solutions')+' on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
- if(tp)s6='<div class="okline">Signed off on '+esc2(tpName)+'\'s own job card, supplied with this document.</div>'+(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by '+esc2(j.reviewed_by_name||co.company_name||'Aura Solutions')+' on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
+ if(tp)s6='<div class="okline">Signed off on the site record supplied with this document.</div>'+(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by '+esc2(j.reviewed_by_name||co.company_name||'Aura Solutions')+' on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
 
  const head=''
   
