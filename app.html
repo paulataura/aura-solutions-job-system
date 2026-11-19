@@ -388,10 +388,13 @@ function localDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padSt
 function parseJobDate(v){if(!v)return null;const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;}
 function startOfWeek(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x;}
 function calendarMovable(j){return ['draft','issued'].includes(j.status);}
+/* calendar: the job number without its date part (the calendar already shows the day) and the site address */
+function calShortNo(n){return String(n||'').replace(/^([A-Z]+)-\d{8}-/,'$1-');}
+function calSiteLine(j){const a=String(j.site_address||'').split(',').map(x=>x.trim()).filter(Boolean);const pc=j.postcode&&!String(j.site_address||'').toUpperCase().includes(String(j.postcode).toUpperCase())?j.postcode:'';return [a.slice(0,2).join(', '),pc].filter(Boolean).join(', ');}
 function calendarJobHtml(j){
  const customer=j.customers?.company_name||''; const time=j.job_time?j.job_time.slice(0,5):'';
- const sub=[time,customer||j.site_address].filter(Boolean).join(' · '); const movable=calendarMovable(j);
- return `<button type="button" class="cal-job status-${esc(j.status)}${movable?'':' locked'}" ${movable?`draggable="true" ondragstart="calendarDragStart(event,'${j.id}')" ondragend="calendarDragEnd(event)"`:''} onclick="openJob('${j.id}')" title="${esc([j.job_number,j.reference,customer,j.site_address,statusLabel(j.status),movable?'Drag to reschedule':'Date locked at this stage'].filter(Boolean).join(' — '))}"><b>${esc(j.job_number)}</b>${j.reference?`<small class="cal-reference">🔖 ${esc(j.reference)}</small>`:''}<small>${esc(sub||statusLabel(j.status))}</small><small>${esc(statusLabel(j.status))}${movable?' · drag to move':''}</small></button>`;
+ const sub=[time,customer].filter(Boolean).join(' · '); const movable=calendarMovable(j);
+ return `<button type="button" class="cal-job status-${esc(j.status)}${movable?'':' locked'}" ${movable?`draggable="true" ondragstart="calendarDragStart(event,'${j.id}')" ondragend="calendarDragEnd(event)"`:''} onclick="openJob('${j.id}')" title="${esc([j.job_number,j.reference,customer,j.site_address,statusLabel(j.status),movable?'Drag to reschedule':'Date locked at this stage'].filter(Boolean).join(' — '))}"><b>${esc(calShortNo(j.job_number))}</b>${j.reference?`<small class="cal-reference">🔖 ${esc(j.reference)}</small>`:''}${calSiteLine(j)?`<small class="cal-site">📍 ${esc(calSiteLine(j))}</small>`:''}<small>${esc(sub||statusLabel(j.status))}</small><small>${esc(statusLabel(j.status))}${movable?' · drag to move':''}</small></button>`;
 }
 function unscheduledJobHtml(j){
  const customer=j.customers?.company_name||'';return `<button type="button" class="unscheduled-job status-${esc(j.status)}" draggable="true" ondragstart="calendarDragStart(event,'${j.id}')" ondragend="calendarDragEnd(event)" onclick="openJob('${j.id}')" title="Drag onto the calendar to schedule"><b>${esc(j.job_number)}</b>${j.reference?`<div class="cal-reference" style="font-size:12px;margin-top:3px">🔖 ${esc(j.reference)}</div>`:''}<div class="muted" style="font-size:12px;margin-top:3px">${esc(customer||j.site_address||'No site')}</div><div class="muted" style="font-size:11px;margin-top:3px">${esc(statusLabel(j.status))} · drag to schedule</div></button>`;
@@ -5490,7 +5493,7 @@ async function calMoveVisit(planId,date){const p=calendarPlannedVisits.find(x=>x
 (function(){const o=window.renderCalendar;if(typeof o!=='function')return;window.renderCalendar=function(){const r=o.apply(this,arguments);
  (async()=>{try{if(!['admin','manager'].includes(activeProfile?.role))return;const grid=el('calendarGrid');if(!grid)return;
   const keys=[...grid.querySelectorAll('.calendar-day[ondrop]')].map(c=>(c.getAttribute('ondrop').match(/'(\d{4}-\d{2}-\d{2})'/)||[])[1]).filter(Boolean).sort();if(!keys.length)return;
-  const JS='job_number,reference,status,job_date,assigned_to,contractor_id,customers(company_name)';
+  const JS='job_number,reference,status,job_date,assigned_to,contractor_id,site_address,postcode,customers(company_name)';
   const pq=await db.from('job_visit_plan').select('id,job_id,planned_date,operator_id,status,visit_id,jobs('+JS+')').in('status',['planned','issued']);const plans=(pq.data||[]).filter(p=>p.jobs&&p.jobs.status!=='aborted');
   const ids=[...new Set(plans.map(p=>p.job_id))];
   const [vq,dq]=await Promise.all([ids.length?db.from('job_visits').select('id,job_id,visit_number,planned_date,arrived_at,completed_at,submitted_at,created_at').in('job_id',ids):Promise.resolve({data:[]}),
@@ -5502,7 +5505,7 @@ async function calMoveVisit(planId,date){const p=calendarPlannedVisits.find(x=>x
   Object.entries(byJobP).forEach(([jid,a])=>{const nv=(byJobV[jid]||[]).length;let k=0;a.filter(p=>p.status==='planned').sort((x,y)=>String(x.planned_date).localeCompare(y.planned_date)).forEach(p=>{p.n=Math.max(nv,1)+(++k);});a.filter(p=>p.status==='issued').forEach(p=>{p.n=p.visit?.visit_number||((byJobV[jid]||[]).indexOf(p.visit)+1)||2;});});
   calendarPlannedVisits=plans;
   const cellFor=d=>grid.querySelector('.calendar-day[ondrop*="\''+d+'\'"]');const add=(d,html)=>{const c=cellFor(d);if(!c)return;c.querySelector('.calendar-empty')?.remove();c.insertAdjacentHTML('beforeend',html);};
-  const head=j=>'<b>'+esc(j.job_number||'')+'</b>'+(j.reference?'<small class="cal-reference">🔖 '+esc(j.reference)+'</small>':'')+'<small>'+esc(j.customers?.company_name||'')+'</small>';
+  const head=j=>'<b>'+esc(calShortNo(j.job_number||''))+'</b>'+(j.reference?'<small class="cal-reference">🔖 '+esc(j.reference)+'</small>':'')+(calSiteLine(j)?'<small class="cal-site">📍 '+esc(calSiteLine(j))+'</small>':'')+'<small>'+esc(j.customers?.company_name||'')+'</small>';
   /* the job's own card is Visit 1: label it, or swap it for a ✓ once Visit 1 is done */
   grid.querySelectorAll('.cal-job:not(.planned-visit):not(.done-visit)').forEach(b=>{const id=((b.getAttribute('onclick')||'').match(/openJob\('([^']+)'\)/)||[])[1];if(!id||!multi.has(id))return;
    const v1=(byJobV[id]||[])[0];if(v1&&v1.completed_at){b.remove();return;}if(!b.querySelector('.v1-tag'))b.insertAdjacentHTML('beforeend','<small class="v1-tag">📅 Visit 1</small>');});
