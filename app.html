@@ -2939,7 +2939,7 @@ function openJobDocsMail(){const s=window.__sendDocs;if(!s)return;if(!(navigator
  keep('toggleOperatorReportEdit','Operator job card');keep('toggleWtnEdit','Waste / WTN');})();
 /* ===== 27 Oct 2026: customer contacts (several per customer, by role) and mailing lists – the start of the CRM ===== */
 const CONTACT_INTERESTS=[['asset','Asset management'],['civils','Civils & installations'],['industrial','Industrial services'],['waste','Waste management']],SERVICE_TO_INTEREST={'Asset management':'asset','Civils & installations':'civils','Industrial services':'industrial','Waste management':'waste'};let mlFilter={interests:[],segment:''};
-const CONTACT_ROLES=[['main','Main contact'],['accounts','Accounts'],['site','Site / operations'],['director','Director / decision maker'],['purchasing','Purchasing'],['other','Other']];
+const CONTACT_ROLES=[['main','Main contact'],['sales','Sales / quotes'],['accounts','Accounts / invoicing'],['docs','Job documents & reports'],['site','Site / operations'],['director','Director / decision maker'],['purchasing','Purchasing'],['other','Other']];
 let expandedContactsCustomerId=null,customerContactsCache={},contactListLinks={},mailingLists=null,mailingListsOpen=false,mailingListMembers={},openMailingListId=null;
 (function(){const st=document.createElement('style');st.textContent='.cc-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:#fff}.cc-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start}.cc-name{font-weight:700;font-size:15px}.cc-chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;margin:3px 4px 0 0;background:#eef4ef;color:#1f5a2a}.cc-chip.acc{background:#fff1d6;color:#7a4d0b}.cc-chip.prim{background:#2f6b3a;color:#fff}.cc-chip.list{background:#e7f1fb;color:#1d4a73}.cc-lines{display:flex;gap:14px;flex-wrap:wrap;margin-top:5px;font-size:14px}.cc-lines a{color:inherit}.cc-checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin:4px 0 10px}.cc-checks label{display:flex;gap:6px;align-items:center;font-weight:400}.cc-checks input{width:auto}.ml-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-top:1px solid #e6ece7}.ml-row:first-child{border-top:0}';document.head.appendChild(st);})();
 async function loadMailingLists(force){if(mailingLists&&!force)return mailingLists;const r=await db.from('mailing_lists').select('id,name,description,active').order('name');mailingLists=r.error?[]:(r.data||[]);return mailingLists;}
@@ -3014,7 +3014,7 @@ async function addMailingList(ev){ev.preventDefault();const name=el('mlName').va
 (function(){const orig=window.renderCustomersDirectory;if(typeof orig!=='function')return;window.renderCustomersDirectory=function(){const r=orig.apply(this,arguments);const list=el('customerDirectoryList');if(!list)return r;
  const host=el('customerDirectorySearch');if(host&&!el('mailingListsBtn')){host.insertAdjacentHTML('beforebegin','<div style="display:flex;justify-content:flex-end;margin:6px 0"><button id="mailingListsBtn" class="btn light" type="button" onclick="toggleMailingLists()">📋 Mailing lists</button></div>');}
  list.querySelectorAll('button[onclick^="editDirectoryCustomer(\'"]').forEach(b=>{const id=(b.getAttribute('onclick').match(/'([^']+)'/)||[])[1];if(!id)return;const rows=customerContactsCache[id];const n=Array.isArray(rows)?' ('+rows.length+')':'';
-  b.insertAdjacentHTML('beforebegin','<button class="mini-btn" type="button" onclick="toggleCustomerContacts(\''+id+'\')">'+(expandedContactsCustomerId===id?'Hide':'👥')+' contacts'+n+'</button>');
+  b.insertAdjacentHTML('beforebegin','<button class="mini-btn" type="button" style="font-weight:700;border:1px solid #2f6b3a;color:#0c3e17" onclick="toggleCustomerContacts(\''+id+'\')">'+(expandedContactsCustomerId===id?'Hide contacts':'👥 Contacts'+n)+'</button>');
   if(expandedContactsCustomerId===id){const card=b.closest('.person-card'),cust=(directoryCustomers||[]).find(x=>x.id===id);if(card&&cust)card.insertAdjacentHTML('beforeend',renderCustomerContactsPanel(cust));}});
  return r;};})();
 /* 30 Oct 2026: copy a saved site (address, pin, access, hazards, contact) to another customer */
@@ -7460,6 +7460,37 @@ async function qdRestore(){const d=qdGet();if(!d)return;await salesLoad();await 
 /* 19 Nov 2026: WTNs know every disposal site, so a typed site name still shows its address, permit and type */
 async function dispSitesLoad(){if(window.__dispSitesAll)return;try{const r=await db.from('disposal_sites').select('id,site_name,address,postcode,permit_number,site_type,active');window.__dispSitesAll=r.data||[];}catch(_){}}
 ['printWasteTransferNote','printLoadWtn','viewWtnPdf'].forEach(n=>{const o=window[n];if(typeof o!=='function')return;window[n]=async function(){await dispSitesLoad();return o.apply(this,arguments);};});
+/* ===== 19 Nov 2026: choose who gets an email – the customer's contacts, each with To / CC, picked by what they deal with
+   (job documents → documents/main/site contacts, quotes → sales/main, invoices → accounts). Used on job documents, quotes and invoices. ===== */
+async function rpContacts(customerId){if(!customerId)return [];let rows=[];try{const r=await db.from('customer_contacts').select('id,full_name,job_title,email,roles,is_primary,active').eq('customer_id',customerId);rows=(r.data||[]).filter(x=>x.active!==false&&x.email);}catch(_){}
+ try{const c=(await db.from('customers').select('contact_name,email,accounts_contact_name,accounts_email,invoice_email').eq('id',customerId).maybeSingle()).data||{};const have=new Set(rows.map(x=>String(x.email).toLowerCase()));
+  const add=(name,email,roles)=>{if(email&&!have.has(String(email).toLowerCase())){have.add(String(email).toLowerCase());rows.push({id:'cu_'+email,full_name:name||'',email,roles,from_customer:true});}};
+  add(c.contact_name,c.email,['main']);add(c.accounts_contact_name||'Invoices',c.invoice_email,['accounts']);add(c.accounts_contact_name||'Accounts',c.accounts_email,['accounts']);}catch(_){}
+ return rows;}
+const RP={};
+async function rpMount(key,host,customerId,toId,ccId,want,opts={}){if(!host||!customerId)return;const rows=await rpContacts(customerId);if(!rows.length){host.innerHTML='<div class="muted" style="font-size:12.5px;margin:-4px 0 8px">No contacts with an email on this customer yet – add them under Customers → 👥 Contacts.</div>';return;}
+ const score=c=>{const r=c.roles||[];let s=0;want.forEach((w,i)=>{if(r.includes(w))s=Math.max(s,10-i);});return s+(c.is_primary?0.5:0);};
+ rows.sort((a,b)=>score(b)-score(a));const best=score(rows[0])>=1?rows.filter(c=>score(c)>=Math.floor(score(rows[0]))):[rows[0]];
+ const toNow=String(el(toId)?.value||'').toLowerCase(),ccNow=String(ccId?el(ccId)?.value||'':'').toLowerCase();
+ const pre=new Set(opts.keep&&toNow?rows.filter(c=>toNow.includes(c.email.toLowerCase())).map(c=>c.id):(opts.single?[best[0].id]:best.map(c=>c.id)));
+ RP[key]={rows,toId,ccId,single:!!opts.single,to:pre,cc:new Set(ccNow?rows.filter(c=>ccNow.includes(c.email.toLowerCase())&&!pre.has(c.id)).map(c=>c.id):[])};
+ const lab=r=>(r||[]).map(x=>(CONTACT_ROLES.find(y=>y[0]===x)||[x,x])[1]).join(', ');
+ host.innerHTML='<div style="border:1px solid #cfe5d3;background:#f6faf6;border-radius:8px;padding:6px 9px;margin:-4px 0 10px"><div style="font-size:12.5px;font-weight:700;margin-bottom:3px">Choose who it goes to</div>'
+  +rows.map(c=>'<div class="rp-row" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:3px 0;border-top:1px solid #e3eee5;font-size:13.5px"><label style="display:flex;gap:5px;align-items:center;font-weight:400;margin:0"><input type="'+(opts.single?'radio':'checkbox')+'" name="rpTo_'+key+'" style="width:auto;margin:0" '+(RP[key].to.has(c.id)?'checked':'')+' onchange="rpSet(\''+key+'\',\''+esc(c.id)+'\',\'to\',this.checked)"> To</label>'
+   +(ccId?'<label style="display:flex;gap:5px;align-items:center;font-weight:400;margin:0"><input type="checkbox" style="width:auto;margin:0" '+(RP[key].cc.has(c.id)?'checked':'')+' onchange="rpSet(\''+key+'\',\''+esc(c.id)+'\',\'cc\',this.checked)"> CC</label>':'')
+   +'<span><b>'+esc(c.full_name||c.email)+'</b>'+(c.job_title?' · '+esc(c.job_title):'')+' <span class="muted">&lt;'+esc(c.email)+'&gt;'+(lab(c.roles)?' · '+esc(lab(c.roles)):'')+'</span></span></div>').join('')+'</div>';
+ rpApply(key);}
+function rpSet(key,id,kind,on){const s=RP[key];if(!s)return;if(kind==='to'){if(s.single)s.to=new Set();on?s.to.add(id):s.to.delete(id);if(on)s.cc.delete(id);}else{on?s.cc.add(id):s.cc.delete(id);if(on)s.to.delete(id);}rpApply(key);}
+function rpApply(key){const s=RP[key];if(!s)return;const em=set=>s.rows.filter(c=>set.has(c.id)).map(c=>c.email).join(', ');const t=el(s.toId);if(t)t.value=em(s.to);if(s.ccId&&el(s.ccId))el(s.ccId).value=em(s.cc);
+ const host=document.querySelector('[data-rp="'+key+'"]');if(host)host.querySelectorAll('.rp-row').forEach((row,i)=>{const c=s.rows[i];if(!c)return;const ins=row.querySelectorAll('input');if(ins[0])ins[0].checked=s.to.has(c.id);if(ins[1])ins[1].checked=s.cc.has(c.id);});}
+function rpHost(afterInputId,key){const inp=el(afterInputId);if(!inp)return null;const row=inp.closest('.two')||inp.closest('.field');if(!row)return null;let h=document.querySelector('[data-rp="'+key+'"]');if(!h){h=document.createElement('div');h.dataset.rp=key;row.after(h);}return h;}
+/* job documents */
+const __rpObs=new MutationObserver(()=>{const t=el('sdTo');if(!t||t.dataset.rp||!activeJob?.customer_id)return;t.dataset.rp='1';rpMount('sd',rpHost('sdTo','sd'),activeJob.customer_id,'sdTo','sdCc',['docs','main','site']);});
+setTimeout(()=>{const p=el('sendDocsPanel');if(p)__rpObs.observe(p,{childList:true,subtree:true});},0);
+/* quotes */
+(function(){const o=window.qeSend;window.qeSend=qeSend=async function(){const r=await o.apply(this,arguments);try{if(QE?.q?.customer_id&&el('qsTo'))await rpMount('qs',rpHost('qsTo','qs'),QE.q.customer_id,'qsTo','qsCc',['sales','main','director','purchasing']);}catch(_){}return r;};})();
+/* invoices (Xero sends to one address) */
+(function(){const o=window.invSend;window.invSend=invSend=async function(kind,id,cust){const r=await o.apply(this,arguments);try{if(cust&&el('emTo'))await rpMount('inv',rpHost('emTo','inv'),cust,'emTo',null,['accounts','main'],{single:true});}catch(_){}return r;};})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(ds&&(!text||text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())))return ds;if(!text)return null;
  /* not linked (or a different site typed): find the disposal site the text names – by postcode, then by name */
