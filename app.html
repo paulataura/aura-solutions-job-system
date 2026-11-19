@@ -7491,6 +7491,13 @@ setTimeout(()=>{const p=el('sendDocsPanel');if(p)__rpObs.observe(p,{childList:tr
 (function(){const o=window.qeSend;window.qeSend=qeSend=async function(){const r=await o.apply(this,arguments);try{if(QE?.q?.customer_id&&el('qsTo'))await rpMount('qs',rpHost('qsTo','qs'),QE.q.customer_id,'qsTo','qsCc',['sales','main','director','purchasing']);}catch(_){}return r;};})();
 /* invoices (Xero sends to one address) */
 (function(){const o=window.invSend;window.invSend=invSend=async function(kind,id,cust){const r=await o.apply(this,arguments);try{if(cust&&el('emTo'))await rpMount('inv',rpHost('emTo','inv'),cust,'emTo',null,['accounts','main'],{single:true});}catch(_){}return r;};})();
+/* ===== 19 Nov 2026: tell the user when a newer version of the app has been published, so changes aren't missed ===== */
+(function(){let base=null;const hash=async t=>{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].slice(0,8).map(x=>x.toString(16).padStart(2,'0')).join('');};
+ const url=()=>location.pathname+'?v='+Date.now();
+ async function check(){try{const r=await fetch(url(),{cache:'no-store'});if(!r.ok)return;const h=await hash(await r.text());if(base===null){base=h;return;}if(h!==base&&!document.getElementById('auraUpdateBar')){const d=document.createElement('div');d.id='auraUpdateBar';
+  d.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;background:#0c3e17;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center;font-size:14px;max-width:92vw';
+  d.innerHTML='<span>✨ A new version of the app is ready.</span><button type="button" style="background:#72c936;color:#0c3e17;border:0;border-radius:8px;padding:7px 12px;font-weight:800;cursor:pointer" onclick="location.reload()">Refresh now</button>';document.body.appendChild(d);}}catch(_){}}
+ setTimeout(check,4000);setInterval(check,3*60*1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)check();});})();
 /* the disposal site typed on the visit overrides the job's planned site when it names a different place */
 function dsOverride(ds,text){text=String(text||'').trim();if(ds&&(!text||text.toLowerCase().includes(String(ds.site_name||'').toLowerCase().trim())))return ds;if(!text)return null;
  /* not linked (or a different site typed): find the disposal site the text names – by postcode, then by name */
