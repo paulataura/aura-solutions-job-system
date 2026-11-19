@@ -2407,12 +2407,12 @@ async function printJobCardV2(){
 
  const head=''
   
-  +(()=>{const sumRows=[['Customer',cu.company_name],['Site',siteName||j.postcode||j.site_address],['Your reference',j.reference],...(j.customer_po?[['Customer PO',j.customer_po]]:[]),...(tp&&tpTbc?[['Work carried out',dOnly(v.arrived_at)]]:[['Arrived',dt(v.arrived_at)],['Completed',dt(completed)]]),['Waste Transfer Note',v.waste_removed?v.waste_transfer_note_number:(tp&&j.waste_expected?'Contractor\'s own':'Not required')],['Time on site',(()=>{if(!v.arrived_at||!completed||(tp&&tpTbc))return '';const m=Math.round((new Date(completed)-new Date(v.arrived_at))/60000);if(m<0||m>60*24*14)return '';const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return (d?d+'d ':'')+(h?h+'h ':'')+mm+'m';})()]].filter(r=>r[1]);const cols=sumRows.length%4===0?4:(sumRows.length%3===0?3:4);return '<div class="summary" style="grid-template-columns:repeat('+cols+',1fr)">'+sumRows.map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1]||'—')+'</b></div>').join('')+'</div>';})();
+  +(()=>{const sumRows=[['Customer',cu.company_name],['Site',siteName||j.postcode||j.site_address],['Your reference',j.reference],...(j.customer_po?[['Customer PO',j.customer_po]]:[]),...(tp&&tpTbc?[['Work carried out',dOnly(v.arrived_at)]]:[['Arrived',dt(v.arrived_at)],['Completed',dt(completed)]]),['Waste Transfer Note',v.waste_removed?v.waste_transfer_note_number:(tp&&j.waste_expected?'Supplied separately':'Not required')],['Time on site',(()=>{if(!v.arrived_at||!completed||(tp&&tpTbc))return '';const m=Math.round((new Date(completed)-new Date(v.arrived_at))/60000);if(m<0||m>60*24*14)return '';const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return (d?d+'d ':'')+(h?h+'h ':'')+mm+'m';})()]].filter(r=>r[1]);const cols=sumRows.length%4===0?4:(sumRows.length%3===0?3:4);return '<div class="summary" style="grid-template-columns:repeat('+cols+',1fr)">'+sumRows.map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1]||'—')+'</b></div>').join('')+'</div>';})();
 
  if(window.__jcCollect){window.__jcCollect.push({v,s1,s2,s3,s4,s5,s6,noIssues,otherIssue,completed,operative,head});w.document.open();w.document.write('<p></p>');w.document.close();return;}
  let n=0;const body=head
   +sec(++n,'The job as issued',s1)
-  +sec(++n,tp?'Who carried out the work':'Arrival on site',s2)
+  +sec(++n,tp?'The work':'Arrival on site',s2)
   +sec(++n,'Work carried out',s3)
   +sec(++n,'Issues / revisit',s4,(noIssues&&!otherIssue?'':'warnsec ')+'keep')
   +(s5?sec(++n,'Waste overview',s5):'')
@@ -5632,7 +5632,7 @@ async function tpcLoadScopes(boxId,live){const box=el(boxId);if(!box||!activeJob
 function tpcDoneChanged(){const d=document.querySelector('input[name=tpcDone]:checked')?.value||'';el('tpcOutWrap')?.classList.toggle('hidden',!d||d==='yes');if(d==='yes')document.querySelectorAll('#tpcScopeBox .tpcScope').forEach(c=>c.checked=true);if(d==='no')document.querySelectorAll('#tpcScopeBox .tpcScope').forEach(c=>c.checked=false);}
 async function tpcSaveScopes(visitId,boxId,outstanding){const nm=await tpcContractorName();const cur=await db.from('job_visits').select('completion_sections').eq('id',visitId).single();if(cur.error)throw cur.error;let arr=Array.isArray(cur.data.completion_sections)?cur.data.completion_sections:[];
  document.querySelectorAll('#'+boxId+' .tpcScope').forEach(c=>{const key=c.dataset.key,old=arr.find(x=>String(x.scope_id||x.id)===key)||{};
-  const entry={...old,id:key,scope_id:key,work:c.checked?'Completed by '+nm+' (third-party contractor).':'',progress_notes:c.checked?(old.progress_notes||''):('Not completed by '+nm+'.'+(outstanding?' '+outstanding:'')),photo_file_ids:old.photo_file_ids||[],progress_photo_file_ids:old.progress_photo_file_ids||[]};
+  const entry={...old,id:key,scope_id:key,work:c.checked?'Completed.':'',progress_notes:c.checked?(old.progress_notes||''):('Not completed.'+(outstanding?' '+outstanding:'')),photo_file_ids:old.photo_file_ids||[],progress_photo_file_ids:old.progress_photo_file_ids||[]};
   arr=arr.filter(x=>String(x.scope_id||x.id)!==key).concat(entry);});
  const order=tpcScopeList.map(x=>String(x.id));arr.sort((a,b)=>order.indexOf(String(a.scope_id||a.id))-order.indexOf(String(b.scope_id||b.id)));
  const u=await db.from('job_visits').update({completion_sections:arr,updated_at:new Date().toISOString()}).eq('id',visitId);if(u.error)throw u.error;}
@@ -7249,7 +7249,7 @@ function noPicInject(){const cap=el('arrivalCapture');const show=!!cap&&!cap.cla
  anchor?anchor.insertAdjacentHTML('beforebegin',html):cap.insertAdjacentHTML('beforeend',html);}
 async function officeNoArrival(){if(!activeJob||!['issued','accepted'].includes(activeJob.status)||!['admin','manager'].includes(activeProfile?.role))return;const reason=el('noPicReason').value.trim(),m=el('noPicMsg');
  if(!reason){m.innerHTML='<div class="err">Say why there\'s no arrival picture.</div>';return;}const btn=el('noPicBtn');btn.disabled=true;m.innerHTML='<div class="muted">Opening the visit…</div>';
- try{if(activeJob.status==='issued')await persistJobStatus('accepted');const now=new Date().toISOString(),note='No arrival picture taken – '+reason+' (recorded by '+(activeProfile?.full_name||'the office')+')';
+ try{if(activeJob.status==='issued')await persistJobStatus('accepted');const now=new Date().toISOString(),note='No arrival picture taken – '+reason;
   const ex=(await db.from('job_visits').select('id,arrival_notes').eq('job_id',activeJob.id).order('created_at',{ascending:false}).limit(1)).data?.[0];
   const res=ex?await db.from('job_visits').update({arrived_at:now,arrival_notes:[note,ex.arrival_notes].filter(Boolean).join('\n'),updated_at:now}).eq('id',ex.id):await db.from('job_visits').insert({job_id:activeJob.id,arrived_at:now,arrival_notes:note});if(res.error)throw res.error;
   await persistJobStatus('on_site');el('arrivalPhotoNoteModal')?.classList.add('hidden');el('arrivalCapture').classList.add('hidden');
