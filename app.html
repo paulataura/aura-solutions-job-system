@@ -2347,7 +2347,7 @@ async function printJobCardV2(){
  const s1='<div class="grid2">'
   +'<div class="box"><h3>Customer</h3>'+kv([['Company',cu.company_name],['Contact',cu.contact_name],['Address',addr(cu.address,cu.postcode)]])+'</div>'
   +'<div class="box"><h3>Site</h3>'+kv([['Site',siteName],['Address',addr(j.site_address,j.postcode)],['Site contact',join(j.site_contact_name,j.site_contact_phone)]])+'</div></div>'
-  +'<div class="box brief"><h3>Job brief</h3>'+(()=>{const ch=[['Job type',j.job_types?.name],['Scheduled',join(dOnly(j.job_date),j.job_time?String(j.job_time).slice(0,5):'')],['Your reference',j.reference],['Customer PO',j.customer_po],['Issued',join(j.issued_by_name,dOnly(j.issued_at))]].filter(r=>r[1]);return '<div class="chips" style="grid-template-columns:repeat('+Math.min(5,Math.max(1,ch.length))+',1fr)">'+ch.map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1])+'</b></div>').join('')+'</div>';})()
+  +'<div class="box brief"><h3>Job brief</h3>'+(()=>{const ch=[['Job type',j.job_types?.name],['Scheduled',join(dOnly(j.job_date),j.job_time?String(j.job_time).slice(0,5):'')],['Your reference',j.reference],['Customer PO',j.customer_po],['Issued',dOnly(j.issued_at)]].filter(r=>r[1]);return '<div class="chips" style="grid-template-columns:repeat('+Math.min(5,Math.max(1,ch.length))+',1fr)">'+ch.map(r=>'<div><span>'+esc2(r[0])+'</span><b>'+esc2(r[1])+'</b></div>').join('')+'</div>';})()
   +(parts.keyInfo?'<div class="line"><span class="lbl">Key information</span>'+nl(parts.keyInfo)+'</div>':'')
   +(equip?'<div class="line"><span class="lbl">Equipment</span>'+esc2(equip)+'</div>':'')
   +(scopes.length?'<div class="line"><span class="lbl">Scope of work</span><ol class="scopes">'+scopes.map(x=>'<li>'+nl(x.details)+'</li>').join('')+'</ol></div>':'')
@@ -2402,8 +2402,8 @@ async function printJobCardV2(){
  let s6='<div class="decl">The customer confirms the work described above has been carried out'+(v.waste_removed?' and the waste details are correct, and that the waste hierarchy has been applied (Waste (England and Wales) Regulations 2011, reg. 12)':'')+'.</div>'
   +'<div class="sigs">'+sigBox('Customer',v.customer_signature,v.customer_signed_name||(v.customer_signature?(j.site_contact_name||cu.contact_name):''),v.customer_signed_at,custReason||'Not signed')
   +sigBox('Signed for Aura Solutions',v.operative_signature,(()=>{const cn=String(co.company_name||'Aura Solutions Group Limited').toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());return operative?operative+', on behalf of '+cn:cn;})(),v.operative_signed_at)+'</div>'
-  +(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by '+esc2(j.reviewed_by_name||co.company_name||'Aura Solutions')+' on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
- if(tp)s6='<div class="okline">Signed off on the site record supplied with this document.</div>'+(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by '+esc2(j.reviewed_by_name||co.company_name||'Aura Solutions')+' on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
+  +(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by Aura Solutions Group Limited on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
+ if(tp)s6='<div class="okline">Signed off on the site record supplied with this document.</div>'+(j.reviewed_at?'<div class="approved">✓ Reviewed and approved by Aura Solutions Group Limited on '+esc2(dOnly(j.reviewed_at))+'</div>':'');
 
  const head=''
   
