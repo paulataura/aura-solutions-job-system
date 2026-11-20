@@ -2322,7 +2322,7 @@ async function printJobCardV2(){
  const kv=rows=>'<table class="kv">'+rows.filter(r=>r[1]!==null&&r[1]!==undefined&&String(r[1]).trim()).map(r=>'<tr><td class="k">'+esc2(r[0])+'</td><td class="v">'+(r[2]?r[1]:nl(r[1]))+'</td></tr>').join('')+'</table>';
  let photoNo=0;
  const photos=(list,emptyText)=>{const ok=list.filter(f=>url[f.storage_path]);return ok.length?'<div class="photos">'+ok.map(f=>'<figure><img src="'+esc2(url[f.storage_path])+'" alt=""><figcaption><b>Photo '+(++photoNo)+'</b>'+(f.caption?' · '+esc2(f.caption):'')+(f.taken_at?'<br><span>'+esc2(dt(f.taken_at))+'</span>':'')+'</figcaption></figure>').join('')+'</div>':(emptyText?'<div class="none">'+esc2(emptyText)+'</div>':'');};
- const sigBox=(label,img,name,at,none)=>'<div class="sig"><div class="lbl">'+esc2(label)+'</div><div class="img">'+(img?'<img src="'+img+'">':'<span class="none">'+esc2(none||'Not signed')+'</span>')+'</div><b>'+esc2(name||'')+'</b>'+(at?'<div class="muted">Signed '+esc2(dt(at))+'</div>':'')+'</div>';
+ const sigBox=(label,img,name,at,none)=>'<div class="sig"><div class="lbl">'+esc2(label)+'</div><div class="img">'+(img?'<img src="'+img+'">':'<span class="none">'+esc2(none||'Not signed')+'</span>')+'</div><b>'+esc2(name||'')+'</b></div>';
  const sec=(n,title,inner,cls)=>'<section class="sec'+(cls?' '+cls:'')+'"><h2><span class="n">'+n+'</span>'+esc2(title)+'<svg class="hl" aria-hidden="true"><line x1="0" x2="100%" y1="0.5" y2="0.5"/></svg></h2>'+inner+'</section>';
 
  /* the job as issued */
