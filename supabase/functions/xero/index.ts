@@ -132,6 +132,10 @@ async function resolveInvoice(kind: string, id: string) {
   } else if (kind === "sale") {
     const { data: si } = await admin.from("sales_invoices").select("xero_invoice_id,customer_id").eq("id", id).maybeSingle();
     xid = si?.xero_invoice_id || null; customerId = si?.customer_id || null; table = "sales_invoices"; key = "id";
+  } else if (kind === "contract") {
+    const { data: ci } = await admin.from("contract_invoices").select("xero_invoice_id,contract_id").eq("id", id).maybeSingle();
+    const { data: c } = ci ? await admin.from("contracts").select("customer_id").eq("id", ci.contract_id).maybeSingle() : { data: null };
+    xid = ci?.xero_invoice_id || null; customerId = c?.customer_id || null; table = "contract_invoices"; key = "id";
   }
   return { xid, customerId, table, key, sentCols };
 }
@@ -252,6 +256,48 @@ Deno.serve(async (req) => {
       const name = String(body.filename || "Hire statement.pdf").replace(/[^A-Za-z0-9 ._-]+/g, "-");
       await xero(`Invoices/${hi.xero_invoice_id}/Attachments/${encodeURIComponent(name)}?IncludeOnline=true`, { method: "PUT", headers: { "Content-Type": body.content_type || "application/pdf" }, body: bytes });
       return json({ ok: true });
+    }
+
+    if (action === "create_contract_invoice") {
+      // one month of a contract's fixed fee, in arrears – dated on the billing day
+      const { data: c } = await admin.from("contracts").select("id,customer_id,title,reference,customer_po").eq("id", body.contract_id).maybeSingle();
+      if (!c) return json({ error: "Contract not found." }, 404);
+      const ps = String(body.period_start || ""), pe = String(body.period_end || ""), idt = String(body.invoice_date || "");
+      if (![ps, pe, idt].every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) || pe < ps) return json({ error: "The billing period isn't valid." }, 400);
+      const { data: clash } = await admin.from("contract_invoices").select("id").eq("contract_id", c.id).eq("invoice_date", idt).not("xero_invoice_id", "is", null);
+      if (clash?.length) return json({ error: "This month has already been invoiced." }, 400);
+      const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
+      const s = conn?.settings || {};
+      if (!s.sales_account_code || !s.sales_tax_type) return json({ error: "Choose the Xero sales account and VAT rate in the Xero settings first." }, 400);
+      const lines = (body.lines || []).filter((l: any) => l.description && Number(l.unit_amount) !== 0);
+      if (!lines.length) return json({ error: "Add at least one invoice line with a price." }, 400);
+      const contactId = await ensureContact("customers", c.customer_id);
+      const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", c.customer_id).maybeSingle();
+      const today = idt <= new Date().toISOString().slice(0, 10) ? new Date(idt + "T12:00:00Z") : new Date();
+      const ref = (c.customer_po || c.reference || c.title || "").slice(0, 255) || undefined;
+      const inv = await xero("Invoices", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ Invoices: [{
+          Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, today),
+          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: ref, BrandingThemeID: s.branding_theme_id || undefined,
+          LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)),
+        }] }),
+      });
+      const x = inv?.Invoices?.[0];
+      if (!x?.InvoiceID) throw new Error("Xero didn't return the invoice.");
+      const { data: ci, error: ce } = await admin.from("contract_invoices").insert({ contract_id: c.id, period_start: ps, period_end: pe, invoice_date: idt, lines, net_total: x.SubTotal, xero_invoice_id: x.InvoiceID, invoice_number: x.InvoiceNumber || null, status: x.Status, created_by_name: user.full_name }).select("id").single();
+      if (ce) throw new Error(ce.message);
+      return json({ ok: true, contract_invoice_id: ci.id, invoice: { id: x.InvoiceID, number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
+    }
+
+    if (action === "sync_contract_invoice") {
+      const { data: ci } = await admin.from("contract_invoices").select("id,xero_invoice_id").eq("id", body.contract_invoice_id).maybeSingle();
+      if (!ci?.xero_invoice_id) return json({ error: "No Xero invoice for this month." }, 400);
+      const x = (await xero(`Invoices/${ci.xero_invoice_id}`))?.Invoices?.[0];
+      if (!x) throw new Error("Invoice not found in Xero.");
+      if (x.Status === "VOIDED" || x.Status === "DELETED") { await admin.from("contract_invoices").delete().eq("id", ci.id); return json({ ok: true, removed: true, status: x.Status }); }
+      await admin.from("contract_invoices").update({ invoice_number: x.InvoiceNumber || null, status: x.Status, net_total: x.SubTotal }).eq("id", ci.id);
+      return json({ ok: true, invoice: { number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
     }
 
     if (action === "sync_hire_invoice") {
@@ -471,6 +517,8 @@ Deno.serve(async (req) => {
       } else if (kind === "sale") {
         const { data: si } = await admin.from("sales_invoices").select("xero_invoice_id,customer_id").eq("id", id).maybeSingle();
         xid = si?.xero_invoice_id || null; customerId = si?.customer_id || null; table = "sales_invoices"; key = "id";
+      } else if (kind === "contract") {
+        const r0 = await resolveInvoice("contract", id); xid = r0.xid; customerId = r0.customerId; table = r0.table; key = r0.key;
       } else return json({ error: "Unknown invoice type." }, 400);
       if (!xid) return json({ error: "This invoice isn't in Xero yet." }, 400);
       const { data: cu } = customerId ? await admin.from("customers").select("company_name,invoice_email,accounts_email,email").eq("id", customerId).maybeSingle() : { data: null };
