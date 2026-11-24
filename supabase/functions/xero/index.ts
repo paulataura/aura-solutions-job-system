@@ -250,6 +250,28 @@ Deno.serve(async (req) => {
       return json({ ok: true, hire_invoice_id: hi.id, invoice: { id: x.InvoiceID, number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
     }
 
+    if (action === "update_hire_invoice") {
+      // change a hire invoice that's still a draft in Xero – same invoice number, lines replaced
+      const { data: hi } = await admin.from("hire_invoices").select("id,hire_id,xero_invoice_id").eq("id", body.hire_invoice_id).maybeSingle();
+      if (!hi?.xero_invoice_id) return json({ error: "No Xero invoice for this hire period." }, 400);
+      const cur = (await xero(`Invoices/${hi.xero_invoice_id}`))?.Invoices?.[0];
+      if (!cur) throw new Error("Invoice not found in Xero.");
+      if (!["DRAFT", "SUBMITTED"].includes(cur.Status)) return json({ error: "This invoice has already been approved in Xero, so it can't be changed from here – credit or void it in Xero instead." }, 400);
+      const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
+      const s = conn?.settings || {};
+      const lines = (body.lines || []).filter((l: any) => l.description && (Number(l.unit_amount) !== 0 || l.note));
+      if (!lines.some((l: any) => !l.note)) return json({ error: "Add at least one invoice line with a price." }, 400);
+      const ref = String(body.reference || "").trim().slice(0, 255);
+      const r = await xero("Invoices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Invoices: [{ InvoiceID: hi.xero_invoice_id, Reference: ref || cur.Reference || undefined, LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)) }] }) });
+      const x = r?.Invoices?.[0];
+      if (!x?.InvoiceID) throw new Error("Xero didn't return the invoice.");
+      await admin.from("hire_invoices").update({ lines: body.store_lines || lines, net_total: x.SubTotal, cost_total: body.cost_total ?? null, status: x.Status, invoice_number: x.InvoiceNumber || null }).eq("id", hi.id);
+      await admin.from("hire_charges").update({ invoice_id: null }).eq("invoice_id", hi.id);
+      const chargeIds = (body.charge_ids || []).filter(Boolean);
+      if (chargeIds.length) await admin.from("hire_charges").update({ invoice_id: hi.id }).in("id", chargeIds).eq("hire_id", hi.hire_id);
+      return json({ ok: true, hire_invoice_id: hi.id, invoice: { id: x.InvoiceID, number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
+    }
+
     if (action === "attach_hire") {
       const { data: hi } = await admin.from("hire_invoices").select("xero_invoice_id").eq("id", body.hire_invoice_id).maybeSingle();
       if (!hi?.xero_invoice_id) return json({ error: "No Xero invoice for this hire period." }, 400);
