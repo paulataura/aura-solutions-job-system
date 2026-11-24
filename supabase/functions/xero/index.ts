@@ -89,7 +89,7 @@ function dueDate(terms: string | null, d: Date) {
 }
 
 // one Xero line: account, VAT and tracking (e.g. Service: Waste removal) can be set per line
-const lineItem = (defAcc: string, defTax: string) => (l: any) => ({
+const lineItem = (defAcc: string, defTax: string) => (l: any) => l.note ? { Description: String(l.description).slice(0, 4000) } : ({
   Description: String(l.description).slice(0, 4000), Quantity: Number(l.quantity) || 1, UnitAmount: Number(l.unit_amount),
   AccountCode: l.account_code || defAcc || undefined, TaxType: l.tax_type || defTax || undefined,
   Tracking: (l.tracking || []).filter((t: any) => t && t.name && t.option).map((t: any) => ({ Name: t.name, Option: t.option })),
@@ -223,13 +223,14 @@ Deno.serve(async (req) => {
       const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
       const s = conn?.settings || {};
       if (!s.sales_account_code || !s.sales_tax_type) return json({ error: "Choose the Xero sales account and VAT rate in the Xero settings first." }, 400);
-      const lines = (body.lines || []).filter((l: any) => l.description && Number(l.unit_amount) !== 0);
-      if (!lines.length) return json({ error: "Add at least one invoice line with a price." }, 400);
+      // a description-only heading line (site, period, ongoing / final) is allowed alongside the priced lines
+      const lines = (body.lines || []).filter((l: any) => l.description && (Number(l.unit_amount) !== 0 || l.note));
+      if (!lines.some((l: any) => !l.note)) return json({ error: "Add at least one invoice line with a price." }, 400);
       const contactId = await ensureContact("customers", h.customer_id);
       const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", h.customer_id).maybeSingle();
       const fmt = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" });
       const today = new Date();
-      const ref = [h.customer_po || h.reference, "Hire " + h.hire_number, fmt(ps) + " – " + fmt(pe)].filter(Boolean).join(" · ").slice(0, 255);
+      const ref = (String(body.reference || "").trim() || [h.customer_po || h.reference, "Hire " + h.hire_number, fmt(ps) + " – " + fmt(pe)].filter(Boolean).join(" · ")).slice(0, 255);
       const inv = await xero("Invoices", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
