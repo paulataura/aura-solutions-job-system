@@ -529,21 +529,42 @@ Deno.serve(async (req) => {
       if (x.Status === "VOIDED" || x.Status === "DELETED") return json({ error: "This invoice has been voided or deleted in Xero." }, 400);
       // Xero emails the invoice contact – make sure it has the right address
       const cid = x.Contact?.ContactID;
+      let orig: any[] = [];
       if (cid) {
         const c = (await xero(`Contacts/${cid}`))?.Contacts?.[0];
-        if (c && String(c.EmailAddress || "").toLowerCase() !== to.toLowerCase()) await xero("Contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Contacts: [{ ContactID: cid, EmailAddress: to }] }) });
+        if (c && String(c.EmailAddress || "").toLowerCase() !== to.toLowerCase() && !body.dry_run) await xero("Contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Contacts: [{ ContactID: cid, EmailAddress: to }] }) });
+        orig = c?.ContactPersons || [];
+      }
+      // copies (CC): Xero emails the contact's main address plus any contact people marked "include in emails" –
+      // so the CC people are added for this one email and the contact's people are put back afterwards
+      const okE = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+      const cc = [...new Set((Array.isArray(body.cc) ? body.cc : String(body.cc || "").split(/[,;]+/)).map((e: any) => String(e).trim().toLowerCase()).filter((e: string) => okE(e) && e !== to.toLowerCase()))] as string[];
+      const keep = (orig || []).map((p: any) => ({ FirstName: p.FirstName || undefined, LastName: p.LastName || undefined, EmailAddress: p.EmailAddress || undefined, IncludeInEmails: !!p.IncludeInEmails }));
+      const extra = cc.filter((e) => !keep.some((p: any) => String(p.EmailAddress || "").toLowerCase() === e));
+      if (cc.length && !cid) return json({ error: "Couldn't find the Xero contact to add the copies to." }, 400);
+      if (keep.length + extra.length > 5) return json({ error: `Xero allows 5 people on a contact – this one already has ${keep.length}, so only ${Math.max(0, 5 - keep.length)} more can be copied in.` }, 400);
+      const ccPersons = [...keep.map((p: any) => cc.includes(String(p.EmailAddress || "").toLowerCase()) ? { ...p, IncludeInEmails: true } : p), ...extra.map((e) => ({ FirstName: e.split("@")[0].slice(0, 255), EmailAddress: e, IncludeInEmails: true }))];
+      const setPersons = (list: any[]) => xero("Contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Contacts: [{ ContactID: cid, ContactPersons: list }] }) });
+      if (body.dry_run) {
+        // check the copy-in and put-back on the contact without sending anything
+        let during: any = null, after: any = null;
+        if (cc.length) { await setPersons(ccPersons); during = (await xero(`Contacts/${cid}`))?.Contacts?.[0]?.ContactPersons || []; await setPersons(keep); after = (await xero(`Contacts/${cid}`))?.Contacts?.[0]?.ContactPersons || []; }
+        return json({ ok: true, dry_run: true, to, cc, before: orig, during, after });
       }
       if (x.Status === "DRAFT" || x.Status === "SUBMITTED") {
         const r = await xero(`Invoices/${xid}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Invoices: [{ InvoiceID: xid, Status: "AUTHORISED" }] }) });
         x = r?.Invoices?.[0] || x;
       }
-      await xero(`Invoices/${xid}/Email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (cc.length) await setPersons(ccPersons);
+      try { await xero(`Invoices/${xid}/Email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); }
+      finally { if (cc.length) { try { await setPersons(keep); } catch (_) { /* put back failed – reported below */ } } }
       const now = new Date().toISOString();
-      const upd: any = { [sentCols[0]]: now, [sentCols[1]]: to };
+      const sentTo = [to, ...cc].join(", ");
+      const upd: any = { [sentCols[0]]: now, [sentCols[1]]: sentTo };
       if (table === "job_finance") Object.assign(upd, { xero_invoice_status: x.Status, invoice_number: x.InvoiceNumber || null, xero_invoice_total: x.Total, invoice_net_amount: x.SubTotal, xero_synced_at: now });
       else Object.assign(upd, { status: x.Status, invoice_number: x.InvoiceNumber || null });
       await admin.from(table).update(upd).eq(key, id);
-      return json({ ok: true, sent_to: to, status: x.Status, number: x.InvoiceNumber, total: x.Total, subtotal: x.SubTotal });
+      return json({ ok: true, sent_to: sentTo, status: x.Status, number: x.InvoiceNumber, total: x.Total, subtotal: x.SubTotal });
     }
 
     if (action === "list_sales_invoices") {
