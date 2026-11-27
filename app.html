@@ -6857,7 +6857,7 @@ function missOpen(){const R=MISS.rows;let ov=el('missOverlay');if(!ov){ov=docume
  ov.innerHTML='<div class="ct-modal"><div class="row" style="align-items:center"><h2 style="margin:0">⚠ Details still to fill in</h2><button class="mini-btn" type="button" onclick="el(\'missOverlay\').remove()">✕ Close</button></div><div class="muted" style="font-size:13px;margin-top:4px">Anything here is missing information the app (or the paperwork) will need. Press Fill in to go straight to it.</div>'+(grp||'<div class="ok" style="margin-top:10px">All complete.</div>')+'</div>';}
 const missWait=async(test,ms)=>{const t=Date.now();while(Date.now()-t<(ms||4000)){try{if(test())return true;}catch(_){}await new Promise(r=>setTimeout(r,120));}return false;};
 async function missGo(kind,id,cid){el('missOverlay')?.remove();
- try{if(kind==='customer'){await navGo('customers');await missWait(()=>(directoryCustomers||[]).some(x=>x.id===id));editDirectoryCustomer(id);}
+ try{if(kind==='customer'){await navGo('customers');await missWait(()=>(directoryCustomers||[]).some(x=>x.id===id));await missOpenCustomer(id);}
   else if(kind==='site'){await navGo('customers');await missWait(()=>(directoryCustomers||[]).some(x=>x.id===cid));if(expandedCustomerSiteId!==cid)await toggleCustomerSites(cid);await missWait(()=>(customerSiteDirectoryCache[cid]||[]).some(x=>x.id===id));setTimeout(()=>editCustomerSite(id),150);}
   else if(kind==='contractor'){await navGo('people');await missWait(()=>(peopleContractors||[]).some(x=>x.id===id));editContractor(id);el('contractor_company_name')?.scrollIntoView({behavior:'smooth',block:'center'});}
   else if(kind==='supplier'){await navGo('suppliers');await missWait(()=>el('supEdit_'+id));editSupplier(id);el('supEdit_'+id)?.scrollIntoView({behavior:'smooth',block:'center'});}
@@ -7987,6 +7987,23 @@ function showSetPassword(kind){let ov=el('pwOverlay');if(ov)return;ov=document.c
 async function setPassword(e){e.preventDefault();const a=el('pw1').value,b=el('pw2').value,m=el('pwMsg');if(a.length<8){m.innerHTML='<div class="err">Use at least 8 characters.</div>';return;}if(a!==b){m.innerHTML='<div class="err">The two passwords don\'t match.</div>';return;}
  el('pwBtn').disabled=true;const {error}=await db.auth.updateUser({password:a});if(error){el('pwBtn').disabled=false;m.innerHTML='<div class="err">'+esc(error.message)+'</div>';return;}
  m.innerHTML='<div class="ok">✓ Password saved. Opening the app…</div>';history.replaceState(null,'',location.pathname);setTimeout(()=>location.reload(),900);}
+
+/* ===== 27 Nov 2026: "Fill in" on a customer opens their full account, with a yellow box saying exactly what's missing and a button for each ===== */
+async function missOpenCustomer(id){custOpen(id);await new Promise(r=>setTimeout(r,250));
+ try{if(typeof expandedContactsCustomerId==='undefined'||expandedContactsCustomerId!==id)await toggleCustomerContacts(id);}catch(_){}
+ await new Promise(r=>setTimeout(r,300));missCustBanner(id);}
+function missCustBanner(id){const c=(directoryCustomers||[]).find(x=>x.id===id);const card=el('customerDirectoryList')?.querySelector('.person-card');if(!c||!card)return;card.querySelector('.miss-box')?.remove();
+ const m=missCustomer(c);if(!m.length)return;const details=m.filter(x=>/^(contact name|email|phone|address|postcode|payment terms)$/.test(x)),inv=m.some(x=>/^invoice email/.test(x)),xl=m.includes('Xero link');
+ const h='<div class="miss-box"><b>⚠ Still to fill in for '+esc(c.company_name)+'</b>'
+  +(details.length?'<div class="miss-row"><span>'+esc(details.join(', ').replace(/^./,x=>x.toUpperCase()))+'</span><button class="mini-btn primary" type="button" onclick="covEdit(\''+id+'\')">✎ Edit details</button></div>':'')
+  +(inv?'<div class="miss-row"><span>Invoice email – tick <b>Accounts / invoicing</b> on the contact who gets the invoices (they need an email), or add one</span><button class="mini-btn primary" type="button" onclick="document.querySelector(\'.contact-panel\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})">↓ Contacts</button></div>':'')
+  +(xl?'<div class="miss-row"><span>Not linked to Xero yet</span><button class="mini-btn primary" type="button" onclick="missXeroLink(\''+id+'\',this)">Link / create in Xero</button></div>':'')+'</div>';
+ const anchor=card.querySelector('h3');anchor?anchor.nextElementSibling?.after(document.createRange().createContextualFragment(h)):card.insertAdjacentHTML('afterbegin',h);
+ setTimeout(()=>{card.scrollIntoView({block:'start'});window.scrollBy(0,-70);},50);}
+async function missXeroLink(id,b){b.disabled=true;b.textContent='Linking…';try{await xeroCall({action:'push_contact',table:'customers',id});const c=(directoryCustomers||[]).find(x=>x.id===id);if(c)c.xero_contact_id='linked';b.textContent='✓ Linked';setTimeout(()=>missCustBanner(id),600);}catch(e){b.disabled=false;b.textContent='Link / create in Xero';alert(e.message||String(e));}}
+/* the box stays up to date as contacts and details are saved */
+['toggleCustomerContacts','saveDirectoryCustomer','saveCustomerContact'].forEach(n=>{const o=window[n];if(typeof o!=='function')return;window[n]=async function(){const r=await o.apply(this,arguments);try{if(CUST_FOCUS){if(n!=='toggleCustomerContacts'){const d=await db.rpc('aura_list_customers');if(d.data)directoryCustomers=d.data;}setTimeout(()=>missCustBanner(CUST_FOCUS),300);}}catch(_){}return r;};});
+(function(){const st=document.createElement('style');st.textContent='.miss-box{background:#fffaf0;border:1px solid #f0d9a8;border-radius:10px;padding:9px 12px;margin:8px 0 10px}.miss-box .miss-row{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:6px;font-size:13.5px;flex-wrap:wrap}';document.head.appendChild(st);})();
 /* 24 Nov 2026: charge lines take several lines of text (Enter for a new line) – each line goes onto the Xero invoice */
 (function(){const st=document.createElement('style');st.textContent='textarea.jc-desc{width:100%;min-height:42px;resize:vertical;line-height:1.35;font:inherit;padding:9px 12px;overflow:hidden}';document.head.appendChild(st);
  new MutationObserver(()=>{document.querySelectorAll('textarea.jc-desc:not([data-sz])').forEach(t=>{t.dataset.sz=1;t.style.height='auto';t.style.height=t.scrollHeight+'px';});}).observe(document.documentElement,{childList:true,subtree:true});})();
