@@ -7634,7 +7634,7 @@ async function ctbLoadAll(force){if(!isFinanceAdmin())return;if(!force&&CTB.all&
 function ctbDueList(){return (CTB.all||[]).map(c=>({c,due:ctbMonths(c,CTB.invs).rows.filter(r=>r.state==='due')})).filter(x=>x.due.length);}
 function ctbStatus(s){return {PAID:'Paid',AUTHORISED:'Approved – unpaid',DRAFT:'Draft in Xero',SUBMITTED:'Awaiting approval',COVERED:'Covered'}[s]||s||'';}
 async function ctbSectionHtml(cid){if(!isFinanceAdmin()||!cid)return '';
- const [cr,ir]=await Promise.all([db.from('contracts').select('id,title,reference,customer_po,billing_day,first_bill_date,last_bill_date,invoice_text,start_date,end_date').eq('id',cid).maybeSingle(),db.from('contract_invoices').select('*').eq('contract_id',cid)]);
+ const [cr,ir]=await Promise.all([db.from('contracts').select('id,title,reference,customer_po,billing_day,first_bill_date,last_bill_date,invoice_text,start_date,end_date,customer_sites(site_name,site_address,postcode)').eq('id',cid).maybeSingle(),db.from('contract_invoices').select('*').eq('contract_id',cid)]);
  const c=cr.data;if(!c)return '';CTB.cur={c,invs:ir.data||[]};const fee=Number(contractCtx?.monthly_fee)||0;
  const {rows,other}=ctbMonths(c,CTB.cur.invs);const due=rows.filter(r=>r.state==='due');const tot=CTB.cur.invs.reduce((a,x)=>a+Number(x.net_total||0),0),paid=CTB.cur.invs.filter(x=>x.status==='PAID').reduce((a,x)=>a+Number(x.net_total||0),0);
  const inp=(k,type,extra)=>'<input id="ctb_'+k+'" type="'+(type||'text')+'" value="'+esc(c[k]??'')+'"'+(extra||'')+'>';
@@ -7663,7 +7663,7 @@ async function ctbSave(cid){const g=k=>el('ctb_'+k)?.value.trim()||null,m=el('ct
 function ctbBuild(bill){const C=CTB.cur;if(!C)return;const r=ctbMonths(C.c,C.invs).rows.find(x=>x.bill===bill);const box=el('ctbr_'+bill)?.querySelector('.ctb-build');if(!r||!box)return;
  if(box.innerHTML){box.innerHTML='';return;}const fee=Number(contractCtx?.monthly_fee)||0;
  const desc=(C.c.invoice_text||C.c.title||'Monthly service')+'\n\nPeriod: '+ctbFmt(r.start)+' – '+ctbFmt(r.end);
- box.innerHTML='<div class="ctb-form"><div class="muted" style="font-size:12.5px;margin-bottom:4px">Draft invoice dated <b>'+esc(ctbFmt(r.bill))+'</b> · reference <b>'+esc(C.c.customer_po||C.c.reference||C.c.title||'')+'</b></div>'
+ box.innerHTML='<div class="ctb-form"><div class="muted" style="font-size:12.5px;margin-bottom:4px">Draft invoice dated <b>'+esc(ctbFmt(r.bill))+'</b> · reference <b>'+esc(invRef({po:C.c.customer_po,yourRef:C.c.reference,site:invSiteName(C.c.customer_sites?.site_name,C.c.customer_sites?.site_address,C.c.customer_sites?.postcode)||C.c.title,ours:C.c.customer_po?C.c.reference:'',when:invShortPeriod(r.start,r.end)}))+'</b></div>'
   +'<textarea class="jc-desc ctb-d" rows="4">'+esc(desc)+'</textarea><div style="display:flex;gap:8px;align-items:center;margin-top:5px;flex-wrap:wrap"><label style="font-size:13px">Amount £ (ex VAT) <input class="ctb-a" type="number" step="0.01" value="'+(fee||'')+'" style="width:120px;display:inline-block"></label>'
   +'<button class="mini-btn" type="button" style="background:#2f6b3a;color:#fff;border-color:#2f6b3a" onclick="ctbCreate(\''+bill+'\',this)">Create draft in Xero</button><button class="mini-btn" type="button" onclick="this.closest(\'.ctb-build\').innerHTML=\'\'">Cancel</button><span class="ctb-m"></span></div></div>';
  const ta=box.querySelector('textarea');ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
@@ -7905,7 +7905,7 @@ function hrInvInfo(h,ps,pe){const invs=HIRE.invoices.filter(i=>i.hire_id===h.id&
  const status=final?'FINAL INVOICE – hire ended; all equipment off hire on '+hrFmt(offDate)+'.':'Hire ongoing – the next invoice will cover from '+hrFmt(nxt)+'.';
  const head=['Equipment hire '+h.hire_number+(h.title?' – '+h.title:''),addr?'Site: '+addr:'',h.customer_po?'Your PO: '+h.customer_po:'',h.reference&&h.reference!==h.customer_po?'Your reference: '+h.reference:'','Invoice period: '+per,offIn.length&&!final?'Off hired during this period: '+offIn.map(x=>x.description+' ('+hrFmt(x.off_hire)+')').join(', '):'',status].filter(Boolean).join('\n');
  const shortP=new Date(ps+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'–'+new Date(pe+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
- const ref=[h.customer_po?(/^po/i.test(h.customer_po)?'':'PO ')+h.customer_po:h.reference||'',site||h.postcode||'',h.hire_number,shortP,final?'FINAL':''].filter(Boolean).join(' · ');
+ const ref=invRef({po:h.customer_po,yourRef:h.reference,site:site||String(h.site_address||'').split(',')[0]||h.postcode,ours:h.hire_number,when:shortP+(final?' · FINAL':'')});
  return {head,ref,final};}
 (function(){const o=window.hireInvBuild;window.hireInvBuild=hireInvBuild=async function(id){const r=await o.apply(this,arguments);try{if(HINV&&HINV.hire_id===id&&HINV.head==null){const h=HIRE.hires.find(x=>x.id===id);const i=hrInvInfo(h,HINV.ps,HINV.pe);HINV.head=i.head;HINV.ref=i.ref;HINV.final=i.final;HINV.useHead=true;hireInvRender();}}catch(e){console.warn(e);}return r;};})();
 (function(){const o=window.hireInvRender;window.hireInvRender=hireInvRender=function(){const r=o.apply(this,arguments);try{const box=el('hrInvBox');const card=box?.querySelector('.card');if(card&&HINV){const h=HIRE.hires.find(x=>x.id===HINV.hire_id);const left=HIRE.charges.filter(c=>c.hire_id===HINV.hire_id&&!c.invoice_id&&Number(c.qty)>0&&(c.charge_date<HINV.ps||c.charge_date>HINV.pe)&&!(c.charge_date<HINV.ps&&hrOrphan(h,c)));const weeks=[...new Set(left.map(c=>{const p=h&&hirePeriodFor(h,c.charge_date);return p?p.start:''}).filter(Boolean))];
@@ -8085,6 +8085,20 @@ function pinClear(){el('siteDir_site_latitude').value='';el('siteDir_site_longit
 (function(){const o=window.editCustomerSite;window.editCustomerSite=editCustomerSite=function(){const r=o.apply(this,arguments);setTimeout(pinInit,150);return r;};})();
 (function(){const o=window.toggleCustomerSites;if(typeof o!=='function')return;window.toggleCustomerSites=toggleCustomerSites=async function(){const r=await o.apply(this,arguments);setTimeout(()=>{if(el('pinMap')&&!el('pinMap').classList.contains('leaflet-container'))pinInit();},250);return r;};})();
 (function(){const st=document.createElement('style');st.textContent='.pin-map{height:240px;border-radius:10px;border:1px solid #dfe8e1;margin:6px 0 4px;background:#eef2ee}.pin-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}';document.head.appendChild(st);})();
+
+/* ===== 27 Nov 2026: ONE PATTERN FOR EVERY INVOICE REFERENCE (the "title" at the top of the invoice in Xero):
+   PO / your ref  ·  Site  ·  Our ref (job / hire / contract)  ·  Date or period ===== */
+function invRef(o){const po=String(o.po||'').trim(),yr=String(o.yourRef||'').trim();const first=po?(/^po\b/i.test(po)?po:'PO '+po):(yr?'Ref '+yr:'');
+ return [first,String(o.site||'').trim(),String(o.ours||'').trim(),String(o.when||'').trim()].filter(Boolean).join(' · ').slice(0,255);}
+const invShortDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+const invShortPeriod=(a,b)=>{const A=new Date(a+'T12:00:00'),B=new Date(b+'T12:00:00');return A.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'–'+B.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});};
+const invSiteName=(siteName,addr,pc)=>siteName||String(addr||'').split(',')[0]||pc||'';
+(function(){const o=window.xeroCall;window.xeroCall=xeroCall=async function(body){try{
+ if(body&&body.action==='create_invoice'&&!body.reference&&body.job_id){const {data:j}=await db.from('jobs').select('job_number,job_date,customer_po,reference,site_address,postcode,customer_sites(site_name)').eq('id',body.job_id).maybeSingle();
+  if(j)body.reference=invRef({po:j.customer_po,yourRef:j.reference,site:invSiteName(j.customer_sites?.site_name,j.site_address,j.postcode),ours:j.job_number,when:invShortDate(body.invoice_date||j.job_date)});}
+ if(body&&body.action==='create_contract_invoice'&&!body.reference&&body.contract_id){const {data:c}=await db.from('contracts').select('title,reference,customer_po,customer_sites(site_name,site_address,postcode)').eq('id',body.contract_id).maybeSingle();
+  if(c)body.reference=invRef({po:c.customer_po,yourRef:c.reference,site:invSiteName(c.customer_sites?.site_name,c.customer_sites?.site_address,c.customer_sites?.postcode)||c.title,ours:c.customer_po?c.reference:'',when:body.period_start&&body.period_end?invShortPeriod(body.period_start,body.period_end):''});}
+ }catch(e){console.warn(e);}return o.apply(this,arguments);};})();
 /* 24 Nov 2026: charge lines take several lines of text (Enter for a new line) – each line goes onto the Xero invoice */
 (function(){const st=document.createElement('style');st.textContent='textarea.jc-desc{width:100%;min-height:42px;resize:vertical;line-height:1.35;font:inherit;padding:9px 12px;overflow:hidden}';document.head.appendChild(st);
  new MutationObserver(()=>{document.querySelectorAll('textarea.jc-desc:not([data-sz])').forEach(t=>{t.dataset.sz=1;t.style.height='auto';t.style.height=t.scrollHeight+'px';});}).observe(document.documentElement,{childList:true,subtree:true});})();

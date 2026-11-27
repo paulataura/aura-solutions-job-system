@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
           Type: "ACCREC", Contact: { ContactID: contactId }, Date: today.toISOString().slice(0, 10), DueDate: dueDate(cust?.payment_terms ?? null, today),
-          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: [job.customer_po || job.reference, job.job_number ? "Job " + job.job_number : ""].filter(Boolean).join(" · ").slice(0, 255) || undefined,
+          LineAmountTypes: "Exclusive", Status: "DRAFT", Reference: (String(body.reference || "").trim() || [job.customer_po || job.reference, job.job_number ? "Job " + job.job_number : ""].filter(Boolean).join(" · ")).slice(0, 255) || undefined,
           BrandingThemeID: s.branding_theme_id || undefined,
           LineItems: lines.map(lineItem(s.sales_account_code, s.sales_tax_type)),
         }] }),
@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
       const contactId = await ensureContact("customers", c.customer_id);
       const { data: cust } = await admin.from("customers").select("payment_terms").eq("id", c.customer_id).maybeSingle();
       const today = idt <= new Date().toISOString().slice(0, 10) ? new Date(idt + "T12:00:00Z") : new Date();
-      const ref = (c.customer_po || c.reference || c.title || "").slice(0, 255) || undefined;
+      const ref = (String(body.reference || "").trim() || c.customer_po || c.reference || c.title || "").slice(0, 255) || undefined;
       const inv = await xero("Invoices", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ Invoices: [{
