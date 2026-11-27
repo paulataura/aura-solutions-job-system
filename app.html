@@ -8095,7 +8095,7 @@ const invShortPeriod=(a,b)=>{const A=new Date(a+'T12:00:00'),B=new Date(b+'T12:0
 const invSiteName=(siteName,addr,pc)=>siteName||String(addr||'').split(',')[0]||pc||'';
 (function(){const o=window.xeroCall;window.xeroCall=xeroCall=async function(body){try{
  if(body&&body.action==='create_invoice'&&!body.reference&&body.job_id){const {data:j}=await db.from('jobs').select('job_number,job_date,customer_po,reference,site_address,postcode,customer_sites(site_name)').eq('id',body.job_id).maybeSingle();
-  if(j)body.reference=invRef({po:j.customer_po,yourRef:j.reference,site:invSiteName(j.customer_sites?.site_name,j.site_address,j.postcode),ours:j.job_number,when:invShortDate(body.invoice_date||j.job_date)});}
+  if(j)body.reference=invRef({po:j.customer_po,site:invSiteName(j.customer_sites?.site_name,j.site_address,j.postcode),ours:j.job_number,when:invShortDate(body.invoice_date||j.job_date)});}
  if(body&&body.action==='create_contract_invoice'&&!body.reference&&body.contract_id){const {data:c}=await db.from('contracts').select('title,reference,customer_po,customer_sites(site_name,site_address,postcode)').eq('id',body.contract_id).maybeSingle();
   if(c)body.reference=invRef({po:c.customer_po,yourRef:c.reference,site:invSiteName(c.customer_sites?.site_name,c.customer_sites?.site_address,c.customer_sites?.postcode)||c.title,ours:c.customer_po?c.reference:'',when:body.period_start&&body.period_end?invShortPeriod(body.period_start,body.period_end):''});}
  }catch(e){console.warn(e);}return o.apply(this,arguments);};})();
