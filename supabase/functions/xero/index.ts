@@ -394,7 +394,7 @@ Deno.serve(async (req) => {
       const { data: po } = await admin.from("purchase_orders").select("id,po_number,supplier_id,xero_po_id").eq("id", body.po_id).maybeSingle();
       if (!po) return json({ error: "PO not found." }, 404);
       const where = encodeURIComponent(`Type=="ACCPAY" AND Reference=="${q(po.po_number)}" AND Status!="DELETED" AND Status!="VOIDED"`);
-      const r = await xero(`Invoices?where=${where}&summaryOnly=true`);
+      const r = await xero(`Invoices?where=${where}`);
       const bills = (r?.Invoices || []);
       let poStatus = null;
       if (po.xero_po_id) { try { const p = await xero(`PurchaseOrders/${po.xero_po_id}`); poStatus = p?.PurchaseOrders?.[0]?.Status || null; } catch (_) { /* ignore */ } }
@@ -505,8 +505,9 @@ Deno.serve(async (req) => {
       if (!contactId) throw new Error("Couldn't find or create the contact in Xero.");
       // the same supplier invoice number already in Xero = a duplicate
       if (b.invoice_number) {
-        const d = await xero(`Invoices?where=${encodeURIComponent(`Type=="ACCPAY" AND InvoiceNumber=="${q(b.invoice_number)}" AND Contact.ContactID==guid("${contactId}") AND Status!="DELETED" AND Status!="VOIDED"`)}&summaryOnly=true`);
-        if (d?.Invoices?.length) return json({ error: `Xero already has invoice ${b.invoice_number} from this supplier (${d.Invoices[0].Status.toLowerCase()}). It looks like a duplicate.` }, 400);
+        const d = await xero(`Invoices?ContactIDs=${contactId}&InvoiceNumbers=${encodeURIComponent(String(b.invoice_number).replace(/,/g, " "))}&Statuses=DRAFT,SUBMITTED,AUTHORISED,PAID&summaryOnly=true`);
+        const dup = (d?.Invoices || []).filter((x: any) => x.Type === "ACCPAY" && String(x.InvoiceNumber || "").trim().toLowerCase() === String(b.invoice_number).trim().toLowerCase());
+        if (dup.length) return json({ error: `Xero already has invoice ${b.invoice_number} from this supplier (${dup[0].Status.toLowerCase()}). It looks like a duplicate.` }, 400);
       }
       const forWhat = (l: any) => l.jobs?.job_number ? "Job " + l.jobs.job_number : l.hires?.hire_number ? "Hire " + l.hires.hire_number : l.contracts?.title ? "Contract: " + l.contracts.title : "Overhead";
       const refs = [...new Set(lines.map(forWhat))];
