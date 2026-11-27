@@ -478,6 +478,66 @@ Deno.serve(async (req) => {
       return json({ ok: true, invoice: { id: x.InvoiceID, number: x.InvoiceNumber, status: x.Status, subtotal: x.SubTotal, total: x.Total } });
     }
 
+    if (action === "create_bill") {
+      // a supplier bill or receipt checked and allocated in the app -> an approved bill in Xero, with the PDF / photo and a note
+      const { data: b } = await admin.from("bills").select("*").eq("id", body.bill_id).maybeSingle();
+      if (!b) return json({ error: "Bill not found." }, 404);
+      if (b.xero_bill_id) return json({ error: "This one is already in Xero." }, 400);
+      const { data: lines0 } = await admin.from("bill_lines").select("*,jobs(job_number),hires(hire_number),contracts(title)").eq("bill_id", b.id).order("sort");
+      const lines = (lines0 || []).filter((l: any) => l.description && Number(l.unit_price) !== 0);
+      if (!lines.length) return json({ error: "Add at least one line with an amount." }, 400);
+      if (lines.some((l: any) => !l.category_id)) return json({ error: "Pick a category (what it is in the accounts) on every line." }, 400);
+      const { data: cats } = await admin.from("finance_categories").select("id,account_code,tax_type,xero_tracking_option,kind");
+      const cat: Record<string, any> = {}; (cats || []).forEach((c: any) => cat[c.id] = c);
+      const { data: conn } = await admin.from("xero_connection").select("settings").eq("id", 1).maybeSingle();
+      const s = conn?.settings || {};
+      // who the bill is from: the supplier, or the person who paid for it themselves
+      let contactId: string;
+      if (b.paid_by === "staff" || b.paid_by === "director") {
+        const nm = String(b.paid_by_name || "").trim(); if (!nm) return json({ error: "Say who paid for it." }, 400);
+        const f = await xero(`Contacts?where=${encodeURIComponent(`Name=="${q(nm)}"`)}`);
+        contactId = f?.Contacts?.[0]?.ContactID;
+        if (!contactId) { const c = await xero("Contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Contacts: [{ Name: nm }] }) }); contactId = c?.Contacts?.[0]?.ContactID; }
+      } else {
+        if (!b.supplier_id) return json({ error: "Pick the supplier first." }, 400);
+        contactId = await ensureContact("suppliers", b.supplier_id);
+      }
+      if (!contactId) throw new Error("Couldn't find or create the contact in Xero.");
+      // the same supplier invoice number already in Xero = a duplicate
+      if (b.invoice_number) {
+        const d = await xero(`Invoices?where=${encodeURIComponent(`Type=="ACCPAY" AND InvoiceNumber=="${q(b.invoice_number)}" AND Contact.ContactID==guid("${contactId}") AND Status!="DELETED" AND Status!="VOIDED"`)}&summaryOnly=true`);
+        if (d?.Invoices?.length) return json({ error: `Xero already has invoice ${b.invoice_number} from this supplier (${d.Invoices[0].Status.toLowerCase()}). It looks like a duplicate.` }, 400);
+      }
+      const forWhat = (l: any) => l.jobs?.job_number ? "Job " + l.jobs.job_number : l.hires?.hire_number ? "Hire " + l.hires.hire_number : l.contracts?.title ? "Contract: " + l.contracts.title : "Overhead";
+      const refs = [...new Set(lines.map(forWhat))];
+      const tcName = s.tracking_category_name || "Resource";
+      const items = lines.map((l: any) => {
+        const c = cat[l.category_id] || {}, r = l.resource_id ? cat[l.resource_id] : null;
+        return { Description: (String(l.description) + " · " + forWhat(l)).slice(0, 4000), Quantity: Number(l.qty) || 1, UnitAmount: Number(l.unit_price), AccountCode: c.account_code || s.cost_account_code || "325", TaxType: l.tax_type || c.tax_type || s.purchase_tax_type || "INPUT2", Tracking: r?.xero_tracking_option ? [{ Name: tcName, Option: r.xero_tracking_option }] : [] };
+      });
+      const d0 = b.invoice_date || new Date().toISOString().slice(0, 10);
+      const due = b.due_date || (b.paid_by === "account" ? dueDate("30 days EOM", new Date(d0 + "T12:00:00Z")) : d0);
+      const inv = await xero("Invoices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ Invoices: [{
+        Type: "ACCPAY", Contact: { ContactID: contactId }, Date: d0, DueDate: due, InvoiceNumber: b.invoice_number || undefined,
+        Reference: refs.join(" · ").slice(0, 255), LineAmountTypes: b.amounts_inc_vat ? "Inclusive" : "Exclusive", Status: "AUTHORISED", LineItems: items }] }) });
+      const x = inv?.Invoices?.[0];
+      if (!x?.InvoiceID) throw new Error("Xero didn't return the bill.");
+      const warn: string[] = [];
+      if (b.file_path) {
+        try {
+          const f = await admin.storage.from("bills").download(b.file_path);
+          if (f.data) { const bytes = new Uint8Array(await f.data.arrayBuffer()); const nm = String(b.file_name || "bill.pdf").replace(/[^A-Za-z0-9 ._-]+/g, "-");
+            await xero(`Invoices/${x.InvoiceID}/Attachments/${encodeURIComponent(nm)}`, { method: "PUT", headers: { "Content-Type": b.file_type || "application/pdf" }, body: bytes }); }
+        } catch (e) { warn.push("the file didn't attach: " + (e as Error).message); }
+      }
+      const how = b.paid_by === "company_card" ? "Paid on the company card – match it to the card payment in the bank feed (don't pay it again)." : b.paid_by === "staff" ? `Expense claim – repay ${b.paid_by_name}.` : b.paid_by === "director" ? `Paid personally by ${b.paid_by_name} (director) – post the payment to the Director's Loan Account.` : "Pay to the supplier as normal.";
+      const note = ["Checked and approved in the Aura app by " + user.full_name + ".", "For: " + refs.join(", ") + ".", how, b.notes ? "Note: " + b.notes : ""].filter(Boolean).join(" ").slice(0, 2400);
+      try { await xero(`Invoices/${x.InvoiceID}/History`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ HistoryRecords: [{ Details: note }] }) }); } catch (e) { warn.push("the note didn't save"); }
+      await admin.from("bills").update({ status: "in_xero", xero_bill_id: x.InvoiceID, xero_number: x.InvoiceNumber || null, xero_status: x.Status, sent_to_xero_at: new Date().toISOString(), approved_by_name: user.full_name, net_total: x.SubTotal, vat_total: x.TotalTax, gross_total: x.Total, updated_at: new Date().toISOString() }).eq("id", b.id);
+      if (b.po_id) await admin.from("purchase_orders").update({ supplier_invoice_amount: x.SubTotal, supplier_invoice_number: b.invoice_number || null, supplier_invoice_date: d0, status: "invoiced" }).eq("id", b.po_id);
+      return json({ ok: true, xero_bill_id: x.InvoiceID, status: x.Status, total: x.Total, warnings: warn });
+    }
+
     if (action === "sync_adhoc_invoice") {
       const { data: si } = await admin.from("sales_invoices").select("id,xero_invoice_id").eq("id", body.sales_invoice_id).maybeSingle();
       if (!si?.xero_invoice_id) return json({ error: "Not in Xero yet." }, 400);
