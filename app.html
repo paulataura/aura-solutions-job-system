@@ -7934,6 +7934,15 @@ async function hrEditDraft(invId){const inv=HIRE.invoices.find(i=>i.id===invId);
  try{await hireInvBuild(h.id);}finally{HIRE.invoices=keepInv;keepCh.forEach(([c,v])=>c.invoice_id=v);}
  if(HINV){HINV.editInvoiceId=invId;HINV.editNumber=inv.invoice_number;hireInvRender();}setTimeout(()=>el('hrInvBox')?.scrollIntoView({behavior:'smooth',block:'start'}),150);}
 (function(){const o=window.hireInvRender;window.hireInvRender=hireInvRender=function(){const r=o.apply(this,arguments);try{if(HINV&&HINV.editInvoiceId){const g=el('hrInvGo');if(g)g.textContent='Update draft '+(HINV.editNumber||'')+' in Xero';const card=el('hrInvBox')?.querySelector('.card');if(card&&!card.querySelector('.hr-edit-note'))card.insertAdjacentHTML('afterbegin','<div class="hr-edit-note">✎ Editing draft <b>'+esc(HINV.editNumber||'')+'</b> – change anything below, then “Update draft”. It keeps the same invoice number; nothing is sent until you press ✉ Approve &amp; send. <button class="linkbtn" type="button" onclick="HINV=null;el(\'hrInvBox\').innerHTML=\'\'">Cancel</button></div>');}}catch(_){}return r;};})();
+
+/* ===== 27 Nov 2026: NEEDS ATTENTION in two lines – Jobs, and Finance (invoicing now; payments to make later) ===== */
+const ATTN_FIN=new Set(['invoice','hireinv','ctinv','payments']);
+(function(){const o=window.renderAttention;window.renderAttention=renderAttention=function(){const r=o.apply(this,arguments);try{const at=el('auraAttn');if(!at||!isMgmt())return r;const all=attentionItems().filter(x=>x.n);
+ const chip=x=>'<button type="button" class="'+(x.red?'red':'')+'" onclick="attentionGo(\''+x.k+'\')">'+esc(x.label)+'<b>'+x.n+'</b></button>';
+ const jobs=all.filter(x=>!ATTN_FIN.has(x.k)),fin=all.filter(x=>ATTN_FIN.has(x.k));
+ at.innerHTML='<div class="aa-row"><span class="aa-t">Jobs</span>'+(jobs.length?jobs.map(chip).join(''):'<span class="aa-ok">✓ Nothing urgent</span>')+'</div>'
+  +(isFinanceAdmin()?'<div class="aa-row"><span class="aa-t">Finance</span>'+(fin.length?fin.map(chip).join(''):'<span class="aa-ok">✓ All invoiced</span>')+'</div>':'');}catch(e){console.warn(e);}return r;};})();
+(function(){const st=document.createElement('style');st.textContent='#auraAttn{flex-direction:column;align-items:stretch!important;gap:5px!important}#auraAttn .aa-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}#auraAttn .aa-row .aa-t{min-width:58px}#auraAttn .aa-row+.aa-row{border-top:1px dashed #dfe8e1;padding-top:5px}';document.head.appendChild(st);})();
 /* 24 Nov 2026: charge lines take several lines of text (Enter for a new line) – each line goes onto the Xero invoice */
 (function(){const st=document.createElement('style');st.textContent='textarea.jc-desc{width:100%;min-height:42px;resize:vertical;line-height:1.35;font:inherit;padding:9px 12px;overflow:hidden}';document.head.appendChild(st);
  new MutationObserver(()=>{document.querySelectorAll('textarea.jc-desc:not([data-sz])').forEach(t=>{t.dataset.sz=1;t.style.height='auto';t.style.height=t.scrollHeight+'px';});}).observe(document.documentElement,{childList:true,subtree:true});})();
