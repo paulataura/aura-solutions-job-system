@@ -7943,6 +7943,17 @@ const ATTN_FIN=new Set(['invoice','hireinv','ctinv','payments']);
  at.innerHTML='<div class="aa-row"><span class="aa-t">Jobs</span>'+(jobs.length?jobs.map(chip).join(''):'<span class="aa-ok">✓ Nothing urgent</span>')+'</div>'
   +(isFinanceAdmin()?'<div class="aa-row"><span class="aa-t">Finance</span>'+(fin.length?fin.map(chip).join(''):'<span class="aa-ok">✓ All invoiced</span>')+'</div>':'');}catch(e){console.warn(e);}return r;};})();
 (function(){const st=document.createElement('style');st.textContent='#auraAttn{flex-direction:column;align-items:stretch!important;gap:5px!important}#auraAttn .aa-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}#auraAttn .aa-row .aa-t{min-width:58px}#auraAttn .aa-row+.aa-row{border-top:1px dashed #dfe8e1;padding-top:5px}';document.head.appendChild(st);})();
+
+/* ===== 27 Nov 2026: DUPLICATE / FOLLOW-UP – the copy is a new job, so any date can be picked (the original's "started on" limit doesn't apply);
+   the form is brought into view, and if anything goes wrong it says so instead of doing nothing ===== */
+(function(){const o=window.duplicateActiveJob;window.duplicateActiveJob=duplicateActiveJob=async function(){
+ if(!activeJob){alert('Open the job you want to copy first.');return;}
+ document.querySelectorAll('.ct-overlay').forEach(x=>{if(!['emOverlay','ivOverlay'].includes(x.id))x.remove();});
+ try{await o.apply(this,arguments);}catch(e){console.error(e);alert('Couldn\'t copy the job: '+(e.message||e));return;}
+ const err=el('jobMsg')?.querySelector('.err');if(err){el('createJob')?.scrollIntoView({block:'start'});return;}
+ const inp=el('job_date');if(inp){inp.removeAttribute('max');inp.removeAttribute('min');}el('jobDateStartedNote')?.remove();
+ el('jobFormSubmitBtn').disabled=false;
+ setTimeout(()=>{el('createJob')?.scrollIntoView({block:'start'});window.scrollBy(0,-70);},50);};})();
 /* 24 Nov 2026: charge lines take several lines of text (Enter for a new line) – each line goes onto the Xero invoice */
 (function(){const st=document.createElement('style');st.textContent='textarea.jc-desc{width:100%;min-height:42px;resize:vertical;line-height:1.35;font:inherit;padding:9px 12px;overflow:hidden}';document.head.appendChild(st);
  new MutationObserver(()=>{document.querySelectorAll('textarea.jc-desc:not([data-sz])').forEach(t=>{t.dataset.sz=1;t.style.height='auto';t.style.height=t.scrollHeight+'px';});}).observe(document.documentElement,{childList:true,subtree:true});})();
